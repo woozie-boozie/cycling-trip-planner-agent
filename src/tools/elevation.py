@@ -1,9 +1,12 @@
 """get_elevation_profile — terrain difficulty for a single segment.
 
-The Amsterdam → Copenhagen corridor is famously *flat* — the entire Dutch and
-Danish portions sit near sea level, and the German segments cross gentle
-moraine. Mock data reflects this so the agent gives an honest "this is an
-easy corridor" rather than fabricating mountains.
+Segments live in the `elevation_segments` table in Postgres (seeded from
+`_SEGMENTS` below via `src/db/seed.py`). Both directions are seeded with
+gain/loss mirrored, so reverse lookups don't need runtime computation.
+
+Mock data reflects honest terrain (the Amsterdam → Copenhagen corridor is
+flat; London → Brighton crosses the South Downs) so the agent gives credible
+recommendations rather than fabricating mountains.
 
 Real elevation data lives in DEMs (digital elevation models like SRTM); the
 abstraction here is the same shape a real provider would use.
@@ -11,6 +14,10 @@ abstraction here is the same shape a real provider would use.
 
 from __future__ import annotations
 
+from sqlmodel import select
+
+from src.db import get_async_session
+from src.db.models import ElevationSegment as ElevRow
 from src.tools.base import register_tool
 from src.tools.schemas import (
     Difficulty,
@@ -71,9 +78,19 @@ def _normalize(s: str) -> str:
     input_model=GetElevationProfileInput,
     output_model=GetElevationProfileOutput,
 )
-def get_elevation_profile(input: GetElevationProfileInput) -> GetElevationProfileOutput:
-    key = (_normalize(input.start), _normalize(input.end))
-    row = _LOOKUP.get(key)
+async def get_elevation_profile(input: GetElevationProfileInput) -> GetElevationProfileOutput:
+    start_lower = _normalize(input.start)
+    end_lower = _normalize(input.end)
+
+    async with get_async_session() as session:
+        result = await session.execute(
+            select(ElevRow).where(
+                ElevRow.start_lower == start_lower,
+                ElevRow.end_lower == end_lower,
+            )
+        )
+        row = result.scalar_one_or_none()
+
     if row is None:
         # Fall back to a flat-ish default with a note rather than 500-error
         # the agent. Keeps the loop moving on unknown segments.
@@ -91,14 +108,13 @@ def get_elevation_profile(input: GetElevationProfileInput) -> GetElevationProfil
             ),
         )
 
-    _, _, dist, gain, loss, grade, diff, note = row
     return GetElevationProfileOutput(
         start=input.start,
         end=input.end,
-        distance_km=dist,
-        elevation_gain_m=gain,
-        elevation_loss_m=loss,
-        max_grade_percent=grade,
-        difficulty=diff,
-        notes=note,
+        distance_km=row.distance_km,
+        elevation_gain_m=row.elevation_gain_m,
+        elevation_loss_m=row.elevation_loss_m,
+        max_grade_percent=row.max_grade_percent,
+        difficulty=row.difficulty,  # type: ignore[arg-type]
+        notes=row.notes,
     )

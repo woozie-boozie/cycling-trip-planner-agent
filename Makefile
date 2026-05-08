@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format clean docker-build docker-run
+.PHONY: install dev test lint format clean docker-build docker-run seed
 
 PYTHON ?= python3.13
 VENV   ?= .venv
@@ -11,6 +11,9 @@ $(VENV)/bin/activate:
 
 install: $(VENV)/bin/activate
 	$(PIP) install -e ".[dev]"
+
+seed:
+	$(VENV)/bin/python -m src.db.seed
 
 dev:
 	$(VENV)/bin/uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000

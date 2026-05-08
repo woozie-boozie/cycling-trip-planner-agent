@@ -14,14 +14,18 @@ Design goals (see docs/decisions.md ADR-002):
 
 from __future__ import annotations
 
-from collections.abc import Callable
+import inspect
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from pydantic import BaseModel, ValidationError
 
 InputT = TypeVar("InputT", bound=BaseModel)
 OutputT = TypeVar("OutputT", bound=BaseModel)
+
+# A tool handler can be sync or async. Dispatch awaits if needed.
+HandlerReturn = Union[BaseModel, Awaitable[BaseModel]]
 
 
 @dataclass(frozen=True)
@@ -103,8 +107,11 @@ def register_tool(
     return decorator
 
 
-def dispatch(name: str, arguments: dict[str, Any]) -> ToolResult:
+async def dispatch(name: str, arguments: dict[str, Any]) -> ToolResult:
     """Validate arguments and invoke the named tool.
+
+    Async — handlers may be sync or async. We await async handlers; sync
+    handlers run inline.
 
     Returns a `ToolResult` with `is_error=True` rather than raising, so the
     agent loop can pass the error back to Claude as a `tool_result` block.
@@ -133,6 +140,8 @@ def dispatch(name: str, arguments: dict[str, Any]) -> ToolResult:
 
     try:
         result = tool.handler(validated)
+        if inspect.isawaitable(result):
+            result = await result
     except Exception as e:  # noqa: BLE001 — we deliberately don't trust tool authors
         return ToolResult(
             content={"error": "tool_exception", "tool": name, "message": str(e)},

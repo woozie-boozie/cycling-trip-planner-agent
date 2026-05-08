@@ -1,15 +1,17 @@
 """find_accommodation — places to stay near a location.
 
-Mock data is per-city and includes a mix of camping, hostel, hotel, and
-guesthouse options with realistic prices and bike-friendliness flags.
-
-The agent uses this to honor preferences like "camping but a hostel every
-4th night" — by filtering `types` per segment as it builds the day-by-day
-plan.
+Catalog lives in the `accommodations` table in Postgres (seeded from
+`_CATALOG` below via `src/db/seed.py`). The agent uses this to honor
+preferences like "camping but a hostel every 4th night" — by filtering
+`types` per segment as it builds the day-by-day plan.
 """
 
 from __future__ import annotations
 
+from sqlmodel import select
+
+from src.db import get_async_session
+from src.db.models import Accommodation as AccommodationRow
 from src.tools.base import register_tool
 from src.tools.schemas import (
     Accommodation,
@@ -498,6 +500,18 @@ def _generic_results(location: str) -> list[Accommodation]:
     ]
 
 
+def _row_to_schema(row: AccommodationRow) -> Accommodation:
+    return Accommodation(
+        name=row.name,
+        type=row.type,  # type: ignore[arg-type]
+        location=row.location,
+        distance_from_location_km=row.distance_from_location_km,
+        estimated_price_eur_per_night=row.estimated_price_eur_per_night,
+        bike_friendly=row.bike_friendly,
+        notes=row.notes,
+    )
+
+
 @register_tool(
     name="find_accommodation",
     description=(
@@ -509,8 +523,18 @@ def _generic_results(location: str) -> list[Accommodation]:
     input_model=FindAccommodationInput,
     output_model=FindAccommodationOutput,
 )
-def find_accommodation(input: FindAccommodationInput) -> FindAccommodationOutput:
-    catalog = _CATALOG.get(_normalize(input.location)) or _generic_results(input.location)
+async def find_accommodation(input: FindAccommodationInput) -> FindAccommodationOutput:
+    location_lower = _normalize(input.location)
+
+    async with get_async_session() as session:
+        result = await session.execute(
+            select(AccommodationRow).where(AccommodationRow.location_lower == location_lower)
+        )
+        rows = result.scalars().all()
+
+    catalog: list[Accommodation] = (
+        [_row_to_schema(r) for r in rows] if rows else _generic_results(input.location)
+    )
 
     filtered: list[Accommodation]
     if input.types:

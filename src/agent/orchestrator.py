@@ -149,7 +149,7 @@ async def run_turn(
             if block.type != "tool_use":
                 continue
             t0 = time.perf_counter()
-            result = dispatch(block.name, dict(block.input))
+            result = await dispatch(block.name, dict(block.input))
             latency_ms = int((time.perf_counter() - t0) * 1000)
 
             tool_result_blocks.append(

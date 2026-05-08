@@ -1,12 +1,19 @@
 """get_weather — typical weather for a location and month.
 
-Mock data is grounded in real climate norms — June in Hamburg averages 17°C,
-not 28°C — so the agent's recommendations stay credible. Real OpenWeather
-integration arrives in Phase 1.10 via the USE_REAL_WEATHER env flag.
+Climate norms live in the `weather_norms` table in Postgres (seeded from
+`_CLIMATE` below via `src/db/seed.py`). Norms are real (June in Hamburg
+averages 17°C, not 28°C) so the agent's recommendations stay credible.
+
+Real OpenWeather integration arrives in Phase 1.10 via the USE_REAL_WEATHER
+env flag — same Pydantic schema, swap the data source.
 """
 
 from __future__ import annotations
 
+from sqlmodel import select
+
+from src.db import get_async_session
+from src.db.models import WeatherNorm as WeatherRow
 from src.tools.base import register_tool
 from src.tools.schemas import GetWeatherInput, GetWeatherOutput, Month
 
@@ -148,9 +155,19 @@ def _normalize(s: str) -> str:
     input_model=GetWeatherInput,
     output_model=GetWeatherOutput,
 )
-def get_weather(input: GetWeatherInput) -> GetWeatherOutput:
-    city_data = _CLIMATE.get(_normalize(input.location))
-    if city_data is None or input.month not in city_data:
+async def get_weather(input: GetWeatherInput) -> GetWeatherOutput:
+    location_lower = _normalize(input.location)
+
+    async with get_async_session() as session:
+        result = await session.execute(
+            select(WeatherRow).where(
+                WeatherRow.location_lower == location_lower,
+                WeatherRow.month == input.month,
+            )
+        )
+        row = result.scalar_one_or_none()
+
+    if row is None:
         # Fall back to a temperate-Europe approximation rather than failing —
         # keeps the agent moving and we flag the uncertainty in `notes`.
         return GetWeatherOutput(
@@ -167,14 +184,13 @@ def get_weather(input: GetWeatherInput) -> GetWeatherOutput:
             ),
         )
 
-    avg, high, low, rain_days, rain_mm, note = city_data[input.month]
     return GetWeatherOutput(
         location=input.location,
-        month=input.month,
-        avg_temp_celsius=avg,
-        avg_high_celsius=high,
-        avg_low_celsius=low,
-        rain_days_per_month=rain_days,
-        avg_rain_mm=rain_mm,
-        notes=note,
+        month=input.month,  # validated by Pydantic against Month enum
+        avg_temp_celsius=row.avg_temp_celsius,
+        avg_high_celsius=row.avg_high_celsius,
+        avg_low_celsius=row.avg_low_celsius,
+        rain_days_per_month=row.rain_days_per_month,
+        avg_rain_mm=row.avg_rain_mm,
+        notes=row.notes,
     )

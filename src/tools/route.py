@@ -1,6 +1,9 @@
 """get_route — cycling route between two points.
 
-Mock data is intentionally plausible. Three real corridors are catalogued:
+Catalogued corridors live in the `routes` + `waypoints` tables in Postgres
+(seeded from `_KNOWN_ROUTES` below via `src/db/seed.py`).
+
+Three real corridors are seeded:
 
   - Amsterdam → Copenhagen (EuroVelo 7 / 12 via Rødby–Puttgarden ferry, ~850km)
   - London → Paris (Avenue Verte via Newhaven–Dieppe ferry, ~380km)
@@ -9,12 +12,20 @@ Mock data is intentionally plausible. Three real corridors are catalogued:
 A real route engine would call something like Komoot, BRouter, or OSRM with
 a cycling profile. The contract here is the same shape — the abstraction
 holds when we wire a real provider in Phase 1.10.
+
+The `_KNOWN_ROUTES` dict below remains as the canonical source for `seed.py`
+to populate Postgres. After seeding, the tool reads from the DB.
 """
 
 from __future__ import annotations
 
 import math
 
+from sqlmodel import select
+
+from src.db import get_async_session
+from src.db.models import Route as RouteRow
+from src.db.models import Waypoint as WaypointRow
 from src.tools.base import register_tool
 from src.tools.schemas import GetRouteInput, GetRouteOutput, Waypoint
 
@@ -80,42 +91,55 @@ def _normalize(city: str) -> str:
     input_model=GetRouteInput,
     output_model=GetRouteOutput,
 )
-def get_route(input: GetRouteInput) -> GetRouteOutput:
-    key = (_normalize(input.start), _normalize(input.end))
-    raw = _KNOWN_ROUTES.get(key)
+async def get_route(input: GetRouteInput) -> GetRouteOutput:
+    start_lower = _normalize(input.start)
+    end_lower = _normalize(input.end)
 
-    if raw is None:
-        # Unknown corridor — return a minimal stub so the agent can still operate
-        # gracefully ("I don't have detailed waypoints for that corridor; can you
-        # break it into shorter legs?").
-        # We mock a single-leg route at a plausible 600km so the rest of the
-        # agent loop has something to work with.
-        return GetRouteOutput(
-            start=input.start,
-            end=input.end,
-            total_distance_km=600.0,
-            estimated_days=max(1, math.ceil(600.0 / input.daily_km_target)),
-            waypoints=[
-                Waypoint(name=input.start, country="Unknown", distance_from_start_km=0.0),
-                Waypoint(name=input.end, country="Unknown", distance_from_start_km=600.0),
-            ],
-            notes=(
-                "Detailed waypoints are not available for this corridor — only the "
-                "start and end are returned. Suggest the user break the trip into "
-                "shorter, well-known legs."
-            ),
+    async with get_async_session() as session:
+        result = await session.execute(
+            select(RouteRow).where(
+                RouteRow.start_lower == start_lower,
+                RouteRow.end_lower == end_lower,
+            )
         )
+        route_row = result.scalar_one_or_none()
+        if route_row is None:
+            # Unknown corridor — return a minimal stub so the agent can still
+            # operate gracefully ("I don't have detailed waypoints for that
+            # corridor; can you break it into shorter legs?").
+            return GetRouteOutput(
+                start=input.start,
+                end=input.end,
+                total_distance_km=600.0,
+                estimated_days=max(1, math.ceil(600.0 / input.daily_km_target)),
+                waypoints=[
+                    Waypoint(name=input.start, country="Unknown", distance_from_start_km=0.0),
+                    Waypoint(name=input.end, country="Unknown", distance_from_start_km=600.0),
+                ],
+                notes=(
+                    "Detailed waypoints are not available for this corridor — only the "
+                    "start and end are returned. Suggest the user break the trip into "
+                    "shorter, well-known legs."
+                ),
+            )
+
+        waypoint_result = await session.execute(
+            select(WaypointRow)
+            .where(WaypointRow.route_id == route_row.id)
+            .order_by(WaypointRow.sequence)
+        )
+        waypoint_rows = waypoint_result.scalars().all()
 
     waypoints = [
         Waypoint(
-            name=name,
-            country=country,
-            distance_from_start_km=km,
-            is_ferry_required=ferry,
+            name=w.name,
+            country=w.country,
+            distance_from_start_km=w.distance_from_start_km,
+            is_ferry_required=w.is_ferry_required,
         )
-        for name, country, km, ferry in raw
+        for w in waypoint_rows
     ]
-    total = waypoints[-1].distance_from_start_km
+    total = waypoints[-1].distance_from_start_km if waypoints else route_row.total_distance_km
     estimated_days = max(1, math.ceil(total / input.daily_km_target))
 
     has_ferry = any(w.is_ferry_required for w in waypoints)

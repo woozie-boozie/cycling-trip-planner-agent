@@ -112,7 +112,7 @@ async def test_no_tool_calls_returns_final_text() -> None:
 
 
 @pytest.mark.asyncio
-async def test_single_tool_call_dispatched_and_followed_up() -> None:
+async def test_single_tool_call_dispatched_and_followed_up(seeded_db: None) -> None:
     """Claude asks for one tool, we dispatch it, Claude wraps up."""
     # Importing tools registers them so dispatch works
     import src.tools  # noqa: F401
@@ -160,7 +160,7 @@ async def test_single_tool_call_dispatched_and_followed_up() -> None:
 
 
 @pytest.mark.asyncio
-async def test_parallel_tool_calls_in_one_turn_all_dispatched() -> None:
+async def test_parallel_tool_calls_in_one_turn_all_dispatched(seeded_db: None) -> None:
     """When Claude emits multiple tool_use blocks in one response, all run."""
     import src.tools  # noqa: F401
 
@@ -233,7 +233,7 @@ async def test_tool_dispatch_error_marked_is_error_true() -> None:
 
 
 @pytest.mark.asyncio
-async def test_trace_records_every_event() -> None:
+async def test_trace_records_every_event(seeded_db: None) -> None:
     """The trace is the data behind /trace — must capture user → tool → result → stop."""
     import src.tools  # noqa: F401
 

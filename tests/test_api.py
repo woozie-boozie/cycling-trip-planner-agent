@@ -200,7 +200,7 @@ def test_chat_resumes_existing_session(client: TestClient) -> None:
     assert body["message"] == "Great, planning for 100km/day."
 
 
-def test_chat_with_real_tool_dispatch(client: TestClient) -> None:
+def test_chat_with_real_tool_dispatch(client: TestClient, seeded_db: None) -> None:
     """Mock Claude into asking for `get_route` — verify the agent dispatches
     our actual tool registry, not a mock."""
     set_fake_client(
@@ -306,7 +306,7 @@ def test_get_session_unknown_returns_404(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_trace_returns_events_in_order(client: TestClient) -> None:
+def test_trace_returns_events_in_order(client: TestClient, seeded_db: None) -> None:
     set_fake_client(
         [
             FakeResponse(
