@@ -41,6 +41,12 @@ include = ["src*"]
 asyncio_mode = "auto"
 pythonpath = ["."]
 testpaths = ["tests"]
+# Evals call the real Claude API and cost a few cents each — opt-in only.
+# Run with `make evals` or `pytest -m evals`.
+addopts = "-m 'not evals'"
+markers = [
+    "evals: real-API integration tests against Claude. Skipped by default (cost real $).",
+]
 
 [tool.ruff]
 line-length = 100

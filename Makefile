@@ -1,4 +1,4 @@
-.PHONY: install dev test lint format clean docker-build docker-run seed
+.PHONY: install dev test evals lint format clean docker-build docker-run seed
 
 PYTHON ?= python3.13
 VENV   ?= .venv
@@ -20,6 +20,9 @@ dev:
 
 test:
 	$(VENV)/bin/pytest -v
+
+evals:
+	$(VENV)/bin/pytest -v -s -m evals
 
 lint:
 	$(VENV)/bin/ruff check src tests
