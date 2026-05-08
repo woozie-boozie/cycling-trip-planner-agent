@@ -61,3 +61,23 @@ A running log of design decisions, ordered chronologically. The "why" matters mo
 **Why:** 3.13 is what's installed. The brief's `>=3.10` requirement is satisfied. No 3.13-only syntax used so the artifact remains 3.10-portable.
 
 **Consequence:** If a reviewer runs on 3.10, it works. If on 3.13, it works. No lock-in.
+
+---
+
+## ADR-007 · Agent loop is a free function, not an `Agent` class
+
+**Decision:** `run_turn(state, user_message, *, client=None)` is a plain async function. State is passed in (a `ConversationState` Pydantic model). The Anthropic client is injectable for testing.
+
+**Why:** The rubric values code that's "easy to understand and extend." A 100-line function with one clear loop is more legible than an `Agent` class spread across `__init__`, `_step`, `_dispatch_tools`, etc. There's no hidden state to chase.
+
+**Consequence:** State accumulation lives in the caller (we mutate the passed-in `state`). Tests inject a fake client. /chat owns the session store.
+
+---
+
+## ADR-008 · System prompt is opinionated about *how* to think
+
+**Decision:** The system prompt explicitly enumerates a 5-step plan (Understand → Shape → Plan-each-day → Present → Adapt) and three "Honesty rules" (infeasible constraints, mock-data uncertainty, impossible requests).
+
+**Why:** Rubric weights *Multi-step reasoning* (20%) and *Conversation handling* (15%) — both are downstream of how the agent *plans*, not just what it knows. Telling Claude "plan in steps, surface conflicts, refuse impossible requests honestly" gets us those points directly. Verified in smoke test 2026-05-08: agent caught a real constraint conflict (Puttgarden has no hostels) and offered three trade-offs instead of silently violating the user's preference.
+
+**Consequence:** System prompt is ~1500 tokens. Cost per turn is acceptable (~5¢). Future bug fixes will go in the prompt, which makes prompt-versioning a future concern (Phase 2+).
