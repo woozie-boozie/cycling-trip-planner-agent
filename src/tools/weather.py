@@ -68,6 +68,68 @@ _CLIMATE: dict[_City, dict[Month, _Stats]] = {
         "July": (17.5, 21.5, 13.0, 11, 65.0, None),
         "August": (17.5, 21.5, 13.0, 12, 65.0, None),
     },
+    # ---- Avenue Verte corridor (London → Paris) ---------------------------
+    "london": {
+        "April": (10.0, 14.0, 6.0, 11, 45.0, "Cool, changeable. Pack layers."),
+        "May": (13.5, 17.5, 9.0, 11, 50.0, None),
+        "June": (16.5, 20.5, 12.0, 10, 50.0, "Mild. Long daylight. Showers possible — pack waterproofs."),
+        "July": (18.5, 23.0, 14.0, 9, 45.0, "Warmest month. Driest of the year on average."),
+        "August": (18.0, 22.5, 13.5, 10, 50.0, None),
+        "September": (15.5, 20.0, 11.0, 11, 55.0, None),
+    },
+    "east grinstead": {
+        "May": (12.5, 16.5, 8.0, 11, 55.0, None),
+        "June": (15.5, 19.5, 11.0, 10, 55.0, "South Downs climbs feel cooler — bring a layer."),
+        "July": (17.5, 22.0, 13.0, 9, 50.0, None),
+    },
+    "lewes": {
+        "May": (12.5, 16.5, 7.5, 11, 55.0, None),
+        "June": (15.5, 19.5, 10.5, 10, 50.0, None),
+        "July": (17.5, 22.0, 12.5, 9, 45.0, None),
+    },
+    "newhaven": {
+        "May": (12.0, 16.0, 8.0, 10, 45.0, None),
+        "June": (15.0, 19.0, 11.0, 9, 45.0, "Coastal — wind exposure on the cliff approach to the ferry."),
+        "July": (17.0, 21.0, 13.0, 8, 40.0, None),
+    },
+    "dieppe": {
+        "May": (12.0, 16.0, 8.0, 10, 50.0, None),
+        "June": (15.0, 19.0, 11.0, 9, 50.0, "Channel coast — prevailing south-westerlies tend to push you towards Paris."),
+        "July": (17.0, 21.0, 13.0, 8, 45.0, None),
+    },
+    "forges-les-eaux": {
+        "May": (12.5, 17.0, 7.5, 11, 60.0, None),
+        "June": (16.0, 20.5, 11.0, 10, 60.0, "Rolling Picardy farmland — beautiful in June."),
+        "July": (18.0, 22.5, 13.0, 9, 55.0, None),
+    },
+    "beauvais": {
+        "May": (13.0, 17.5, 8.0, 10, 55.0, None),
+        "June": (16.5, 21.0, 11.5, 9, 55.0, None),
+        "July": (18.5, 23.0, 13.5, 9, 55.0, None),
+    },
+    "cergy-pontoise": {
+        "May": (13.5, 18.0, 8.5, 10, 55.0, None),
+        "June": (17.0, 22.0, 12.0, 9, 55.0, None),
+        "July": (19.0, 24.0, 14.0, 8, 55.0, None),
+    },
+    "paris": {
+        "April": (11.5, 16.0, 6.5, 11, 50.0, None),
+        "May": (15.0, 19.5, 9.5, 11, 60.0, None),
+        "June": (18.0, 22.5, 12.5, 9, 55.0, "Mild and pleasant. Watch for weekend crowds at the Champs-Élysées."),
+        "July": (20.5, 25.0, 15.0, 8, 50.0, "Warmest month. Heatwaves possible."),
+        "August": (20.0, 25.0, 14.5, 9, 50.0, None),
+        "September": (17.0, 21.5, 12.0, 10, 55.0, None),
+    },
+    "crystal palace": {
+        "June": (16.0, 20.0, 12.0, 10, 50.0, None),
+        "July": (18.0, 22.5, 13.5, 9, 45.0, None),
+    },
+    "brighton": {
+        "May": (12.0, 16.0, 8.0, 10, 45.0, None),
+        "June": (15.0, 19.0, 11.0, 9, 40.0, "Sea breeze keeps it cooler than inland."),
+        "July": (17.5, 21.5, 13.0, 8, 35.0, None),
+        "August": (17.5, 21.5, 13.0, 9, 45.0, None),
+    },
 }
 
 

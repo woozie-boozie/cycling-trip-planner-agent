@@ -26,8 +26,8 @@ import src.tools  # noqa: F401
 
 
 CANONICAL_PROMPT = (
-    "I want to cycle from Amsterdam to Copenhagen. I can do around 100km a day, "
-    "prefer camping but want a hostel every 4th night. Traveling in June."
+    "I want to cycle from London to Paris on the Avenue Verte. I can do around "
+    "100km a day, prefer camping but want a hostel every 3rd night. Traveling in June."
 )
 
 

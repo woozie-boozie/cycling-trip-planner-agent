@@ -1,8 +1,10 @@
 """get_route — cycling route between two points.
 
-Mock data is intentionally plausible: the Amsterdam → Copenhagen corridor follows
-EuroVelo 7 / EuroVelo 12-style routing through the Netherlands → northern
-Germany → Denmark, including the Rødby–Puttgarden ferry across the Fehmarn Belt.
+Mock data is intentionally plausible. Three real corridors are catalogued:
+
+  - Amsterdam → Copenhagen (EuroVelo 7 / 12 via Rødby–Puttgarden ferry, ~850km)
+  - London → Paris (Avenue Verte via Newhaven–Dieppe ferry, ~380km)
+  - London → Brighton (short south-coast classic, ~95km)
 
 A real route engine would call something like Komoot, BRouter, or OSRM with
 a cycling profile. The contract here is the same shape — the abstraction
@@ -30,10 +32,35 @@ _WAYPOINTS_AMS_TO_CPH: list[tuple[str, str, float, bool]] = [
     ("Copenhagen", "Denmark", 850.0, False),
 ]
 
+# Avenue Verte — the official signed cycle route from London to Paris.
+# Newhaven → Dieppe ferry crosses the English Channel (~4 hr crossing).
+_WAYPOINTS_LDN_TO_PAR: list[tuple[str, str, float, bool]] = [
+    ("London", "United Kingdom", 0.0, False),
+    ("East Grinstead", "United Kingdom", 60.0, False),
+    ("Lewes", "United Kingdom", 110.0, False),
+    ("Newhaven", "United Kingdom", 122.0, False),
+    ("Dieppe", "France", 122.0, True),  # ferry crossing — 0 cycling km added
+    ("Forges-les-Eaux", "France", 180.0, False),
+    ("Beauvais", "France", 240.0, False),
+    ("Cergy-Pontoise", "France", 320.0, False),
+    ("Paris", "France", 380.0, False),
+]
+
+# London → Brighton — the canonical southern UK day-ride.
+_WAYPOINTS_LDN_TO_BRI: list[tuple[str, str, float, bool]] = [
+    ("London", "United Kingdom", 0.0, False),
+    ("Crystal Palace", "United Kingdom", 12.0, False),
+    ("Brighton", "United Kingdom", 95.0, False),
+]
+
 
 _KNOWN_ROUTES: dict[tuple[str, str], list[tuple[str, str, float, bool]]] = {
     ("amsterdam", "copenhagen"): _WAYPOINTS_AMS_TO_CPH,
     ("copenhagen", "amsterdam"): list(reversed(_WAYPOINTS_AMS_TO_CPH)),
+    ("london", "paris"): _WAYPOINTS_LDN_TO_PAR,
+    ("paris", "london"): list(reversed(_WAYPOINTS_LDN_TO_PAR)),
+    ("london", "brighton"): _WAYPOINTS_LDN_TO_BRI,
+    ("brighton", "london"): list(reversed(_WAYPOINTS_LDN_TO_BRI)),
 }
 
 
@@ -92,13 +119,23 @@ def get_route(input: GetRouteInput) -> GetRouteOutput:
     estimated_days = max(1, math.ceil(total / input.daily_km_target))
 
     has_ferry = any(w.is_ferry_required for w in waypoints)
-    notes = (
-        "Includes the Rødby–Puttgarden ferry across the Fehmarn Belt — a fixed link "
-        "tunnel is under construction but the ferry remains the standard option as of "
-        "this dataset. Allow ~45 minutes for the crossing."
-        if has_ferry
-        else None
-    )
+    ferry_waypoint = next((w for w in waypoints if w.is_ferry_required), None)
+    if not has_ferry:
+        notes = None
+    elif ferry_waypoint and _normalize(ferry_waypoint.name) in {"rødby", "puttgarden"}:
+        notes = (
+            "Includes the Rødby–Puttgarden ferry across the Fehmarn Belt — a fixed link "
+            "tunnel is under construction but the ferry remains the standard option as of "
+            "this dataset. Allow ~45 minutes for the crossing."
+        )
+    elif ferry_waypoint and _normalize(ferry_waypoint.name) in {"dieppe", "newhaven"}:
+        notes = (
+            "Includes the Newhaven–Dieppe ferry across the English Channel (DFDS, "
+            "~4 hours). Bikes carried free of charge. Avenue Verte is the official "
+            "signed cycle route either side."
+        )
+    else:
+        notes = "Route includes a ferry crossing — check schedules in advance."
 
     return GetRouteOutput(
         start=input.start,

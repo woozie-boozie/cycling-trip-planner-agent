@@ -24,6 +24,7 @@ from src.tools.schemas import (
 _SegmentRow = tuple[str, str, float, int, int, float, Difficulty, str | None]
 
 _SEGMENTS: list[_SegmentRow] = [
+    # Amsterdam → Copenhagen corridor
     ("amsterdam", "hoorn", 45.0, 30, 25, 1.0, "easy", "Flat polders. Possible headwinds."),
     ("hoorn", "groningen", 185.0, 80, 70, 1.5, "easy", "Mostly flat, dyke-side cycling."),
     ("groningen", "bremen", 180.0, 120, 100, 2.0, "easy", "Crosses German lowlands — flat with gentle rolls."),
@@ -33,6 +34,18 @@ _SEGMENTS: list[_SegmentRow] = [
     ("puttgarden", "rødby", 20.0, 5, 5, 0.5, "easy", "Ferry crossing — minimal cycling distance."),
     ("rødby", "vordingborg", 60.0, 60, 55, 2.0, "easy", "Flat Lolland and Falster islands. Wind exposure."),
     ("vordingborg", "copenhagen", 80.0, 90, 80, 2.5, "easy", "Crosses Storstrøm bridge then gentle Zealand terrain."),
+    # Avenue Verte (London → Paris)
+    ("london", "east grinstead", 60.0, 280, 180, 4.0, "moderate", "South London hills, then Greenwich Park climb. Forest of Ashdown approach."),
+    ("east grinstead", "lewes", 50.0, 320, 380, 5.0, "moderate", "Crosses the South Downs ridge — proper climbs and a steep descent into Lewes."),
+    ("lewes", "newhaven", 12.0, 40, 80, 2.0, "easy", "Short, flat ride along the Ouse valley to the ferry port."),
+    ("newhaven", "dieppe", 0.0, 0, 0, 0.0, "easy", "Channel ferry crossing — no cycling. ~4 hour journey."),
+    ("dieppe", "forges-les-eaux", 58.0, 250, 150, 4.0, "moderate", "Climb out of Dieppe, then rolling Pays de Bray farmland."),
+    ("forges-les-eaux", "beauvais", 60.0, 180, 200, 3.0, "easy", "Gentle agricultural rolls through Picardy."),
+    ("beauvais", "cergy-pontoise", 80.0, 150, 130, 3.0, "easy", "Approach to the Paris basin — mostly flat."),
+    ("cergy-pontoise", "paris", 60.0, 100, 120, 2.0, "easy", "Riverside paths along the Seine into central Paris. Watch for traffic in the last 10km."),
+    # London → Brighton (south coast classic)
+    ("london", "crystal palace", 12.0, 80, 30, 5.0, "easy", "Urban climb out of central London to Crystal Palace ridge."),
+    ("crystal palace", "brighton", 83.0, 400, 420, 6.0, "hard", "South Downs the whole way — Ditchling Beacon's the steepest climb in the south of England (16% near top)."),
 ]
 
 _LOOKUP: dict[tuple[str, str], _SegmentRow] = {(s, e): row for row in _SEGMENTS for s, e in [(row[0], row[1])]}

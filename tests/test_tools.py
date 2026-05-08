@@ -100,6 +100,38 @@ def test_get_route_unknown_corridor_falls_back_gracefully() -> None:
     assert len(parsed.waypoints) == 2  # only start + end
 
 
+def test_get_route_london_to_paris_avenue_verte() -> None:
+    """London → Paris should follow the Avenue Verte with the Newhaven–Dieppe ferry."""
+    result = dispatch(
+        "get_route",
+        {"start": "London", "end": "Paris", "daily_km_target": 100},
+    )
+    assert result.is_error is False
+    parsed = GetRouteOutput.model_validate(result.content)
+    assert parsed.start == "London"
+    assert parsed.end == "Paris"
+    # Avenue Verte is roughly 380km of cycling (ferry distance excluded)
+    assert 350 < parsed.total_distance_km < 420
+    # Ferry must surface — Newhaven–Dieppe across the Channel
+    waypoint_names = [w.name.lower() for w in parsed.waypoints]
+    assert "newhaven" in waypoint_names
+    assert "dieppe" in waypoint_names
+    ferry_waypoints = [w for w in parsed.waypoints if w.is_ferry_required]
+    assert any(w.name == "Dieppe" for w in ferry_waypoints)
+    # Notes should mention the Newhaven–Dieppe crossing, NOT Rødby–Puttgarden
+    assert parsed.notes is not None
+    assert "Newhaven" in parsed.notes or "Dieppe" in parsed.notes
+
+
+def test_get_route_london_to_brighton_short_ride() -> None:
+    """London → Brighton is a famous one-day classic."""
+    result = dispatch("get_route", {"start": "London", "end": "Brighton", "daily_km_target": 100})
+    parsed = GetRouteOutput.model_validate(result.content)
+    assert 80 < parsed.total_distance_km < 110
+    assert parsed.estimated_days == 1
+    assert not any(w.is_ferry_required for w in parsed.waypoints)
+
+
 # ---------------------------------------------------------------------------
 # find_accommodation
 # ---------------------------------------------------------------------------
