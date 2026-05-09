@@ -4,6 +4,9 @@ Endpoints:
   GET  /healthz                  — liveness probe
   GET  /                         — root, same shape as healthz
   POST /chat                     — single conversational turn (the brief's required endpoint)
+  POST /profile                  — upsert a cyclist profile (Phase 2D)
+  GET  /profile/{profile_id}     — fetch a cyclist profile (Phase 2D)
+  DELETE /profile/{profile_id}   — drop a profile (Phase 2D)
   GET  /sessions                 — list active session ids
   GET  /sessions/{session_id}    — full conversation state for a session
   DELETE /sessions/{session_id}  — drop a session
@@ -26,8 +29,12 @@ from src.agent import (
     TraceEvent,
     run_turn,
 )
-from src.api.dependencies import get_anthropic_client, get_session_store
-from src.sessions import SessionStore
+from src.api.dependencies import (
+    get_anthropic_client,
+    get_profile_store,
+    get_session_store,
+)
+from src.sessions import ProfileStore, SessionStore, UserProfile, UserProfileCreate
 
 log = structlog.get_logger(__name__)
 
@@ -107,6 +114,14 @@ class ChatRequest(BaseModel):
             "When provided, the agent receives both the image and the text as content blocks."
         ),
     )
+    profile_id: str | None = Field(
+        default=None,
+        description=(
+            "Optional cyclist profile id (Phase 2D). When supplied and known, "
+            "the agent personalises its planning to this rider's experience, "
+            "priorities, and dietary needs. Created via POST /profile."
+        ),
+    )
 
 
 class ChatResponse(BaseModel):
@@ -131,6 +146,7 @@ class ChatResponse(BaseModel):
 async def chat(
     request: ChatRequest,
     store: SessionStore = Depends(get_session_store),
+    profile_store: ProfileStore = Depends(get_profile_store),
     client: AsyncAnthropic = Depends(get_anthropic_client),
 ) -> ChatResponse:
     """Run one conversational turn against the cycling trip planner agent.
@@ -157,12 +173,26 @@ async def chat(
         state = existing
         is_new = False
 
+    # Load the profile (if requested + known). Treat missing profile as a soft
+    # miss — log it but proceed without personalisation; mirrors the same
+    # contract as session expiry on /chat (frontend handles re-onboarding).
+    profile: UserProfile | None = None
+    if request.profile_id is not None:
+        profile = await profile_store.get(request.profile_id)
+        if profile is None:
+            log.info(
+                "chat.profile.unknown",
+                session_id=state.session_id,
+                profile_id=request.profile_id,
+            )
+
     log.info(
         "chat.turn.start",
         session_id=state.session_id,
         is_new=is_new,
         message_len=len(request.message),
         has_image=request.image is not None,
+        has_profile=profile is not None,
     )
 
     # Multimodal: build a content list with the image as the first block,
@@ -185,7 +215,9 @@ async def chat(
         user_message = request.message
 
     try:
-        response: AgentResponse = await run_turn(state, user_message, client=client)
+        response: AgentResponse = await run_turn(
+            state, user_message, client=client, profile=profile
+        )
     except AgentLoopExceeded as e:
         log.warning("chat.loop_exceeded", session_id=state.session_id, error=str(e))
         # Persist the partial state so /trace can still show what happened.
@@ -215,6 +247,51 @@ async def chat(
         output_tokens=response.output_tokens,
         tool_calls=response.tool_calls,
     )
+
+
+# ---------------------------------------------------------------------------
+# Profile — Phase 2D · onboarding wizard backend
+# ---------------------------------------------------------------------------
+
+
+@router.post("/profile", response_model=UserProfile, tags=["profile"])
+async def upsert_profile(
+    create: UserProfileCreate,
+    profile_store: ProfileStore = Depends(get_profile_store),
+) -> UserProfile:
+    """Create or update a cyclist profile.
+
+    Idempotent: send the same `profile_id` to update the existing profile,
+    omit it for a fresh one (server generates a UUID4). The returned object
+    includes the canonical `profile_id` the client should persist locally.
+
+    `max_daily_km_comfort` is derived from `experience` server-side — clients
+    don't need to know the mapping.
+    """
+    profile = create.to_profile()
+    return await profile_store.upsert(profile)
+
+
+@router.get("/profile/{profile_id}", response_model=UserProfile, tags=["profile"])
+async def get_profile(
+    profile_id: str,
+    profile_store: ProfileStore = Depends(get_profile_store),
+) -> UserProfile:
+    profile = await profile_store.get(profile_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="profile not found")
+    return profile
+
+
+@router.delete("/profile/{profile_id}", tags=["profile"])
+async def delete_profile(
+    profile_id: str,
+    profile_store: ProfileStore = Depends(get_profile_store),
+) -> dict[str, bool]:
+    deleted = await profile_store.delete(profile_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="profile not found")
+    return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------
