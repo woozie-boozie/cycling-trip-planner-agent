@@ -27,6 +27,7 @@ from src.db import get_async_session
 from src.db.models import Route as RouteRow
 from src.db.models import Waypoint as WaypointRow
 from src.tools.base import register_tool
+from src.tools.route_real import fetch_real_route, use_real_routes
 from src.tools.schemas import GetRouteInput, GetRouteOutput, Waypoint
 
 # (name, country, cumulative_km_from_start, ferry_required)
@@ -94,6 +95,14 @@ def _normalize(city: str) -> str:
 async def get_route(input: GetRouteInput) -> GetRouteOutput:
     start_lower = _normalize(input.start)
     end_lower = _normalize(input.end)
+
+    # Phase 1.10b: opt into real BRouter-computed distances via env flag.
+    # Falls back to the DB mock on unknown corridor or any BRouter failure —
+    # same Pydantic schema either way, so the agent never sees the difference.
+    if use_real_routes():
+        live = await fetch_real_route(input.start, input.end, input.daily_km_target)
+        if live is not None:
+            return live
 
     async with get_async_session() as session:
         result = await session.execute(
