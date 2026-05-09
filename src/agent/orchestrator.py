@@ -27,8 +27,9 @@ import structlog
 from anthropic import AsyncAnthropic
 
 from src.agent.config import get_settings
-from src.agent.prompts import SYSTEM_PROMPT
+from src.agent.prompts import SYSTEM_PROMPT, user_profile_context
 from src.agent.state import AgentResponse, ConversationState, TraceEvent
+from src.sessions import UserProfile
 from src.tools import all_anthropic_definitions, dispatch
 
 log = structlog.get_logger(__name__)
@@ -63,6 +64,7 @@ async def run_turn(
     user_message: str | list[dict[str, Any]],
     *,
     client: AsyncAnthropic | None = None,
+    profile: UserProfile | None = None,
 ) -> AgentResponse:
     """Run one full user → final-answer cycle, mutating `state` in place.
 
@@ -70,6 +72,11 @@ async def run_turn(
       - a plain string (text-only turn — the common case), or
       - a list of Anthropic content blocks (e.g. `[{type:"image",...}, {type:"text",...}]`
         for multimodal turns).
+
+    `profile` is the cyclist's onboarding profile (Phase 2D). When supplied,
+    a personalisation fragment is appended to the system prompt for THIS turn
+    only — it's not stored in `state.messages` so prompt edits take effect
+    immediately on every existing session.
 
     The state object accumulates messages, traces, and token usage so that
     the next call to `run_turn` resumes the same conversation seamlessly.
@@ -79,6 +86,13 @@ async def run_turn(
         client = AsyncAnthropic(api_key=settings.anthropic_api_key)
 
     tools = all_anthropic_definitions()
+
+    # Build the per-turn system prompt — base + (optional) profile context.
+    # Profile lives outside `state.messages` so we never serialise it into
+    # the turn history; the agent always sees the freshest profile data.
+    system_prompt = SYSTEM_PROMPT
+    if profile is not None:
+        system_prompt = SYSTEM_PROMPT + "\n\n" + user_profile_context(profile)
 
     # Append the user's message to the conversation.
     state.messages.append({"role": "user", "content": user_message})
@@ -111,7 +125,7 @@ async def run_turn(
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=SYSTEM_PROMPT,
+            system=system_prompt,
             tools=tools,
             messages=state.messages,
         )

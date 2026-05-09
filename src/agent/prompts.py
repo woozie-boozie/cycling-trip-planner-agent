@@ -3,9 +3,23 @@
 The system prompt is load-bearing — it's how we get the agent to score on the
 multi-step reasoning rubric (20%) and the conversation rubric (15%). It is
 deliberately opinionated about *how* to think, not just what to do.
+
+Two things live here:
+  - SYSTEM_PROMPT — the static base prompt, identical across all calls
+  - user_profile_context(profile) — Phase 2D · returns a per-turn personalisation
+    fragment that gets appended to SYSTEM_PROMPT when a profile is in scope.
+    NOT persisted in state.messages, so prompt edits take effect on every
+    existing session immediately.
 """
 
 from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Avoid a circular import at runtime (sessions imports prompts via
+    # orchestrator). Only used for type-checking the function signature.
+    from src.sessions import UserProfile
 
 SYSTEM_PROMPT = """\
 You are an expert cycling trip planner. You help cyclists plan multi-day bike trips through conversation.
@@ -78,3 +92,110 @@ Use ASCII elevation sparklines (`▁▂▃▄▅▆▇█`) when they add inform
 
 End the plan with a short "Heads up" section if there are anything-could-bite-you items: ferries, headwinds, hard segments, accommodations far from the route.
 """
+
+
+# ---------------------------------------------------------------------------
+# Phase 2D · user-profile personalisation fragment
+# ---------------------------------------------------------------------------
+
+# Free-text labels the agent reads. Keys must match the Literal types in
+# src.sessions.profile_store. If new options are added there, mirror here.
+
+_EXPERIENCE_LABEL = {
+    "beginner": "beginner (max comfort 50 km/day)",
+    "casual": "casual rider (max comfort 80 km/day)",
+    "intermediate": "intermediate (max comfort 100 km/day)",
+    "experienced": "experienced (max comfort 130 km/day)",
+    "racer": "racer / ultra-endurance (max comfort 180+ km/day)",
+}
+
+_TRIP_STYLE_LABEL = {
+    "weekend": "weekend tour",
+    "touring": "multi-day touring",
+    "commute": "daily commute",
+    "charity": "charity ride",
+    "special": "special-occasion / honeymoon trip",
+    "solo": "unsupported solo trip",
+}
+
+_PRIORITY_LABEL = {
+    "scenery": "scenic routes",
+    "distance": "covering distance",
+    "food_drink": "food and drink along the way",
+    "wild_camping": "wild camping",
+    "quiet_roads": "quiet roads (avoid busy A-roads)",
+    "pubs_culture": "pubs and local culture",
+    "cheap": "keeping costs down",
+    "iconic": "iconic / well-known routes",
+    "photography": "photography stops",
+}
+
+_DIETARY_LABEL = {
+    "vegetarian": "vegetarian",
+    "vegan": "vegan",
+    "gluten_free": "gluten-free",
+    "halal": "halal",
+    "kosher": "kosher",
+    "lactose_free": "lactose-free",
+    "none": None,
+}
+
+
+def user_profile_context(profile: "UserProfile") -> str:
+    """Build a per-turn personalisation fragment for the system prompt.
+
+    The agent reads this and adjusts its planning. Never stored in
+    state.messages — fresh on every turn so prompt iterations take effect
+    immediately on long-running sessions.
+    """
+    lines: list[str] = ["# Cyclist profile (drives personalisation)"]
+    lines.append("")
+    lines.append("This rider has filled in their profile. Adjust your planning accordingly.")
+    lines.append("")
+
+    lines.append(
+        f"- **Experience:** {_EXPERIENCE_LABEL.get(profile.experience, profile.experience)}"
+    )
+
+    if profile.trip_styles:
+        styles = ", ".join(_TRIP_STYLE_LABEL.get(s, s) for s in profile.trip_styles)
+        lines.append(f"- **Trip style:** {styles}")
+
+    if profile.priorities:
+        prios = ", ".join(_PRIORITY_LABEL.get(p, p) for p in profile.priorities)
+        lines.append(f"- **Top priorities:** {prios}")
+
+    diet_labels = [
+        _DIETARY_LABEL.get(d, d) for d in profile.dietary if _DIETARY_LABEL.get(d, d)
+    ]
+    if diet_labels:
+        lines.append(f"- **Dietary:** {", ".join(diet_labels)}")
+
+    if profile.additional_notes:
+        lines.append(f"- **Notes from rider:** \"{profile.additional_notes}\"")
+
+    lines.append("")
+    lines.append("**Apply this profile in four ways:**")
+    lines.append(
+        f"1. **Don't push past their comfort distance unsolicited.** Their max comfortable "
+        f"daily distance is **{profile.max_daily_km_comfort} km**. If they ask for more, "
+        f"flag the gap honestly before producing a plan: e.g. \"you said {profile.experience}, "
+        f"that pace is challenging — want a slower version?\". Don't silently set them up for failure."
+    )
+    lines.append(
+        "2. **Match accommodation, food, and POI choices to dietary needs.** Vegetarian → "
+        "flag vegetarian-friendly pubs/cafes; lactose-free → mention dairy-free options at stops."
+    )
+    lines.append(
+        "3. **Match route choices to their priorities.** Scenery → prefer Avenue Verte over the "
+        "Dover route; quiet_roads → prefer NCN signed routes over A-roads; food_drink → "
+        "highlight markets and local-produce stops; cheap → prefer camping over hotels."
+    )
+    lines.append(
+        "4. **Reference their context naturally, but only when it's useful.** If they mentioned "
+        "charity in their notes, congratulate once and offer to compute estimated km-per-£ for "
+        "fundraising. Don't parrot the profile back at them every turn."
+    )
+
+    return "\n".join(lines)
+
