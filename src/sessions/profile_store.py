@@ -33,6 +33,31 @@ from src.db import get_async_session
 from src.db.models import UserProfileRow
 
 # ---------------------------------------------------------------------------
+# Datetime convention
+# ---------------------------------------------------------------------------
+#
+# Pydantic boundary:  tz-aware UTC (datetime.now(timezone.utc))
+# Postgres column:    TIMESTAMP WITHOUT TIME ZONE (the SQLModel default)
+#
+# `_to_naive_utc` and `_to_aware_utc` translate at the storage boundary so
+# the API stays explicit-UTC while DB rows match SQLModel's default schema.
+# Same convention will apply when sessions move to Postgres in Phase 1.12b.
+
+
+def _to_naive_utc(dt: datetime) -> datetime:
+    """Drop tzinfo (after converting to UTC) — for writing to Postgres."""
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _to_aware_utc(dt: datetime) -> datetime:
+    """Attach UTC tzinfo to a naive datetime read from the DB."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+# ---------------------------------------------------------------------------
 # Pydantic models — the API + agent boundary
 # ---------------------------------------------------------------------------
 
@@ -183,7 +208,7 @@ class PostgresProfileStore:
             return _row_to_profile(row) if row else None
 
     async def upsert(self, profile: UserProfile) -> UserProfile:
-        now = datetime.now(timezone.utc)
+        now_naive = _to_naive_utc(datetime.now(timezone.utc))
         async with get_async_session() as session:
             existing = await self._fetch(session, profile.profile_id)
             if existing is None:
@@ -195,8 +220,8 @@ class PostgresProfileStore:
                     priorities_json=json.dumps(profile.priorities),
                     dietary_json=json.dumps(profile.dietary),
                     additional_notes=profile.additional_notes,
-                    created_at=now,
-                    updated_at=now,
+                    created_at=now_naive,
+                    updated_at=now_naive,
                 )
                 session.add(row)
             else:
@@ -206,7 +231,7 @@ class PostgresProfileStore:
                 existing.priorities_json = json.dumps(profile.priorities)
                 existing.dietary_json = json.dumps(profile.dietary)
                 existing.additional_notes = profile.additional_notes
-                existing.updated_at = now
+                existing.updated_at = now_naive
             await session.commit()
 
             # Re-fetch to return the canonical view (timestamps, etc.)
@@ -232,7 +257,8 @@ class PostgresProfileStore:
 
 
 def _row_to_profile(row: UserProfileRow) -> UserProfile:
-    """Hydrate a UserProfile from a UserProfileRow. JSON-decodes the list cols."""
+    """Hydrate a UserProfile from a UserProfileRow. JSON-decodes the list cols
+    and re-attaches UTC tzinfo to the naive timestamps."""
     return UserProfile(
         profile_id=row.profile_id,
         experience=row.experience,  # type: ignore[arg-type]
@@ -241,8 +267,8 @@ def _row_to_profile(row: UserProfileRow) -> UserProfile:
         priorities=json.loads(row.priorities_json or "[]"),
         dietary=json.loads(row.dietary_json or "[]"),
         additional_notes=row.additional_notes,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
+        created_at=_to_aware_utc(row.created_at),
+        updated_at=_to_aware_utc(row.updated_at),
     )
 
 
