@@ -40,16 +40,19 @@ const components: Components = {
     <p className="mb-2 text-sm leading-relaxed text-foreground/90 last:mb-0">{children}</p>
   ),
   ul: ({ children }) => (
-    <ul className="mb-3 ml-1 space-y-1.5 text-sm leading-relaxed">{children}</ul>
+    <ul className="mb-3 ml-5 list-disc space-y-1.5 text-sm leading-relaxed marker:text-muted-foreground/60">
+      {children}
+    </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mb-3 ml-5 list-decimal space-y-1.5 text-sm leading-relaxed">{children}</ol>
+    <ol className="mb-3 ml-5 list-decimal space-y-1.5 text-sm leading-relaxed marker:text-muted-foreground/80 marker:font-medium">
+      {children}
+    </ol>
   ),
+  // Use the browser's native list marker (• for ul, 1. for ol) so we don't
+  // double up on bullet characters when the agent uses an ordered list.
   li: ({ children }) => (
-    <li className="text-foreground/90 [&>strong]:text-foreground">
-      <span className="text-muted-foreground/60 mr-2">•</span>
-      <span>{children}</span>
-    </li>
+    <li className="pl-1 text-foreground/90 [&>strong]:text-foreground">{children}</li>
   ),
   strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
   em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
