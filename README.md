@@ -184,22 +184,106 @@ Listed roughly in priority order — each is a clean extension of the existing a
 
 **3. Cloud Run deploy + Firebase Auth.** Dockerfile is already Cloud-Run-shaped (listens on `$PORT`). Production URL with `gcloud run deploy --set-env-vars ANTHROPIC_API_KEY=... DATABASE_URL=...`. Firebase Auth would gate `/chat` behind a bearer token.
 
-**4. Bonus tools.** The brief lists three optional tools that the registry pattern makes trivial to add:
-   - `get_points_of_interest` — bike shops, scenic detours, rest stops per waypoint
-   - `estimate_budget` — €/day breakdown across accommodation + food + ferries
-   - `get_ferry_schedule` — ScandLines / DFDS departures for a date range
+**4. Real route engine.** `get_route` currently reads from Postgres (3 hand-curated corridors). Wiring Komoot, BRouter, or OSRM behind the same `GetRouteOutput` schema would make any city pair work — this is the same architectural pattern as the Open-Meteo integration but for routing.
 
-**5. Real route engine.** `get_route` currently reads from Postgres (3 hand-curated corridors). Wiring Komoot, BRouter, or OSRM behind the same `GetRouteOutput` schema would make any city pair work — this is the same architectural pattern as the Open-Meteo integration but for routing.
+**5. Self-critique → revise loop.** Today the agent calls `critique_trip_plan` once and either ships, surfaces warnings, or stops. With more time, the system prompt would explicitly allow up to 2 critique-revise cycles, with the trace recording the iteration so reviewers can see the agent improving on its own draft.
 
-**6. Self-critique → revise loop.** Today the agent calls `critique_trip_plan` once and either ships, surfaces warnings, or stops. With more time, the system prompt would explicitly allow up to 2 critique-revise cycles, with the trace recording the iteration so reviewers can see the agent improving on its own draft.
+**6. Eval harness expansion.** Add scenarios for: weather-driven rest day insertion, ferry-aware day boundaries, multi-leg trips with intermediate stops the user specifies, and adversarial inputs (typos, contradictions). Each is one new `@pytest.mark.evals` test using the same scoreboard format.
 
-**7. Eval harness expansion.** Add scenarios for: weather-driven rest day insertion, ferry-aware day boundaries, multi-leg trips with intermediate stops the user specifies, and adversarial inputs (typos, contradictions). Each is one new `@pytest.mark.evals` test using the same scoreboard format.
+**7. Mobile (Phase 3) — Flutter companion app**. Single screen that hits the deployed Cloud Run `/chat`. Shares zero code with the backend (correctly) — proves the agent is platform-agnostic.
 
-**8. Frontend (Phase 2) — Next.js chat UI** with streaming display, multimodal upload (drop a route screenshot, agent extracts intent), and an [ElevenLabs](https://elevenlabs.io) voice-conversation embed using their Conversational AI agent product. The same `/chat` endpoint serves all three surfaces.
+**8. Observability hardening.** Currently structlog-based JSON logs and an in-process trace. Production would add OpenTelemetry spans per tool call, Sentry for error capture, and a Grafana dashboard for token usage / cost / p50-p99 latency per endpoint.
 
-**9. Mobile (Phase 3) — Flutter companion app**. Single screen that hits the deployed Cloud Run `/chat`. Shares zero code with the backend (correctly) — proves the agent is platform-agnostic.
+---
 
-**10. Observability hardening.** Currently structlog-based JSON logs and an in-process trace. Production would add OpenTelemetry spans per tool call, Sentry for error capture, and a Grafana dashboard for token usage / cost / p50-p99 latency per endpoint.
+## Cyclist user research findings (May 2026)
+
+Mid-build I ran interviews with ~10 cyclists — weekend tourers, commuters, charity riders, randonneurs. They surfaced ~30 feature ideas, far more than fit a 5-day case study. Rather than chase the firehose, I grouped the findings into five themes, **shipped the keystone + three supporting tools** that one of the themes pointed to, and document the rest here as a roadmap. (Full reasoning in `docs/decisions.md`, ADR-013.)
+
+The keystone: *"don't set them up for failure — build their profile first"* (a beginner asking for 130 km/day is the brief's S2 infeasibility scenario with a human dimension the v1 agent didn't see). That insight became the onboarding wizard + `UserProfile` table + per-turn personalisation fragment in the system prompt — all live and verified end-to-end.
+
+### Theme A · Real-time route hazards · 🟡 Roadmap
+
+Live road conditions, weather windows, and safety telemetry were the most frequent ask.
+
+- Live pothole density per segment (Strava heat-map style)
+- Tractor / lorry frequency on rural roads
+- Per-segment safety rating (cyclist-friendly index)
+- Live weather updates during the ride (not just monthly norms)
+- Sunrise / sunset times for daily start/finish planning
+- Live wind direction + strength along the corridor
+
+**Needs:** real-time data feeds, location streaming, partnerships with Strava/Komoot/Met Office. Not 5-day scope.
+
+### Theme B · Local content & discovery · 🟡 Roadmap
+
+Cycling is also tourism. Riders wanted the agent to surface what makes each segment *worth* riding, not just survivable.
+
+- "What animals can I see along this route in June" (rewilding sites, raptor sanctuaries)
+- Fun facts about the area (Domesday-Book-era abbeys, WWII trivia, local legends)
+- Names of the regions you ride through (the *Pays de Bray* between Forges and Beauvais)
+- Scenic-route prompts (extra 8 km but the cliff path is iconic)
+- Local-produce stops (cider farms, cheesemakers, farmers' markets)
+- Souvenir-shopping recommendations
+- Photography stops worth a 5-minute pause
+
+**Partial coverage today:** `get_points_of_interest` covers `scenic_viewpoint` + `market` categories. The deeper "stories of the land" content needs a separate content layer (curated text, ideally from a travel-writing partner).
+
+### Theme C · Logistics & fueling · ✅ Mostly shipped
+
+The bread-and-butter "I need this NOW" questions. This was the highest-actionability theme — and the new bonus tools cover most of it.
+
+- Toilets and water fountains along the route — ✅ `get_points_of_interest(categories=['toilet','water_fountain'])`
+- Bike repair when something breaks — ✅ `get_points_of_interest(categories=['bike_shop'])`
+- Hospitals nearby for safety reference — ✅ `get_points_of_interest(categories=['hospital'])`
+- Supermarkets for snack resupply — ✅ `get_points_of_interest(categories=['market'])`
+- Pubs (with games / live music) — ✅ `get_points_of_interest(categories=['pub'])` (games + music as `notes`)
+- Bike rental at the destination — ✅ `get_points_of_interest(categories=['bike_rental'])`
+- Cafes / coffee stops — ✅ `get_points_of_interest(categories=['cafe'])`
+- Calorie planning per day ("how much fuel do I need the night before") — ✅ `estimate_budget` returns `daily_calorie_estimate` (1800 base + 30 per km cycled)
+
+Roadmap items in this theme:
+- 🟡 Live opening hours (today's hours, not catalogued hours)
+- 🟡 E-bike charging stations (needs a real-data feed)
+
+### Theme D · Social & community · 🟡 Roadmap
+
+Cyclists wanted the experience to extend beyond the ride itself.
+
+- "How many people are also doing this route right now"
+- Built-in fundraising integration (JustGiving / GoFundMe deep links + km-per-£ math)
+- Monthly Wrapped-style summary of the rider's stats
+- Public profile pages with completed-routes badges
+- Trip sharing (export to Strava, Komoot, social media)
+- Social-reach metrics ("your fundraising shared by 23 people")
+
+**Needs:** persistent multi-month longitudinal data, presence/WebSocket infrastructure, OAuth integrations with at least three third parties (Strava, JustGiving, social platforms). Each is a multi-day build on its own.
+
+### Theme E · Lifestyle & commerce · 🟡 Roadmap
+
+The further-out asks — interesting product directions but they pull the brief well past a planning agent.
+
+- Spotify integration ("queue me a 4-hour ride playlist matching the elevation profile")
+- Live GPS tracker for friends/family while riding
+- "Box of stuff" delivery to the next overnight stop (charger forgot, spare tube needed)
+- E-bike charging-station marketplace
+- Bike rental + sale marketplace at start/end cities
+- Souvenir shopping along the route
+
+**Needs:** payments, live tracking, third-party OAuth, fulfilment partners. Adjacent product, not 5-day scope.
+
+### How this maps to the build
+
+| Theme | Coverage in this build |
+|---|---|
+| A · Real-time hazards | Roadmap |
+| B · Local content & discovery | `scenic_viewpoint`, `market` shipped; deeper content layer roadmap |
+| C · Logistics & fueling | **Shipped** (`get_points_of_interest` covers 7 categories; `estimate_budget` covers calories) |
+| D · Social & community | Roadmap |
+| E · Lifestyle & commerce | Roadmap |
+| Cross-cutting · personalisation | **Shipped** (onboarding wizard + `UserProfile` + per-turn personalisation fragment) |
+
+The discipline of *deciding what NOT to build* and writing it up here matters more than any single shipped item. ADR-013 in `docs/decisions.md` records why the keystone was chosen over the alternatives.
 
 ---
 
