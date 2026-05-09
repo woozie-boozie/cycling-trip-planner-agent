@@ -1,21 +1,199 @@
 """get_weather — typical weather for a location and month.
 
-Climate norms live in the `weather_norms` table in Postgres (seeded from
-`_CLIMATE` below via `src/db/seed.py`). Norms are real (June in Hamburg
-averages 17°C, not 28°C) so the agent's recommendations stay credible.
+THREE storage backends, one Pydantic schema:
 
-Real OpenWeather integration arrives in Phase 1.10 via the USE_REAL_WEATHER
-env flag — same Pydantic schema, swap the data source.
+  1. Postgres `weather_norms` table (default) — seeded from `_CLIMATE` below
+     via `src/db/seed.py`. Hand-curated mock based on real climate averages.
+  2. Open-Meteo Archive API (Phase 1.10) — opt-in via `USE_REAL_WEATHER=true`.
+     No API key required. Computes 5-year monthly climate norms from the
+     ECMWF ERA5 reanalysis archive. Falls back to (1) on any failure.
+  3. SQLite in-memory (tests) — same SQLModel schema as (1), populated by
+     the `seeded_db` fixture. Tests never hit Open-Meteo.
+
+Switch backends without touching schemas, the registry, the agent loop,
+or the system prompt. That's the abstraction — same `GetWeatherOutput`
+return shape regardless of where the data came from.
 """
 
 from __future__ import annotations
 
+import logging
+import os
+from datetime import datetime
+from statistics import mean
+
+import httpx
+import structlog
 from sqlmodel import select
 
 from src.db import get_async_session
 from src.db.models import WeatherNorm as WeatherRow
 from src.tools.base import register_tool
 from src.tools.schemas import GetWeatherInput, GetWeatherOutput, Month
+
+log = structlog.get_logger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # silence chatty INFO logs
+
+# ---------------------------------------------------------------------------
+# Open-Meteo integration (Phase 1.10)
+# ---------------------------------------------------------------------------
+
+_OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
+
+# Lat/lon for every city we've seeded. Pre-populating beats geocoding on
+# every call: lookups are O(1), no extra HTTP round-trip, no second API
+# dependency. Unknown cities fall through to the DB mock — which itself has
+# a "mock data" note that the agent surfaces honestly to the user.
+_CITY_COORDS: dict[str, tuple[float, float]] = {
+    # Amsterdam → Copenhagen corridor
+    "amsterdam": (52.3676, 4.9041),
+    "hoorn": (52.6422, 5.0594),
+    "groningen": (53.2194, 6.5665),
+    "bremen": (53.0793, 8.8017),
+    "hamburg": (53.5511, 9.9937),
+    "lübeck": (53.8654, 10.6866),
+    "puttgarden": (54.5092, 11.2226),
+    "rødby": (54.6906, 11.3539),
+    "vordingborg": (55.0084, 11.9098),
+    "copenhagen": (55.6761, 12.5683),
+    # Avenue Verte (London → Paris)
+    "london": (51.5074, -0.1278),
+    "east grinstead": (51.1267, -0.0067),
+    "lewes": (50.8736, 0.0097),
+    "newhaven": (50.7906, 0.0533),
+    "dieppe": (49.9239, 1.0775),
+    "forges-les-eaux": (49.6173, 1.5460),
+    "beauvais": (49.4295, 2.0808),
+    "cergy-pontoise": (49.0398, 2.0712),
+    "paris": (48.8566, 2.3522),
+    # London → Brighton
+    "crystal palace": (51.4189, -0.0735),
+    "brighton": (50.8225, -0.1372),
+}
+
+_MONTH_TO_NUMBER: dict[Month, int] = {
+    "January": 1, "February": 2, "March": 3, "April": 4,
+    "May": 5, "June": 6, "July": 7, "August": 8,
+    "September": 9, "October": 10, "November": 11, "December": 12,
+}
+
+
+def _use_real_weather() -> bool:
+    return os.getenv("USE_REAL_WEATHER", "").strip().lower() in {"true", "1", "yes", "on"}
+
+
+async def _fetch_open_meteo_norm(
+    location: str,
+    location_lower: str,
+    month: Month,
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> GetWeatherOutput | None:
+    """Compute a multi-year monthly climate norm from Open-Meteo's archive.
+
+    Returns None on any failure (unknown city, network error, malformed
+    response, etc.) so the caller falls back to the DB mock and the agent
+    surfaces no error to the user.
+
+    Strategy: pull 5 years of daily data from the ECMWF ERA5 archive,
+    filter client-side to the target month, aggregate to a monthly norm.
+    """
+    coords = _CITY_COORDS.get(location_lower)
+    if coords is None:
+        log.info("open_meteo.skip_unknown_city", location=location)
+        return None
+
+    month_num = _MONTH_TO_NUMBER.get(month)
+    if month_num is None:
+        return None
+
+    # Use a 5-year window ending in last full year. Archive lags by a few
+    # weeks for the most recent dates so don't assume current year is full.
+    end_year = datetime.now().year - 1
+    start_year = end_year - 4
+    start_date = f"{start_year}-01-01"
+    end_date = f"{end_year}-12-31"
+
+    lat, lon = coords
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "start_date": start_date,
+        "end_date": end_date,
+        "daily": (
+            "temperature_2m_mean,temperature_2m_max,"
+            "temperature_2m_min,precipitation_sum"
+        ),
+    }
+
+    own_client = client is None
+    if own_client:
+        client = httpx.AsyncClient(timeout=15.0)
+
+    try:
+        try:
+            resp = await client.get(_OPEN_METEO_ARCHIVE_URL, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+        except (httpx.HTTPError, ValueError) as e:
+            log.warning("open_meteo.http_error", error=str(e), location=location)
+            return None
+
+        daily = data.get("daily") or {}
+        times: list[str] = daily.get("time") or []
+        if not times:
+            return None
+
+        try:
+            target_idx = [i for i, t in enumerate(times) if int(t.split("-")[1]) == month_num]
+        except (IndexError, ValueError):
+            return None
+        if not target_idx:
+            return None
+
+        def _vals(key: str) -> list[float]:
+            arr = daily.get(key) or []
+            return [arr[i] for i in target_idx if i < len(arr) and arr[i] is not None]
+
+        means = _vals("temperature_2m_mean")
+        maxes = _vals("temperature_2m_max")
+        mins = _vals("temperature_2m_min")
+        rains = _vals("precipitation_sum")
+
+        if not (means and maxes and mins and rains):
+            return None
+
+        # Distinct years in the sampled month — this is the correct denominator
+        # for converting a multi-year sum into a per-month figure. Counting
+        # `len(target_idx) / 30` would mis-handle 28-/31-day months and any
+        # missing days in the archive.
+        distinct_years = {times[i].split("-", 1)[0] for i in target_idx}
+        years_in_data = max(1, len(distinct_years))
+
+        avg_temp = round(mean(means), 1)
+        avg_high = round(mean(maxes), 1)
+        avg_low = round(mean(mins), 1)
+        avg_rain_mm = round(sum(rains) / years_in_data, 1)
+        # "Rain day" = day with ≥ 1mm precipitation, the WMO-standard threshold.
+        rain_days = round(sum(1 for r in rains if r >= 1.0) / years_in_data)
+
+        return GetWeatherOutput(
+            location=location,
+            month=month,
+            avg_temp_celsius=avg_temp,
+            avg_high_celsius=avg_high,
+            avg_low_celsius=avg_low,
+            rain_days_per_month=rain_days,
+            avg_rain_mm=avg_rain_mm,
+            notes=(
+                f"Real climate norm — Open-Meteo Archive (ECMWF ERA5), "
+                f"{start_year}–{end_year}, {len(target_idx)} {month} days sampled. "
+                f"No API key required."
+            ),
+        )
+    finally:
+        if own_client:
+            await client.aclose()
 
 # Per-city, per-month climate norms.
 # Sourced from typical climate averages for these European cities.
@@ -157,6 +335,14 @@ def _normalize(s: str) -> str:
 )
 async def get_weather(input: GetWeatherInput) -> GetWeatherOutput:
     location_lower = _normalize(input.location)
+
+    # Phase 1.10: opt into real Open-Meteo data via the env flag.
+    # Falls back to the DB mock on any failure — same Pydantic schema
+    # either way, so the agent never sees the difference.
+    if _use_real_weather():
+        live = await _fetch_open_meteo_norm(input.location, location_lower, input.month)
+        if live is not None:
+            return live
 
     async with get_async_session() as session:
         result = await session.execute(
