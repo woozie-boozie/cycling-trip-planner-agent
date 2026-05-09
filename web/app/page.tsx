@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Header } from "@/components/header";
 import { MessageBubble } from "@/components/message-bubble";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
 import { TracePanel } from "@/components/trace-panel";
 import { ApiError, getTrace, postChat } from "@/lib/api";
+import { matchCorridor } from "@/lib/corridors";
 import { clearSessionId, loadSessionId, saveSessionId } from "@/lib/session";
 import type { TraceResponse, UiMessage } from "@/lib/types";
 
@@ -142,6 +143,17 @@ export default function Home() {
   const isEmpty = messages.length === 0 && !isPending;
   const canSend = input.trim().length > 0;
 
+  // Detect which corridor the conversation is about by scanning messages
+  // (most recent first) for any of the known route aliases. Cheap pure
+  // function, derived state — no effect needed.
+  const corridor = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = matchCorridor(messages[i].content);
+      if (m) return m;
+    }
+    return null;
+  }, [messages]);
+
   return (
     <div className="flex h-dvh flex-col bg-background">
       <Header sessionId={sessionId} onReset={handleReset} />
@@ -171,11 +183,12 @@ export default function Home() {
           </div>
 
           {/* Trace panel — hidden on mobile, ~3/10ths on lg+ */}
-          <aside className="hidden w-[320px] shrink-0 border-l border-border/40 bg-card/30 p-4 lg:block">
+          <aside className="hidden w-[360px] shrink-0 overflow-y-auto border-l border-border/40 bg-card/30 p-4 lg:block">
             <TracePanel
               trace={trace}
               isLoading={isTraceLoading || isPending}
               hasSession={Boolean(sessionId)}
+              corridor={corridor}
             />
           </aside>
         </div>

@@ -4,12 +4,15 @@ import { Activity, Coins, Cpu, Wrench } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
 import { ToolCallRow } from "@/components/tool-call-row";
+import { RouteMap } from "@/components/route-map";
+import type { Corridor } from "@/lib/corridors";
 import type { TraceEvent, TraceResponse } from "@/lib/types";
 
 interface TracePanelProps {
   trace: TraceResponse | null;
   isLoading: boolean;
   hasSession: boolean;
+  corridor: Corridor | null;
 }
 
 interface ToolCallSummary {
@@ -54,17 +57,32 @@ function maxIteration(events: TraceEvent[]): number {
   return events.reduce((max, e) => Math.max(max, e.iteration ?? 0), 0);
 }
 
-export function TracePanel({ trace, isLoading, hasSession }: TracePanelProps) {
+export function TracePanel({ trace, isLoading, hasSession, corridor }: TracePanelProps) {
   if (!hasSession && !isLoading) {
-    return <EmptyTrace />;
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <RouteMap corridor={corridor} />
+        <EmptyTrace />
+      </div>
+    );
   }
 
   if (isLoading && !trace) {
-    return <LoadingTrace />;
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <RouteMap corridor={corridor} />
+        <LoadingTrace />
+      </div>
+    );
   }
 
   if (!trace) {
-    return <EmptyTrace />;
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <RouteMap corridor={corridor} />
+        <EmptyTrace />
+      </div>
+    );
   }
 
   const calls = summarizeToolCalls(trace.events);
@@ -73,6 +91,9 @@ export function TracePanel({ trace, isLoading, hasSession }: TracePanelProps) {
 
   return (
     <div className="flex h-full flex-col gap-3">
+      {/* Map at the top — always visible, updates as we recognise the corridor */}
+      <RouteMap corridor={corridor} />
+
       {/* Header */}
       <div>
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
