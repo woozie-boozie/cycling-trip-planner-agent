@@ -127,3 +127,23 @@ A running log of design decisions, ordered chronologically. The "why" matters mo
 **Why:** Mocking Claude in eval tests would just be testing my mocks. The eval scenarios are about *emergent* agent behaviour — clarifying questions, honest refusals, draft-critique-revise — and the only way to know the system prompt is driving Claude correctly is to ask it. Cost is bounded (~$0.21 per full run) and acceptable for a once-a-week regression check.
 
 **Consequence:** CI doesn't need an API key (default `pytest` skips evals). Developers run `make evals` periodically. The skip-if guard checks for a real key, not the placeholder value, so accidental commits of fake keys don't cause silent test passes.
+
+---
+
+## ADR-013 · User-research-driven personalisation as the Phase 2D keystone
+
+**Decision (2026-05-09):** After the v1 was rubric-complete, I ran user interviews with cyclists and surfaced ~30 distinct feature ideas. Rather than chase the firehose, I picked one keystone and three supporting tools and **documented the rest as a roadmap** (see README, "Cyclist user research findings"):
+
+  - **Keystone:** an onboarding wizard + `UserProfile` table + per-turn personalisation fragment in the system prompt (Phase 2D·1 + 2D·3).
+  - **Three bonus tools:** `get_points_of_interest`, `estimate_budget`, `get_ferry_schedule` — each answering an interview question that came up across multiple riders (Phase 2D·2).
+  - **Everything else:** roadmap, with each item tagged by what infrastructure it needs that the case-study scope doesn't cover.
+
+**Why:** The brightest signal across the interviews was a beginner saying *"don't set them up for failure — build their profile first."* That's the brief's **S2 infeasibility-refusal scenario** but with a *human* dimension the v1 agent didn't see. A beginner asking for 130 km/day looks like a normal request to the agent unless the profile says otherwise. Fixing that *one* gap is worth more than ten cosmetic features.
+
+**Why Postgres for profiles, not localStorage-only:** Profiles are durable, cross-device-aspirational, and exactly the data shape Postgres handles well. localStorage works for the session_id (opaque, cheap to regenerate, single-device by design) but not for a profile a user might build up over months. Same `Protocol + InMemory + Postgres` pattern as `SessionStore` (ADR-004) — third time the discipline appears, deliberate not coincidental.
+
+**Why 3 bonus tools, not 9:** Each new tool earns its keep when the agent actually calls it. POI is multi-category (bike_shop / pub / water_fountain / toilet / hospital / market / scenic_viewpoint / cafe / bike_rental — *one tool with focused queries*, not nine noisy ones). Budget is deterministic Python so the cost math is auditable in the trace, not an LLM hallucination. Ferry data is real (DFDS, P&O, Scandlines, Stena), sampled from operator sites in May 2026. The other six interview themes (real-time hazards, animal watching, Spotify integration, fundraising widgets, ecommerce, social Wrapped) need infrastructure outside the scope of a take-home — documented as roadmap, not built.
+
+**Why the profile fragment is fresh-per-turn, not stored in `state.messages`:** If a user's onboarding lives in the message history, prompt edits I make next week only affect *new* sessions. By appending `user_profile_context(profile)` to the system prompt at the moment of the call, every existing session benefits the moment a prompt change ships. Documented in `src/agent/orchestrator.py` and verified by the test that intercepts `kwargs` sent to the mocked Anthropic client.
+
+**Consequence:** Backend gains `UserProfile` + `UserProfileCreate` Pydantic models, `ProfileStore` Protocol, `PostgresProfileStore`, three new tools (POI / budget / ferry), and a personalisation fragment in `prompts.py`. Frontend gains a 5-step skippable wizard, profile_id in localStorage, threaded into every `/chat` call. Live-verified end-to-end: same prompt, profile changes the agent's behaviour ("plan 100 km/day London → Paris in 4 days" + casual rider with charity in `additional_notes` → agent flags 80 km/day comfort gap, recommends 5-day option *"because your donors want you to finish strong, not limp into Paris wrecked"* — referencing the charity context unprompted on turn 2 with zero new tool calls).

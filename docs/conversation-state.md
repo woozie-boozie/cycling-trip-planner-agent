@@ -111,6 +111,60 @@ Cost is computed from token counts using Sonnet-tier pricing (~$3 per 1M input, 
 
 That's how multi-step reasoning (20% of the grade) gets *demonstrated* instead of *described*.
 
+## User profile — a parallel store, with a deliberately different lifecycle
+
+Phase 2D added a second persistence concern that *isn't* session state and shouldn't be conflated with it: the **cyclist profile**. When the user fills the onboarding wizard (experience level, trip styles, priorities, dietary, free-text notes), the frontend posts to `POST /profile` and persists the returned `profile_id` in `localStorage`. Every subsequent `/chat` call carries the `profile_id` so the agent can personalise.
+
+The architecture mirrors `SessionStore`:
+
+```python
+class ProfileStore(Protocol):
+    async def get(self, profile_id: str) -> UserProfile | None: ...
+    async def upsert(self, profile: UserProfile) -> UserProfile: ...
+    async def delete(self, profile_id: str) -> bool: ...
+```
+
+`InMemoryProfileStore` for tests, `PostgresProfileStore` for production. Same dependency-injection seam in `src/api/dependencies.py`. Third time this discipline shows up (sessions, tool data, profiles) — deliberate, not coincidental.
+
+### Why the profile is NOT inside `state.messages`
+
+This is the key design choice. When `/chat` receives a `profile_id`:
+
+```python
+profile = await profile_store.get(request.profile_id)
+# ... downstream:
+response = await run_turn(state, user_message, profile=profile)
+```
+
+`run_turn` then composes the system prompt **fresh on this call**:
+
+```python
+system_prompt = SYSTEM_PROMPT
+if profile is not None:
+    system_prompt += "\n\n" + user_profile_context(profile)
+```
+
+The profile fragment is **never written into `state.messages`**. It only ever appears in the `system` parameter passed to `messages.create()` for *this turn*. Two consequences:
+
+1. **Prompt edits ship instantly to every existing session.** When I tweak `user_profile_context()` next week to handle a new dietary option or change how it phrases a directive, every conversation in flight benefits the next turn — no migration, no replay, no bumping a "prompt version" field on stored messages. If the profile lived inside `state.messages` it would be frozen to whatever shape it had on the original turn.
+2. **The session store stays storage-agnostic about user identity.** `SessionStore` doesn't know what a profile is. It stores conversation messages and trace events; profiles are someone else's problem (the `ProfileStore`). Two stores, two purposes, no coupling.
+
+### Two stores, two purposes — mirroring the brief's tool-data vs session-data split
+
+The brief implicitly has two storage concerns: the agent's *tool data* (routes, accommodation, weather norms — Postgres) and *conversation state* (messages, trace — `SessionStore`). Phase 2D adds a third one — *user identity* — and keeps it cleanly separated:
+
+| Concern | Lifetime | Identity | Store |
+|---|---|---|---|
+| Tool data | Static-ish | None | Postgres tables |
+| Session state | Conversation-scoped | `session_id` (opaque) | `SessionStore` (in-memory now, Postgres post-1.12b) |
+| User profile | Cross-conversation, cross-device-aspirational | `profile_id` (UUID4 client-generated) | `ProfileStore` (Postgres on Neon) |
+
+Three orthogonal stores with a single shared discipline (`Protocol` + concrete impls + dependency injection). When Cloud Run deploys ship and a user opens the app on a phone instead of a laptop, only the *session* starts fresh — the profile follows them via the `profile_id` in localStorage.
+
+### Soft-miss on unknown `profile_id`
+
+Same contract as session expiry: if the client sends a `profile_id` the backend doesn't know (e.g. dev DB was wiped, or a stale id from another environment), `/chat` logs `chat.profile.unknown` and proceeds **without** personalisation rather than 404-ing the request. The frontend can re-prompt for onboarding next time the user clicks "Edit profile". Backend strict, frontend polite.
+
 ## Session expiry
 
 Today: sessions live as long as the server process does. Restart = fresh start.
@@ -125,4 +179,4 @@ Both extensions are additive — they don't change the `SessionStore` Protocol.
 
 - [`docs/agent-loop.md`](agent-loop.md) — how `state.messages` and `state.trace` get populated
 - [`docs/architecture.md`](architecture.md) — where the session store sits in the stack
-- [`docs/decisions.md`](decisions.md) — ADR-004 (SessionStore Protocol from minute one)
+- [`docs/decisions.md`](decisions.md) — ADR-004 (SessionStore Protocol from minute one), ADR-013 (user-research-driven personalisation)
