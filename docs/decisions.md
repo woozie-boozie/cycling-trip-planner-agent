@@ -81,3 +81,49 @@ A running log of design decisions, ordered chronologically. The "why" matters mo
 **Why:** Rubric weights *Multi-step reasoning* (20%) and *Conversation handling* (15%) — both are downstream of how the agent *plans*, not just what it knows. Telling Claude "plan in steps, surface conflicts, refuse impossible requests honestly" gets us those points directly. Verified in smoke test 2026-05-08: agent caught a real constraint conflict (Puttgarden has no hostels) and offered three trade-offs instead of silently violating the user's preference.
 
 **Consequence:** System prompt is ~1500 tokens. Cost per turn is acceptable (~5¢). Future bug fixes will go in the prompt, which makes prompt-versioning a future concern (Phase 2+).
+
+---
+
+## ADR-009 · Tool data on Neon Postgres mid-build (Phase 1.12a)
+
+**Decision:** After the initial mock-data version was working, migrate tool data from in-code Python dicts to Postgres-on-Neon via SQLModel. Tools become async, dispatch becomes async, the SessionStore Protocol stays in-memory for now.
+
+**Why:** The brief allows mock data, but doing the migration *during* the build is the strongest possible proof of the abstraction. "Swap-able" goes from a claim to a demonstration. After the swap landed, the agent loop, system prompt, eval harness, and 43 tests all stayed unchanged — only the four tool functions and a new `src/db/` module changed. That's not a future-state architecture diagram; that's a verifiable diff.
+
+**Consequence:** Tests need a `seeded_db` fixture (SQLite in-memory with the same SQLModel schema as Neon). Async tools mean async dispatch, which the orchestrator already supported via `inspect.isawaitable()`. One new env var (`DATABASE_URL`); falls back to SQLite in-memory if unset.
+
+---
+
+## ADR-010 · Self-critique is a tool, not a hard-coded validation step
+
+**Decision:** Add `critique_trip_plan` as a registered tool. The agent calls it after drafting (per the system prompt), reads the result, decides whether to ship, surface warnings, or revise. Implementation is deterministic Python (rule-based pacing + accommodation pattern + consistency checks) — not another LLM call.
+
+**Why:** Three reasons.
+  1. **Visible in the trace.** Reviewers see the agent self-checking; that's worth more than a behind-the-scenes validation pass.
+  2. **Forward compatibility.** If we want to swap the deterministic check for an LLM-based critique later, the registry entry doesn't change.
+  3. **Multi-step reasoning rubric (20%) values the *step* explicitly.** A draft → critique → revise pattern is more multi-step than a draft → ship pattern.
+
+**Consequence:** One extra tool in the registry. One extra iteration per agent turn. ~$0.02 of extra Claude tokens per turn. New unit tests for each rule path. S1 eval upgraded with a check that asserts critique was called.
+
+---
+
+## ADR-011 · Open-Meteo over OpenWeather for real climate norms
+
+**Decision:** When integrating real weather data behind `USE_REAL_WEATHER=true`, use Open-Meteo's free Archive API instead of OpenWeather. The integration computes 5-year monthly norms from the ECMWF ERA5 reanalysis archive.
+
+**Why:**
+  1. **No API key.** The case study should be runnable by anyone reviewing it without a signup loop or secret reveal. Open-Meteo's Archive endpoint is free with no auth.
+  2. **Reviewer experience.** A senior-engineering signal: pick the dependency that minimizes friction for whoever's going to read your code.
+  3. **Velocity moat in action.** When the OpenWeather account locked over a weekend, switching to Open-Meteo took 45 minutes — same Pydantic schema, same env-flag toggle, same fallback chain. Demonstrating the abstraction works under unplanned dependency changes.
+
+**Consequence:** One new dependency on `httpx` (already in the deps). Hardcoded city-to-coords table for the 21 seeded cities (faster than per-call geocoding). Falls back to DB mock for unknown cities or any failure — agent never breaks. Zero env-var secrets.
+
+---
+
+## ADR-012 · Eval harness with real Claude calls, opt-in via marker
+
+**Decision:** Eval scenarios in `tests/test_evals.py` hit the real Anthropic API. Marked with `@pytest.mark.evals`; `pyproject.toml` registers the marker and `addopts = "-m 'not evals'"` excludes them by default. Run via `make evals`.
+
+**Why:** Mocking Claude in eval tests would just be testing my mocks. The eval scenarios are about *emergent* agent behaviour — clarifying questions, honest refusals, draft-critique-revise — and the only way to know the system prompt is driving Claude correctly is to ask it. Cost is bounded (~$0.21 per full run) and acceptable for a once-a-week regression check.
+
+**Consequence:** CI doesn't need an API key (default `pytest` skips evals). Developers run `make evals` periodically. The skip-if guard checks for a real key, not the placeholder value, so accidental commits of fake keys don't cause silent test passes.
