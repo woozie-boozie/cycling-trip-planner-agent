@@ -147,3 +147,32 @@ A running log of design decisions, ordered chronologically. The "why" matters mo
 **Why the profile fragment is fresh-per-turn, not stored in `state.messages`:** If a user's onboarding lives in the message history, prompt edits I make next week only affect *new* sessions. By appending `user_profile_context(profile)` to the system prompt at the moment of the call, every existing session benefits the moment a prompt change ships. Documented in `src/agent/orchestrator.py` and verified by the test that intercepts `kwargs` sent to the mocked Anthropic client.
 
 **Consequence:** Backend gains `UserProfile` + `UserProfileCreate` Pydantic models, `ProfileStore` Protocol, `PostgresProfileStore`, three new tools (POI / budget / ferry), and a personalisation fragment in `prompts.py`. Frontend gains a 5-step skippable wizard, profile_id in localStorage, threaded into every `/chat` call. Live-verified end-to-end: same prompt, profile changes the agent's behaviour ("plan 100 km/day London → Paris in 4 days" + casual rider with charity in `additional_notes` → agent flags 80 km/day comfort gap, recommends 5-day option *"because your donors want you to finish strong, not limp into Paris wrecked"* — referencing the charity context unprompted on turn 2 with zero new tool calls).
+
+---
+
+## ADR-014 · Real route distances via BRouter, opt-in like the Open-Meteo swap
+
+**Decision (2026-05-09):** When `USE_REAL_ROUTES=true`, `get_route` calls **BRouter** (https://brouter.de) — a free OpenStreetMap-backed bike routing engine — for real road-network distances between hand-curated anchor cities per corridor. Falls back to the existing Postgres mock on any failure. Same architectural pattern as ADR-011 (Open-Meteo over OpenWeather) — second tool to prove the abstraction works against real public data.
+
+**Why this decision became necessary:** During Phase 2D testing I asked the agent to plan a London → Paris cycling trip and **fact-checked the response against cycle.travel and Cicerone**. Three real factual errors in the seeded data:
+  - Total distance was 380 km in the seed; reality is ~398 km (Normandy variant) or ~462 km (Beauvais variant) on the signposted Avenue Verte
+  - Day 1 London → Lewes was 110 km in the seed; the signposted route is closer to 140-150 km
+  - Day 4 Beauvais → Paris was 140 km in the seed; BRouter direct-bike-route says 86 km, signposted route ~95-105 km
+
+These weren't hallucinations — they were **my** mistakes baked into the mock data. The agent dutifully reasoned over them, surfaced an "honest" Day 4 problem (140 km > 80 km comfort zone) that didn't actually exist on a real route. Cyclists fact-check; the abstraction needed to support real data, not just a plausible mock.
+
+**Why BRouter, not cycle.travel:** cycle.travel doesn't have a public API and returns 403 to programmatic fetches. Their forum says "contact us." That's a multi-day delay. BRouter:
+  1. Free, no API key, public HTTP endpoint at `brouter.de/brouter`
+  2. Backed by OpenStreetMap — same data foundation as the planned POI swap (consistency)
+  3. Cyclist-specific routing profiles (we use `trekking`)
+  4. Returns track length + ascent + GeoJSON geometry per request
+
+**Why hand-curated anchor cities, not free-form geocoding:** A general-purpose A→B router would route arbitrary city pairs but can't tell you "Newhaven → Dieppe is a ferry hop." The corridor-based approach respects domain knowledge (the Avenue Verte's signed waypoints, the Rødby–Puttgarden ferry crossing) while still letting BRouter compute real road-network distances *between* the curated anchors. Three corridors, ~7-9 anchors each, ~15-30s cold cache for the whole route, instant when cached.
+
+**Caching:** Process-local dict keyed by `(lat₁, lon₁, lat₂, lon₂)` rounded to 4 dp (~11m precision). 24h TTL — road networks don't change minute-to-minute.
+
+**Failure model:** Any BRouter error or unknown corridor → return None → caller falls back to Postgres mock. Identical to the `_use_real_weather()` fallback chain. Logs the fallback event so it's visible in observability without breaking the agent.
+
+**Verified:** Same prompt the user fact-checked ("plan a 4-day cycle from London to Paris on the Avenue Verte, 100km/day, prefer camping but a hostel every 3rd night, traveling in June") — with `USE_REAL_ROUTES=false` produces 380 km / Day 4 = 140 km / agent has to apologise and offer trade-offs; with `USE_REAL_ROUTES=true` produces 319 km / Day 4 = 97 km / the plan actually fits in 4 days at 100 km/day. **Fixing the data fixed the agent's product behaviour without changing one line of orchestrator code.**
+
+**Consequence:** A second tool (`get_route` after `get_weather`) now ships behind an env flag with real public-data backing. The README's coverage table can promote `get_route` from "mock" to "real, opt-in." 90/90 unit tests stay green because the env flag is unset by default in tests.

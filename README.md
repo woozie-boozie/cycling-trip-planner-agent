@@ -80,6 +80,22 @@ USE_REAL_WEATHER=true
 # (no API key, no signup). Falls back to seeded mocks on any failure.
 ```
 
+### Optional: real route distances
+
+```bash
+# In .env:
+USE_REAL_ROUTES=true
+
+# Restart the server. get_route now computes real road-network distances
+# via BRouter (https://brouter.de) — a free OpenStreetMap-backed bike
+# routing engine. No API key, no signup. Falls back to seeded mocks on
+# unknown corridor or any BRouter failure.
+#
+# Result: London→Paris (Avenue Verte) reports ~319km on the trekking
+# profile vs the seed's hand-typed 380km. Day-4 Beauvais→Paris is 97km
+# real, not the 140km the seed claimed. ADR-014 documents the swap.
+```
+
 ### Optional: production database
 
 ```bash
@@ -102,12 +118,13 @@ The brief grades agent architecture (25%), tool design (20%), multi-step reasoni
 
 **3. `SessionStore` is a Protocol from minute one.** Today: `InMemorySessionStore` (a dict). Tomorrow: `PostgresSessionStore` swaps in via one line in `src/api/dependencies.py`. The route code never changes. See [`src/sessions/store.py`](src/sessions/store.py).
 
-**4. Tool data lives in three storage backends — same Pydantic schema across all three.**
+**4. Tool data lives in four storage backends — same Pydantic schema across all four.**
    - **Python dicts** (Phase 1.2) — case study mock seed
    - **Neon Postgres** (Phase 1.12a) — operational store, default backend, async via SQLModel
    - **Open-Meteo Archive** (Phase 1.10) — real ECMWF ERA5 climate norms, opt-in via `USE_REAL_WEATHER=true`, falls back to (2) on any failure
+   - **BRouter** (Phase 1.10b) — real OpenStreetMap-backed bike routing, opt-in via `USE_REAL_ROUTES=true`, falls back to (2) on unknown corridor or BRouter failure. Caught real factual errors in the seed data when fact-checked against cycle.travel — see ADR-014.
 
-   The agent loop, the system prompt, the tests — none of these change as the storage backend changes. That's the abstraction earning its keep, demonstrated three times.
+   The agent loop, the system prompt, the tests — none of these change as the storage backend changes. That's the abstraction earning its keep, demonstrated **four times** across two tools (`get_weather`, `get_route`).
 
 **5. Errors travel as data, not exceptions.** Tool failures return a `ToolResult(is_error=True, content=...)` matching Anthropic's `tool_result` protocol. The agent loop sees the error block and adapts (or asks the user) instead of crashing the whole turn.
 
@@ -184,7 +201,7 @@ Listed roughly in priority order — each is a clean extension of the existing a
 
 **3. Cloud Run deploy + Firebase Auth.** Dockerfile is already Cloud-Run-shaped (listens on `$PORT`). Production URL with `gcloud run deploy --set-env-vars ANTHROPIC_API_KEY=... DATABASE_URL=...`. Firebase Auth would gate `/chat` behind a bearer token.
 
-**4. Real route engine.** `get_route` currently reads from Postgres (3 hand-curated corridors). Wiring Komoot, BRouter, or OSRM behind the same `GetRouteOutput` schema would make any city pair work — this is the same architectural pattern as the Open-Meteo integration but for routing.
+**4. Free-form route engine.** `get_route` ships behind `USE_REAL_ROUTES=true` using BRouter (Phase 1.10b, ADR-014) — but only for the three hand-curated anchor corridors (Avenue Verte, Amsterdam→Copenhagen, London→Brighton). Adding Nominatim geocoding for arbitrary city pairs + a runtime corridor-detection step would make any A→B request work without expanding the anchor catalog. Same `GetRouteOutput` schema, same BRouter call pattern.
 
 **5. Self-critique → revise loop.** Today the agent calls `critique_trip_plan` once and either ships, surfaces warnings, or stops. With more time, the system prompt would explicitly allow up to 2 critique-revise cycles, with the trace recording the iteration so reviewers can see the agent improving on its own draft.
 
