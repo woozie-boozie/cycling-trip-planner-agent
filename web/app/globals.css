@@ -5,16 +5,18 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Cycling earth-tone palette (locked 2026-05-09):
- *   background  — deep forest #1A2E1F
- *   card        — muted olive #2D3A2C
- *   foreground  — cream       #F5F1E8
- *   muted-fg    — sage        #8FA28E
- *   primary     — warm amber  #E59C5A  (CTA / send / accent)
- *   destructive — rust        #C2613D  (errors / blockers)
+ * Cycling outdoor palette — peppy, energetic, motivating (revised 2026-05-09):
+ *   - Light cream background (warm, inviting — feels outdoorsy not corporate)
+ *   - White cards (clean, readable)
+ *   - Deep forest text (on-brand, high contrast)
+ *   - Bright amber/orange primary (Strava-energy — CTAs jump out)
+ *   - Sage muted (soft secondary information)
+ *   - Rust destructive (warm warning, not aggressive red)
  *
- * App is dark-only (earth-tone-dark by design — no light/dark toggle).
- * Tokens live in :root so we don't depend on a `dark` class on <html>.
+ * Reference inspirations: REI catalog, Komoot, Strava — outdoor brands
+ * that pair cream/white with one BOLD warm accent for energy.
+ *
+ * App is light-only by default — tokens live in :root.
  */
 
 @theme inline {
@@ -70,51 +72,53 @@
 }
 
 :root {
-  /* Surfaces */
-  --background: oklch(0.27 0.025 145);          /* deep forest */
-  --foreground: oklch(0.95 0.018 90);           /* cream */
+  /* Surfaces — light, warm, clean */
+  --background: oklch(0.98 0.012 85);           /* warm cream */
+  --foreground: oklch(0.26 0.04 145);           /* deep forest text */
 
-  --card: oklch(0.36 0.022 130);                /* muted olive */
-  --card-foreground: oklch(0.95 0.018 90);
+  --card: oklch(1 0 0);                         /* clean white */
+  --card-foreground: oklch(0.26 0.04 145);
 
-  --popover: oklch(0.36 0.022 130);
-  --popover-foreground: oklch(0.95 0.018 90);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.26 0.04 145);
 
-  /* Brand action — warm amber */
-  --primary: oklch(0.74 0.13 60);
-  --primary-foreground: oklch(0.18 0.02 145);   /* dark forest text on amber */
+  /* PRIMARY — bright amber-orange (Strava-energy CTAs) */
+  --primary: oklch(0.69 0.19 50);
+  --primary-foreground: oklch(1 0 0);           /* white on orange */
 
-  --secondary: oklch(0.42 0.018 135);           /* slightly lighter olive */
-  --secondary-foreground: oklch(0.95 0.018 90);
+  /* Secondary — light sage (subtle UI elements) */
+  --secondary: oklch(0.94 0.02 130);
+  --secondary-foreground: oklch(0.32 0.05 145);
 
-  --muted: oklch(0.36 0.022 130);
-  --muted-foreground: oklch(0.66 0.04 140);     /* sage */
+  --muted: oklch(0.95 0.012 85);                /* slightly warmer cream */
+  --muted-foreground: oklch(0.50 0.06 145);     /* mid sage */
 
-  --accent: oklch(0.42 0.018 135);
-  --accent-foreground: oklch(0.95 0.018 90);
+  --accent: oklch(0.92 0.04 130);               /* light forest tint */
+  --accent-foreground: oklch(0.26 0.04 145);
 
-  --destructive: oklch(0.58 0.15 40);           /* rust */
+  --destructive: oklch(0.58 0.20 28);           /* rust — warm but clear */
 
-  --border: oklch(0.95 0.018 90 / 12%);
-  --input: oklch(0.95 0.018 90 / 15%);
-  --ring: oklch(0.74 0.13 60);                  /* amber focus ring */
+  --border: oklch(0.26 0.04 145 / 14%);
+  --input: oklch(0.26 0.04 145 / 10%);
+  --ring: oklch(0.69 0.19 50);                  /* amber focus ring */
 
-  --chart-1: oklch(0.74 0.13 60);               /* amber */
-  --chart-2: oklch(0.66 0.04 140);              /* sage */
-  --chart-3: oklch(0.58 0.15 40);               /* rust */
-  --chart-4: oklch(0.42 0.018 135);             /* olive */
-  --chart-5: oklch(0.95 0.018 90);              /* cream */
+  /* Categorical chart colors */
+  --chart-1: oklch(0.69 0.19 50);               /* amber */
+  --chart-2: oklch(0.55 0.13 140);              /* forest */
+  --chart-3: oklch(0.65 0.16 130);              /* lime */
+  --chart-4: oklch(0.58 0.13 230);              /* sky */
+  --chart-5: oklch(0.58 0.20 28);               /* rust */
 
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.32 0.022 138);
-  --sidebar-foreground: oklch(0.95 0.018 90);
-  --sidebar-primary: oklch(0.74 0.13 60);
-  --sidebar-primary-foreground: oklch(0.18 0.02 145);
-  --sidebar-accent: oklch(0.42 0.018 135);
-  --sidebar-accent-foreground: oklch(0.95 0.018 90);
-  --sidebar-border: oklch(0.95 0.018 90 / 10%);
-  --sidebar-ring: oklch(0.74 0.13 60);
+  --sidebar: oklch(0.96 0.015 85);
+  --sidebar-foreground: oklch(0.26 0.04 145);
+  --sidebar-primary: oklch(0.69 0.19 50);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.92 0.04 130);
+  --sidebar-accent-foreground: oklch(0.26 0.04 145);
+  --sidebar-border: oklch(0.26 0.04 145 / 14%);
+  --sidebar-ring: oklch(0.69 0.19 50);
 }
 
 @layer base {
