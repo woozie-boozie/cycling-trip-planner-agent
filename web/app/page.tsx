@@ -66,8 +66,15 @@ export default function Home() {
     try {
       const data = await getTrace(id);
       setTrace(data);
-    } catch {
-      // Trace fetch failures are non-fatal — leave the existing panel as-is.
+    } catch (err) {
+      // 404 means the backend doesn't know this session anymore (e.g. server
+      // restarted). Clear the stale id so the next /chat starts fresh.
+      // Other errors are non-fatal — leave the existing panel as-is.
+      if (err instanceof ApiError && err.status === 404) {
+        clearSessionId();
+        setSessionId(null);
+        setTrace(null);
+      }
     } finally {
       setIsTraceLoading(false);
     }
@@ -98,11 +105,30 @@ export default function Home() {
     // useTransition keeps the input UI responsive during the in-flight call.
     startTransition(async () => {
       try {
-        const res = await postChat({
-          message: text || "Plan this trip from the attached image.",
-          session_id: sessionId ?? undefined,
-          image: imageForRequest?.payload,
-        });
+        const messageText = text || "Plan this trip from the attached image.";
+        let res;
+        try {
+          res = await postChat({
+            message: messageText,
+            session_id: sessionId ?? undefined,
+            image: imageForRequest?.payload,
+          });
+        } catch (firstErr) {
+          // Session expired on the backend (e.g. process restart wiped the
+          // in-memory store). Drop the stale session_id and retry once as
+          // a fresh conversation. Same pattern as silent token refresh.
+          if (firstErr instanceof ApiError && firstErr.status === 404 && sessionId) {
+            clearSessionId();
+            setSessionId(null);
+            setTrace(null);
+            res = await postChat({
+              message: messageText,
+              image: imageForRequest?.payload,
+            });
+          } else {
+            throw firstErr;
+          }
+        }
 
         if (res.session_id !== sessionId) {
           saveSessionId(res.session_id);
