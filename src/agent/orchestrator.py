@@ -60,11 +60,16 @@ def _trace(state: ConversationState, iteration: int, type_: str, payload: dict[s
 
 async def run_turn(
     state: ConversationState,
-    user_message: str,
+    user_message: str | list[dict[str, Any]],
     *,
     client: AsyncAnthropic | None = None,
 ) -> AgentResponse:
     """Run one full user → final-answer cycle, mutating `state` in place.
+
+    `user_message` may be either:
+      - a plain string (text-only turn — the common case), or
+      - a list of Anthropic content blocks (e.g. `[{type:"image",...}, {type:"text",...}]`
+        for multimodal turns).
 
     The state object accumulates messages, traces, and token usage so that
     the next call to `run_turn` resumes the same conversation seamlessly.
@@ -77,7 +82,19 @@ async def run_turn(
 
     # Append the user's message to the conversation.
     state.messages.append({"role": "user", "content": user_message})
-    _trace(state, iteration=0, type_="user_message", payload={"text": user_message})
+
+    # Trace event — for multimodal turns, summarise: trace stays compact even
+    # when the message includes a multi-MB base64 image payload.
+    if isinstance(user_message, str):
+        trace_payload: dict[str, Any] = {"text": user_message}
+    else:
+        text_parts = [b.get("text", "") for b in user_message if b.get("type") == "text"]
+        image_count = sum(1 for b in user_message if b.get("type") == "image")
+        trace_payload = {
+            "text": "\n".join(text_parts),
+            "images": image_count,
+        }
+    _trace(state, iteration=0, type_="user_message", payload=trace_payload)
 
     turn_input_tokens = 0
     turn_output_tokens = 0

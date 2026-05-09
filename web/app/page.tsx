@@ -8,6 +8,7 @@ import { ChatInput } from "@/components/chat-input";
 import { TracePanel } from "@/components/trace-panel";
 import { ApiError, getTrace, postChat } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
+import type { PreparedImage } from "@/lib/image";
 import { clearSessionId, loadSessionId, saveSessionId } from "@/lib/session";
 import type { TraceResponse, UiMessage } from "@/lib/types";
 
@@ -24,6 +25,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
   const [isTraceLoading, setIsTraceLoading] = useState(false);
+  const [attachedImage, setAttachedImage] = useState<PreparedImage | null>(null);
 
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
@@ -73,25 +75,33 @@ export default function Home() {
 
   const handleSubmit = useCallback(() => {
     const text = input.trim();
-    if (!text || isPending) return;
+    // Allow send when there's text OR an image (both are valid turns).
+    if ((!text && !attachedImage) || isPending) return;
 
     const userMessage: UiMessage = {
       id: makeId(),
       role: "user",
       content: text,
+      imageDataUrl: attachedImage?.dataUrl,
     };
+
+    // Snapshot the attached image so we can clear UI state immediately and
+    // still send it inside the transition.
+    const imageForRequest = attachedImage;
 
     // Optimistic append + clear input. Functional setState keeps callbacks stable.
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
+    setAttachedImage(null);
     setError(null);
 
     // useTransition keeps the input UI responsive during the in-flight call.
     startTransition(async () => {
       try {
         const res = await postChat({
-          message: text,
+          message: text || "Plan this trip from the attached image.",
           session_id: sessionId ?? undefined,
+          image: imageForRequest?.payload,
         });
 
         if (res.session_id !== sessionId) {
@@ -125,7 +135,7 @@ export default function Home() {
         }
       }
     });
-  }, [input, isPending, sessionId, refreshTrace]);
+  }, [input, isPending, sessionId, attachedImage, refreshTrace]);
 
   // If a session was restored from localStorage on mount, fetch its trace
   // so the panel reflects state from before the page reload. refreshTrace
@@ -141,7 +151,7 @@ export default function Home() {
   }, [sessionId]);
 
   const isEmpty = messages.length === 0 && !isPending;
-  const canSend = input.trim().length > 0;
+  const canSend = input.trim().length > 0 || attachedImage !== null;
 
   // Detect which corridor the conversation is about by scanning messages
   // (most recent first) for any of the known route aliases. Cheap pure
@@ -200,6 +210,8 @@ export default function Home() {
         onSubmit={handleSubmit}
         disabled={!canSend}
         isPending={isPending}
+        attachedImage={attachedImage}
+        onAttachImage={setAttachedImage}
       />
     </div>
   );
