@@ -122,8 +122,14 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
                 total_distance_km=600.0,
                 estimated_days=max(1, math.ceil(600.0 / input.daily_km_target)),
                 waypoints=[
-                    Waypoint(name=input.start, country="Unknown", distance_from_start_km=0.0),
-                    Waypoint(name=input.end, country="Unknown", distance_from_start_km=600.0),
+                    Waypoint(
+                        name=input.start, country="Unknown",
+                        distance_from_start_km=0.0, segment_km=0.0,
+                    ),
+                    Waypoint(
+                        name=input.end, country="Unknown",
+                        distance_from_start_km=600.0, segment_km=600.0,
+                    ),
                 ],
                 notes=(
                     "Detailed waypoints are not available for this corridor — only the "
@@ -139,15 +145,25 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
         )
         waypoint_rows = waypoint_result.scalars().all()
 
-    waypoints = [
-        Waypoint(
-            name=w.name,
-            country=w.country,
-            distance_from_start_km=w.distance_from_start_km,
-            is_ferry_required=w.is_ferry_required,
+    # segment_km is the cycling distance from the previous waypoint. Compute
+    # via consecutive subtraction here so the Pydantic boundary always
+    # carries the field — same contract as the BRouter path.
+    waypoints: list[Waypoint] = []
+    for i, w in enumerate(waypoint_rows):
+        seg = (
+            0.0
+            if i == 0
+            else round(w.distance_from_start_km - waypoint_rows[i - 1].distance_from_start_km, 1)
         )
-        for w in waypoint_rows
-    ]
+        waypoints.append(
+            Waypoint(
+                name=w.name,
+                country=w.country,
+                distance_from_start_km=w.distance_from_start_km,
+                segment_km=seg,
+                is_ferry_required=w.is_ferry_required,
+            )
+        )
     total = waypoints[-1].distance_from_start_km if waypoints else route_row.total_distance_km
     estimated_days = max(1, math.ceil(total / input.daily_km_target))
 
@@ -164,8 +180,9 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
     elif ferry_waypoint and _normalize(ferry_waypoint.name) in {"dieppe", "newhaven"}:
         notes = (
             "Includes the Newhaven–Dieppe ferry across the English Channel (DFDS, "
-            "~4 hours). Bikes carried free of charge. Avenue Verte is the official "
-            "signed cycle route either side."
+            "~4 hours). Cyclists travel as foot passengers — bikes carry no surcharge "
+            "above the foot-passenger fare (from £33 each way, ~£40–55 in summer). "
+            "Avenue Verte is the official signed cycle route either side."
         )
     else:
         notes = "Route includes a ferry crossing — check schedules in advance."

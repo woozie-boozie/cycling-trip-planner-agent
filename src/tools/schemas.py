@@ -52,6 +52,18 @@ class Waypoint(BaseModel):
     distance_from_start_km: float = Field(
         ge=0, description="Cumulative distance from the route's start point in km"
     )
+    segment_km: float = Field(
+        default=0.0,
+        ge=0,
+        description=(
+            "Cycling distance from the PREVIOUS waypoint to this one. The first "
+            "waypoint has segment_km=0. Use this when computing per-day cycling "
+            "distances — sum segment_km across all waypoints visited on the day, "
+            "including any pre-ferry leg. Avoids the math error of subtracting "
+            "cumulative distances and missing legs that share a cumulative value "
+            "with a ferry crossing."
+        ),
+    )
     is_ferry_required: bool = Field(
         default=False,
         description="True if reaching this waypoint requires a ferry (e.g. Rødby–Puttgarden)",

@@ -285,8 +285,12 @@ def _ferry_notes(anchors: list[Anchor]) -> str | None:
     if _normalize(ferry.name) in {"dieppe", "newhaven"}:
         return (
             "Includes the Newhaven–Dieppe ferry across the English Channel (DFDS, "
-            "~4 hours). Bikes carried free of charge. Avenue Verte is the official "
-            "signed cycle route either side."
+            "~4 hours). Cyclists travel as foot passengers — bikes carry no "
+            "surcharge above the foot-passenger fare (from £33 each way, ~£40–55 "
+            "in summer). Avenue Verte is the official signed cycle route either "
+            "side. Note: this corridor uses the V16a Beauvais variant (~364 km via "
+            "Beaumont-sur-Oise); a longer signposted Oise/Chantilly detour adds "
+            "~20–30 km via Senlis and Chantilly if the rider prefers the scenic loop."
         )
     return "Route includes a ferry crossing — check schedules in advance."
 
@@ -315,6 +319,10 @@ async def fetch_real_route(
         client = await _get_client()
 
     cumulative_km = 0.0
+    # Track distance accumulated SINCE the last overnight waypoint we emitted.
+    # Through-towns add to this without producing a Waypoint; when we hit the
+    # next overnight, that accumulated value becomes its segment_km.
+    pending_segment_km = 0.0
     waypoints: list[Waypoint] = []
     if anchors[0].is_overnight:
         waypoints.append(
@@ -322,6 +330,7 @@ async def fetch_real_route(
                 name=anchors[0].name,
                 country=anchors[0].country,
                 distance_from_start_km=0.0,
+                segment_km=0.0,
                 is_ferry_required=False,
             )
         )
@@ -331,10 +340,11 @@ async def fetch_real_route(
             if curr.is_ferry_arrival:
                 # Skip BRouter for ferry — distance contribution is 0 km
                 # cycling. The ferry tool surfaces sailing details separately.
-                segment_km = 0.0
+                hop_km = 0.0
             else:
-                segment_km, _ascend, _seconds = await _brouter_segment(client, prev, curr)
-            cumulative_km += segment_km
+                hop_km, _ascend, _seconds = await _brouter_segment(client, prev, curr)
+            cumulative_km += hop_km
+            pending_segment_km += hop_km
             # Only surface anchors flagged as overnight options to the agent.
             # The through-towns drive BRouter's path but would clutter the
             # agent's output and inflate downstream tool calls.
@@ -344,9 +354,11 @@ async def fetch_real_route(
                         name=curr.name,
                         country=curr.country,
                         distance_from_start_km=round(cumulative_km, 1),
+                        segment_km=round(pending_segment_km, 1),
                         is_ferry_required=curr.is_ferry_arrival,
                     )
                 )
+                pending_segment_km = 0.0
     except (httpx.HTTPError, ValueError, KeyError) as e:
         log.warning(
             "route_real.fallback",
