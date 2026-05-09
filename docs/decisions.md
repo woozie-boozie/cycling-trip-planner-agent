@@ -167,12 +167,20 @@ These weren't hallucinations — they were **my** mistakes baked into the mock d
   3. Cyclist-specific routing profiles (we use `trekking`)
   4. Returns track length + ascent + GeoJSON geometry per request
 
-**Why hand-curated anchor cities, not free-form geocoding:** A general-purpose A→B router would route arbitrary city pairs but can't tell you "Newhaven → Dieppe is a ferry hop." The corridor-based approach respects domain knowledge (the Avenue Verte's signed waypoints, the Rødby–Puttgarden ferry crossing) while still letting BRouter compute real road-network distances *between* the curated anchors. Three corridors, ~7-9 anchors each, ~15-30s cold cache for the whole route, instant when cached.
+**Why hand-curated anchor cities, not free-form geocoding:** A general-purpose A→B router would route arbitrary city pairs but can't tell you "Newhaven → Dieppe is a ferry hop." The corridor-based approach respects domain knowledge (the Avenue Verte's signed waypoints, the Rødby–Puttgarden ferry crossing) while still letting BRouter compute real road-network distances *between* the curated anchors. Three corridors, ~10-18 anchors each, ~30s cold cache for the whole route, instant when cached.
+
+**Why DENSE anchors with an `is_overnight` flag (added 2026-05-09):** First cut had only the major overnight cities (London → East Grinstead → Lewes → Newhaven). BRouter's trekking profile then took the most-direct cycle-routable path between those few points — shorter than the *signposted* Avenue Verte / NCN 20 cyclists actually ride. User caught this on fact-check: 319 km via direct routing didn't match cycle.travel's 387 km signposted total. Fix: each corridor now lists every signposted intermediate town as an anchor (Wandsworth, Crystal Palace, Coulsdon, Redhill, Crawley, Forest Row in the UK; Gournay-en-Bray, Saint-Germer-de-Fly, Beaumont-sur-Oise in France). A boolean `is_overnight` flag distinguishes "overnight options shown to the agent" from "through-towns that just steer BRouter." BRouter routes through every anchor; the agent only sees overnight ones. Result: 363.7 km on Avenue Verte, within 6% of cycle.travel's 387 km. The architecture handled the upgrade without changing the agent loop, the schema, or any downstream tool.
 
 **Caching:** Process-local dict keyed by `(lat₁, lon₁, lat₂, lon₂)` rounded to 4 dp (~11m precision). 24h TTL — road networks don't change minute-to-minute.
 
 **Failure model:** Any BRouter error or unknown corridor → return None → caller falls back to Postgres mock. Identical to the `_use_real_weather()` fallback chain. Logs the fallback event so it's visible in observability without breaking the agent.
 
-**Verified:** Same prompt the user fact-checked ("plan a 4-day cycle from London to Paris on the Avenue Verte, 100km/day, prefer camping but a hostel every 3rd night, traveling in June") — with `USE_REAL_ROUTES=false` produces 380 km / Day 4 = 140 km / agent has to apologise and offer trade-offs; with `USE_REAL_ROUTES=true` produces 319 km / Day 4 = 97 km / the plan actually fits in 4 days at 100 km/day. **Fixing the data fixed the agent's product behaviour without changing one line of orchestrator code.**
+**Verified across three iterations of the same fact-checked prompt** ("plan a 4-day cycle from London to Paris on the Avenue Verte, 100km/day, prefer camping but a hostel every 3rd night, traveling in June"):
+
+  - Mock seed:               380 km total, Day 4 = 140 km (fabricated; agent apologises, offers trade-offs)
+  - BRouter sparse anchors:  319 km total, Day 4 = 97 km (real road network but the most-direct path, NOT the signposted route)
+  - BRouter dense anchors:   363.7 km total, Day 4 = 109 km (real signposted Avenue Verte; cycle.travel reference: 387 km, we're within 6%)
+
+**Fixing the data fixed the agent's product behaviour without changing one line of orchestrator code.**
 
 **Consequence:** A second tool (`get_route` after `get_weather`) now ships behind an env flag with real public-data backing. The README's coverage table can promote `get_route` from "mock" to "real, opt-in." 90/90 unit tests stay green because the env flag is unset by default in tests.
