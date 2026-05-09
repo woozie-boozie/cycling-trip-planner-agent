@@ -77,6 +77,14 @@ If the route in the image is one of your known corridors (Amsterdam → Copenhag
 - **Don't repeat yourself.** Don't call the same tool with the same arguments twice in one turn.
 - **Stop tool-calling once you have what you need.** When you have everything to answer, write the final plan in your next response without more tool calls.
 
+## When to use the bonus tools
+
+These three tools answer specific cyclist questions surfaced by user research. They're optional during initial trip-planning — call them when the user asks (or the question is implicit in the request):
+
+- **`get_points_of_interest(location, categories)`** — call when the user asks "where can I get my bike fixed in X", "any good pubs / cafes near Y", "where do I refill water", "is there a hospital nearby", or wants scenic stops. Filter via `categories` (e.g. `['bike_shop']` for repair questions, `['water_fountain', 'toilet']` for fueling stops, `['scenic_viewpoint']` for photo spots) — don't over-fetch.
+- **`get_ferry_schedule(from_port, to_port, travel_month)`** — call once a route's `notes` confirm a ferry crossing AND the user is converging on departure planning ("when should I leave London?", "which ferry should I aim for?"). Surface departure times, durations, and bike policy. Don't call it speculatively before the route is settled.
+- **`estimate_budget(daily_km_target, days, accommodation_mix, country_breakdown)`** — call when the user asks about money, calories, or fuel ("how much will this cost?", "what should I eat the night before?", "is camping or hostels cheaper?"). Always provide `country_breakdown` for cross-border trips and set `has_ferry=True` with `ferry_route` when relevant — both materially change the total.
+
 # Output format
 
 Each day should be terse and information-dense — real cyclists hate fluff. Aim for:
@@ -141,7 +149,7 @@ _DIETARY_LABEL = {
 }
 
 
-def user_profile_context(profile: "UserProfile") -> str:
+def user_profile_context(profile: UserProfile) -> str:
     """Build a per-turn personalisation fragment for the system prompt.
 
     The agent reads this and adjusts its planning. Never stored in
@@ -165,21 +173,19 @@ def user_profile_context(profile: "UserProfile") -> str:
         prios = ", ".join(_PRIORITY_LABEL.get(p, p) for p in profile.priorities)
         lines.append(f"- **Top priorities:** {prios}")
 
-    diet_labels = [
-        _DIETARY_LABEL.get(d, d) for d in profile.dietary if _DIETARY_LABEL.get(d, d)
-    ]
+    diet_labels = [_DIETARY_LABEL.get(d, d) for d in profile.dietary if _DIETARY_LABEL.get(d, d)]
     if diet_labels:
-        lines.append(f"- **Dietary:** {", ".join(diet_labels)}")
+        lines.append(f"- **Dietary:** {', '.join(diet_labels)}")
 
     if profile.additional_notes:
-        lines.append(f"- **Notes from rider:** \"{profile.additional_notes}\"")
+        lines.append(f'- **Notes from rider:** "{profile.additional_notes}"')
 
     lines.append("")
     lines.append("**Apply this profile in four ways:**")
     lines.append(
         f"1. **Don't push past their comfort distance unsolicited.** Their max comfortable "
         f"daily distance is **{profile.max_daily_km_comfort} km**. If they ask for more, "
-        f"flag the gap honestly before producing a plan: e.g. \"you said {profile.experience}, "
+        f'flag the gap honestly before producing a plan: e.g. "you said {profile.experience}, '
         f"that pace is challenging — want a slower version?\". Don't silently set them up for failure."
     )
     lines.append(
@@ -198,4 +204,3 @@ def user_profile_context(profile: "UserProfile") -> str:
     )
 
     return "\n".join(lines)
-
