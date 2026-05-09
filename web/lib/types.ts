@@ -11,9 +11,22 @@
 
 export type Role = "user" | "assistant";
 
+export type ImageMediaType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/gif";
+
+export interface ChatImage {
+  media_type: ImageMediaType;
+  /** Base64-encoded image data (no data URL prefix). */
+  base64_data: string;
+}
+
 export interface ChatRequest {
   message: string;
   session_id?: string;
+  image?: ChatImage;
 }
 
 export interface ToolCallSummary {
@@ -60,6 +73,11 @@ export interface UiMessage {
   id: string;
   role: Role;
   content: string;
+  /**
+   * For user messages with an attached image — the data URL we display in
+   * the bubble. Stored separately from `content` (which is the text).
+   */
+  imageDataUrl?: string;
   /** Per-turn snapshot for assistant messages. Undefined while in flight. */
   meta?: {
     iterations: number;

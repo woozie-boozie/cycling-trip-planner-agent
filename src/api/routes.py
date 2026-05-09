@@ -12,7 +12,7 @@ Endpoints:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from anthropic import AsyncAnthropic
@@ -61,11 +61,33 @@ async def root() -> HealthResponse:
 # ---------------------------------------------------------------------------
 
 
+class ChatImage(BaseModel):
+    """Optional image attachment for multimodal /chat requests.
+
+    Mirrors Anthropic's content-block image format. The agent receives the
+    image as the first content block of the user message and reasons about
+    it directly — no separate "extract intent" pass.
+    """
+
+    media_type: Literal["image/jpeg", "image/png", "image/webp", "image/gif"] = Field(
+        description="MIME type. Anthropic vision supports JPEG, PNG, WebP, and GIF."
+    )
+    base64_data: str = Field(
+        min_length=1,
+        max_length=10_000_000,
+        description="Base64-encoded image data. Cap at ~7MB encoded (~5MB decoded).",
+    )
+
+
 class ChatRequest(BaseModel):
     """Body for POST /chat.
 
     Pass `session_id` to continue an existing conversation. Omit it to start a
     fresh one — the response will include a generated id you can re-send.
+
+    Optionally attach an `image` (base64) to send a multimodal turn — the
+    agent will reason over the image (e.g. a Strava/Komoot screenshot) AND
+    the text in one loop.
     """
 
     message: str = Field(
@@ -77,6 +99,13 @@ class ChatRequest(BaseModel):
         default=None,
         description="Optional. If provided and the session exists, the conversation resumes. "
         "If omitted, a fresh session is created.",
+    )
+    image: ChatImage | None = Field(
+        default=None,
+        description=(
+            "Optional. Base64-encoded image to attach to the user's message. "
+            "When provided, the agent receives both the image and the text as content blocks."
+        ),
     )
 
 
@@ -133,10 +162,30 @@ async def chat(
         session_id=state.session_id,
         is_new=is_new,
         message_len=len(request.message),
+        has_image=request.image is not None,
     )
 
+    # Multimodal: build a content list with the image as the first block,
+    # text as the second. Anthropic accepts a string OR a list of content
+    # blocks for the user message — see docs/agent-loop.md.
+    user_message: str | list[dict[str, Any]]
+    if request.image is not None:
+        user_message = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": request.image.media_type,
+                    "data": request.image.base64_data,
+                },
+            },
+            {"type": "text", "text": request.message},
+        ]
+    else:
+        user_message = request.message
+
     try:
-        response: AgentResponse = await run_turn(state, request.message, client=client)
+        response: AgentResponse = await run_turn(state, user_message, client=client)
     except AgentLoopExceeded as e:
         log.warning("chat.loop_exceeded", session_id=state.session_id, error=str(e))
         # Persist the partial state so /trace can still show what happened.

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Bike, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
@@ -34,7 +35,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         }
       >
         {isUser ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          <>
+            {message.imageDataUrl ? (
+              <div className="mb-2 overflow-hidden rounded-lg ring-1 ring-border/30">
+                <Image
+                  src={message.imageDataUrl}
+                  alt="Attached"
+                  width={400}
+                  height={300}
+                  className="h-auto w-full object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : null}
+            {message.content ? (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+            ) : null}
+          </>
         ) : (
           <MarkdownRenderer content={message.content} />
         )}
