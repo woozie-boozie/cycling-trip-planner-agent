@@ -185,3 +185,83 @@ class GetElevationProfileOutput(BaseModel):
     )
     difficulty: Difficulty
     notes: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# critique_trip_plan — self-critique tool the agent calls before finalizing
+# ---------------------------------------------------------------------------
+
+
+class DraftedDay(BaseModel):
+    """A single day in the agent's draft plan, structured for critique.
+
+    Required fields: day_number + distance_km. Everything else is optional but
+    informative — the more the agent fills in, the more thorough the critique.
+    """
+
+    day_number: int = Field(ge=1)
+    distance_km: float = Field(ge=0, description="Distance cycled this day in km")
+    elevation_gain_m: int = Field(default=0, ge=0)
+    difficulty: Difficulty | None = None
+    accommodation_type: AccommodationType | None = Field(
+        default=None,
+        description="Where the cyclist sleeps THIS NIGHT (after riding day_number)",
+    )
+    accommodation_name: str | None = None
+    has_ferry: bool = Field(
+        default=False, description="True if this day involves a ferry crossing"
+    )
+    notes: str | None = None
+
+
+CritiqueSeverity = Literal["info", "warning", "blocker"]
+CritiqueCategory = Literal[
+    "pacing",
+    "accommodation_mismatch",
+    "elevation_pacing",
+    "consistency",
+    "ferry_missing",
+]
+
+
+class CritiqueIssue(BaseModel):
+    """A single issue surfaced by the critique."""
+
+    severity: CritiqueSeverity
+    category: CritiqueCategory
+    message: str
+    affects_days: list[int] = Field(default_factory=list)
+    suggestion: str | None = None
+
+
+CritiqueAssessment = Literal["ship_it", "minor_revisions", "major_revisions"]
+
+
+class CritiqueTripPlanInput(BaseModel):
+    """Input for critique_trip_plan."""
+
+    days: list[DraftedDay] = Field(min_length=1)
+    daily_km_target: float = Field(gt=0, description="The user's stated daily distance target")
+    accommodation_preference: str = Field(
+        default="any",
+        description=(
+            "Free-text describing the user's accommodation preference, e.g. "
+            "'mostly camping', 'hostel every 3rd night', 'hotels every night'. "
+            "The critique parses this for known patterns ('every Nth night', 'camping')."
+        ),
+    )
+
+
+class CritiqueTripPlanOutput(BaseModel):
+    """Output for critique_trip_plan — issues found + overall assessment.
+
+    Agent uses this to decide whether to ship the plan, surface warnings to
+    the user, or revise. `overall_assessment` is the headline:
+      - ship_it          → present the plan as-is
+      - minor_revisions  → surface the warnings to the user (Heads up section)
+      - major_revisions  → revise the plan, optionally re-critique
+    """
+
+    issues: list[CritiqueIssue]
+    overall_assessment: CritiqueAssessment
+    summary: str
