@@ -27,6 +27,70 @@ export interface ChatRequest {
   message: string;
   session_id?: string;
   image?: ChatImage;
+  /** Optional cyclist profile id (Phase 2D) — backend personalises the plan. */
+  profile_id?: string;
+}
+
+// ---------------------------------------------------------------------------
+// User profile (Phase 2D)
+// ---------------------------------------------------------------------------
+
+export type ExperienceLevel =
+  | "beginner"
+  | "casual"
+  | "intermediate"
+  | "experienced"
+  | "racer";
+
+export type TripStyle =
+  | "weekend"
+  | "touring"
+  | "commute"
+  | "charity"
+  | "special"
+  | "solo";
+
+export type Priority =
+  | "scenery"
+  | "distance"
+  | "food_drink"
+  | "wild_camping"
+  | "quiet_roads"
+  | "pubs_culture"
+  | "cheap"
+  | "iconic"
+  | "photography";
+
+export type DietaryRestriction =
+  | "vegetarian"
+  | "vegan"
+  | "gluten_free"
+  | "halal"
+  | "kosher"
+  | "lactose_free"
+  | "none";
+
+/** Body for POST /profile — server fills in derived fields + timestamps. */
+export interface UserProfileCreate {
+  profile_id?: string;
+  experience: ExperienceLevel;
+  trip_styles: TripStyle[];
+  priorities: Priority[];
+  dietary: DietaryRestriction[];
+  additional_notes?: string | null;
+}
+
+/** Canonical profile returned by GET / POST /profile. */
+export interface UserProfile {
+  profile_id: string;
+  experience: ExperienceLevel;
+  max_daily_km_comfort: number;
+  trip_styles: TripStyle[];
+  priorities: Priority[];
+  dietary: DietaryRestriction[];
+  additional_notes: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ToolCallSummary {
