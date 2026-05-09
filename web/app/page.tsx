@@ -5,9 +5,10 @@ import { Header } from "@/components/header";
 import { MessageBubble } from "@/components/message-bubble";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
-import { ApiError, postChat } from "@/lib/api";
+import { TracePanel } from "@/components/trace-panel";
+import { ApiError, getTrace, postChat } from "@/lib/api";
 import { clearSessionId, loadSessionId, saveSessionId } from "@/lib/session";
-import type { UiMessage } from "@/lib/types";
+import type { TraceResponse, UiMessage } from "@/lib/types";
 
 function makeId(): string {
   // Quick-and-light unique id for React keys; not the backend session_id.
@@ -20,6 +21,8 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [trace, setTrace] = useState<TraceResponse | null>(null);
+  const [isTraceLoading, setIsTraceLoading] = useState(false);
 
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
@@ -49,6 +52,22 @@ export default function Home() {
     setSessionId(null);
     setMessages([]);
     setError(null);
+    setTrace(null);
+  }, []);
+
+  // Fetch the trace for the current session whenever a turn settles. Kept as
+  // a separate function (not a hook) so we can call it imperatively from
+  // handleSubmit's transition without re-creating dependencies.
+  const refreshTrace = useCallback(async (id: string) => {
+    setIsTraceLoading(true);
+    try {
+      const data = await getTrace(id);
+      setTrace(data);
+    } catch {
+      // Trace fetch failures are non-fatal — leave the existing panel as-is.
+    } finally {
+      setIsTraceLoading(false);
+    }
   }, []);
 
   const handleSubmit = useCallback(() => {
@@ -91,6 +110,9 @@ export default function Home() {
           },
         };
         setMessages((prev) => [...prev, assistantMessage]);
+
+        // Fire-and-forget — don't block the UI on the trace fetch.
+        void refreshTrace(res.session_id);
       } catch (err) {
         const fallback = "Something went wrong talking to the agent.";
         if (err instanceof ApiError) {
@@ -102,7 +124,20 @@ export default function Home() {
         }
       }
     });
-  }, [input, isPending, sessionId]);
+  }, [input, isPending, sessionId, refreshTrace]);
+
+  // If a session was restored from localStorage on mount, fetch its trace
+  // so the panel reflects state from before the page reload. refreshTrace
+  // calls setState internally — that's the legitimate "hydrate from external"
+  // pattern, same justification as the localStorage restore above.
+  useEffect(() => {
+    if (sessionId && !trace) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void refreshTrace(sessionId);
+    }
+    // We intentionally only run this when sessionId becomes truthy after mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const isEmpty = messages.length === 0 && !isPending;
   const canSend = input.trim().length > 0;
@@ -112,25 +147,37 @@ export default function Home() {
       <Header sessionId={sessionId} onReset={handleReset} />
 
       <main className="flex-1 overflow-hidden">
-        <div className="mx-auto flex h-full max-w-5xl flex-col">
-          <div className="flex-1 overflow-y-auto px-4 py-6">
-            {isEmpty ? (
-              <EmptyState />
-            ) : (
-              <div className="space-y-5">
-                {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} />
-                ))}
-                {isPending ? <LoadingIndicator /> : null}
-                {error ? (
-                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                    {error}
-                  </div>
-                ) : null}
-                <div ref={scrollAnchorRef} />
-              </div>
-            )}
+        <div className="mx-auto flex h-full max-w-7xl">
+          {/* Chat column — full width on mobile, ~7/10ths on desktop */}
+          <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex-1 overflow-y-auto px-4 py-6">
+              {isEmpty ? (
+                <EmptyState />
+              ) : (
+                <div className="space-y-5">
+                  {messages.map((m) => (
+                    <MessageBubble key={m.id} message={m} />
+                  ))}
+                  {isPending ? <LoadingIndicator /> : null}
+                  {error ? (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                      {error}
+                    </div>
+                  ) : null}
+                  <div ref={scrollAnchorRef} />
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Trace panel — hidden on mobile, ~3/10ths on lg+ */}
+          <aside className="hidden w-[320px] shrink-0 border-l border-border/40 bg-card/30 p-4 lg:block">
+            <TracePanel
+              trace={trace}
+              isLoading={isTraceLoading || isPending}
+              hasSession={Boolean(sessionId)}
+            />
+          </aside>
         </div>
       </main>
 
