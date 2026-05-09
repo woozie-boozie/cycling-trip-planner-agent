@@ -1,15 +1,22 @@
 "use client";
 
-import { Bike, RotateCcw } from "lucide-react";
+import { Bike, RotateCcw, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 interface HeaderProps {
   sessionId: string | null;
   onReset: () => void;
+  hasProfile?: boolean;
+  onEditProfile?: () => void;
 }
 
-export function Header({ sessionId, onReset }: HeaderProps) {
+export function Header({
+  sessionId,
+  onReset,
+  hasProfile = false,
+  onEditProfile,
+}: HeaderProps) {
   const sessionLabel = sessionId ? sessionId.slice(0, 8) : "new";
 
   return (
@@ -30,9 +37,31 @@ export function Header({ sessionId, onReset }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {hasProfile && (
+            <Badge
+              variant="outline"
+              className="hidden border-primary/40 bg-primary/10 text-[10px] text-primary sm:inline-flex"
+            >
+              personalised
+            </Badge>
+          )}
           <Badge variant="secondary" className="font-mono text-[10px] tracking-wider">
             session · {sessionLabel}
           </Badge>
+          {onEditProfile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEditProfile}
+              className="text-muted-foreground hover:text-foreground"
+              title={hasProfile ? "Edit your profile" : "Set up your profile"}
+            >
+              <UserCog className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline">
+                {hasProfile ? "Edit profile" : "Set up profile"}
+              </span>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"

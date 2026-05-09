@@ -10,7 +10,13 @@
  * set in Vercel's project env vars.
  */
 
-import type { ChatRequest, ChatResponse, TraceResponse } from "@/lib/types";
+import type {
+  ChatRequest,
+  ChatResponse,
+  TraceResponse,
+  UserProfile,
+  UserProfileCreate,
+} from "@/lib/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -53,6 +59,30 @@ export async function getTrace(sessionId: string, signal?: AbortSignal): Promise
     signal,
   });
   return jsonOrThrow<TraceResponse>(res);
+}
+
+export async function postProfile(
+  body: UserProfileCreate,
+  signal?: AbortSignal,
+): Promise<UserProfile> {
+  const res = await fetch(`${API_URL}/profile`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  return jsonOrThrow<UserProfile>(res);
+}
+
+export async function getProfile(
+  profileId: string,
+  signal?: AbortSignal,
+): Promise<UserProfile> {
+  const res = await fetch(
+    `${API_URL}/profile/${encodeURIComponent(profileId)}`,
+    { signal },
+  );
+  return jsonOrThrow<UserProfile>(res);
 }
 
 export const apiBaseUrl = API_URL;
