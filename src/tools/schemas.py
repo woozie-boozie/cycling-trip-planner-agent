@@ -83,15 +83,70 @@ class GetRouteInput(BaseModel):
     )
 
 
+class RouteVariant(BaseModel):
+    """A single way to cycle the corridor — its own road choice, distance,
+    and waypoint chain. Most signposted long-distance routes have multiple
+    real variants (e.g. Avenue Verte: V16a Beauvais, Oise/Chantilly, Gisors)
+    with different distances and characters.
+
+    The agent's job is to surface 2-3 variants side-by-side and let the
+    user choose, rather than picking silently.
+    """
+
+    name: str = Field(description="Short identifier, e.g. 'v16a_beauvais'")
+    title: str = Field(
+        description="Display title for side-by-side comparison, e.g. "
+        "'V16a Beauvais — fastest signposted'",
+    )
+    description: str = Field(description="One-line summary the agent surfaces in the comparison")
+    total_distance_km: float = Field(ge=0)
+    estimated_days: int = Field(ge=1, description="Total days at the user's daily_km_target")
+    waypoints: list[Waypoint] = Field(
+        description="Ordered list including start and end. Used for day planning."
+    )
+    distinguishing_features: list[str] = Field(
+        default_factory=list,
+        description="2-4 concrete things that make this variant distinct from the others",
+    )
+    trade_offs: list[str] = Field(
+        default_factory=list,
+        description="2-4 honest trade-offs (what you give up by choosing this one)",
+    )
+    best_for: str = Field(
+        description="Who/when this variant fits, e.g. 'targeting the fastest crossing"
+        " and prefer modern cities to chateaux'",
+    )
+    notes: str | None = None
+    is_default: bool = Field(
+        default=False,
+        description="True if this is the variant the agent should default to when the "
+        "user expresses no preference (e.g. fastest with widest signposting).",
+    )
+
+
 class GetRouteOutput(BaseModel):
-    """Output for get_route — full route summary plus ordered waypoints."""
+    """Output for get_route — multiple route variants for the corridor.
+
+    For corridors with one catalogued variant (or unknown corridors that
+    fall back to the stub), `variants` is length 1. For corridors with
+    multiple signposted alternatives, `variants` carries 2-3 entries and
+    the agent should present them side-by-side for the user to pick.
+
+    Legacy single-variant fields (`total_distance_km`, `waypoints`, `notes`,
+    `estimated_days`) mirror the default variant so older consumers keep
+    working without code changes.
+    """
 
     start: str
     end: str
+    variants: list[RouteVariant] = Field(
+        description="One entry per available variant. Length-1 for single-route corridors.",
+    )
+    # ── Legacy fields ── populated from the default variant for back-compat ──
     total_distance_km: float = Field(ge=0)
     estimated_days: int = Field(ge=1, description="Total days assuming the daily_km_target")
     waypoints: list[Waypoint] = Field(
-        description="Ordered list including start and end. Use to break trip into daily segments."
+        description="Ordered list including start and end. Use to break trip into daily segments.",
     )
     notes: str | None = Field(
         default=None,

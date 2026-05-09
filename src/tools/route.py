@@ -28,7 +28,7 @@ from src.db.models import Route as RouteRow
 from src.db.models import Waypoint as WaypointRow
 from src.tools.base import register_tool
 from src.tools.route_real import fetch_real_route, use_real_routes
-from src.tools.schemas import GetRouteInput, GetRouteOutput, Waypoint
+from src.tools.schemas import GetRouteInput, GetRouteOutput, RouteVariant, Waypoint
 
 # (name, country, cumulative_km_from_start, ferry_required)
 _WAYPOINTS_AMS_TO_CPH: list[tuple[str, str, float, bool]] = [
@@ -116,26 +116,43 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
             # Unknown corridor — return a minimal stub so the agent can still
             # operate gracefully ("I don't have detailed waypoints for that
             # corridor; can you break it into shorter legs?").
+            stub_waypoints = [
+                Waypoint(
+                    name=input.start, country="Unknown",
+                    distance_from_start_km=0.0, segment_km=0.0,
+                ),
+                Waypoint(
+                    name=input.end, country="Unknown",
+                    distance_from_start_km=600.0, segment_km=600.0,
+                ),
+            ]
+            stub_notes = (
+                "Detailed waypoints are not available for this corridor — only the "
+                "start and end are returned. Suggest the user break the trip into "
+                "shorter, well-known legs."
+            )
+            stub_days = max(1, math.ceil(600.0 / input.daily_km_target))
+            stub_variant = RouteVariant(
+                name="unknown_stub",
+                title="Unknown corridor — placeholder",
+                description="Detailed route data not available; placeholder distance only.",
+                total_distance_km=600.0,
+                estimated_days=stub_days,
+                waypoints=stub_waypoints,
+                distinguishing_features=[],
+                trade_offs=["No real route data — distances are an approximation"],
+                best_for="not recommended without verifying the route via another source",
+                notes=stub_notes,
+                is_default=True,
+            )
             return GetRouteOutput(
                 start=input.start,
                 end=input.end,
+                variants=[stub_variant],
                 total_distance_km=600.0,
-                estimated_days=max(1, math.ceil(600.0 / input.daily_km_target)),
-                waypoints=[
-                    Waypoint(
-                        name=input.start, country="Unknown",
-                        distance_from_start_km=0.0, segment_km=0.0,
-                    ),
-                    Waypoint(
-                        name=input.end, country="Unknown",
-                        distance_from_start_km=600.0, segment_km=600.0,
-                    ),
-                ],
-                notes=(
-                    "Detailed waypoints are not available for this corridor — only the "
-                    "start and end are returned. Suggest the user break the trip into "
-                    "shorter, well-known legs."
-                ),
+                estimated_days=stub_days,
+                waypoints=stub_waypoints,
+                notes=stub_notes,
             )
 
         waypoint_result = await session.execute(
@@ -187,9 +204,31 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
     else:
         notes = "Route includes a ferry crossing — check schedules in advance."
 
+    # Wrap the DB-loaded route as a single variant for schema consistency
+    # with the multi-variant real-data path. Frontend + downstream tools
+    # consume `waypoints` directly so they don't need to know about variants.
+    db_variant = RouteVariant(
+        name="seed_default",
+        title=f"{input.start} → {input.end} (seeded route)",
+        description=(
+            "Route loaded from the seed dataset. Set USE_REAL_ROUTES=true to "
+            "compute real road distances via BRouter and access multiple "
+            "signposted variants where available."
+        ),
+        total_distance_km=total,
+        estimated_days=estimated_days,
+        waypoints=waypoints,
+        distinguishing_features=[],
+        trade_offs=[],
+        best_for="quick demo / offline mode",
+        notes=notes,
+        is_default=True,
+    )
+
     return GetRouteOutput(
         start=input.start,
         end=input.end,
+        variants=[db_variant],
         total_distance_km=total,
         estimated_days=estimated_days,
         waypoints=waypoints,
