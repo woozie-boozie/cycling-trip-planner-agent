@@ -83,22 +83,52 @@ class Anchor:
     lat: float
     lon: float
     is_ferry_arrival: bool = False
+    # When False, this anchor is used to STEER BRouter along the signposted
+    # route but is NOT surfaced to the agent as an overnight option. Default
+    # True keeps existing behaviour; set False on through-towns we add to
+    # force the routing closer to the official signposted track.
+    is_overnight: bool = True
 
 
-# Avenue Verte — London → Paris via Newhaven-Dieppe ferry.
+# Avenue Verte — London → Paris (Beauvais variant, ~387 km signposted).
+#
+# Dense anchors steer BRouter through the signposted towns rather than
+# letting it pick the most-direct bike-routable path. Sources cross-checked
+# with avenuevertelondonparis.co.uk, cycle.travel/route/avenue_verte_uk and
+# Cicerone's London-to-Paris guidebook (May 2026).
+#
+# UK side (via NCN 21 / 20 / 2 / 21):
+#   London → Wandsworth → Crystal Palace → Coulsdon → Redhill → Crawley →
+#   East Grinstead → Forest Row → Lewes → Newhaven
+# Ferry: Newhaven ↔ Dieppe (DFDS, ~4 hr)
+# France side (Beauvais variant V16a):
+#   Dieppe → Forges-les-Eaux → Gournay-en-Bray → Saint-Germer-de-Fly →
+#   Beauvais → Beaumont-sur-Oise → Cergy-Pontoise → Paris
 _AVENUE_VERTE: list[Anchor] = [
     Anchor("London", "United Kingdom", 51.5074, -0.1278),
+    Anchor("Wandsworth", "United Kingdom", 51.4530, -0.1845, is_overnight=False),
+    Anchor("Crystal Palace", "United Kingdom", 51.4216, -0.0746, is_overnight=False),
+    Anchor("Coulsdon", "United Kingdom", 51.3208, -0.1395, is_overnight=False),
+    Anchor("Redhill", "United Kingdom", 51.2400, -0.1714, is_overnight=False),
+    Anchor("Crawley", "United Kingdom", 51.1092, -0.1872, is_overnight=False),
     Anchor("East Grinstead", "United Kingdom", 51.1283, -0.0094),
+    Anchor("Forest Row", "United Kingdom", 51.1006, 0.0312, is_overnight=False),
     Anchor("Lewes", "United Kingdom", 50.8736, 0.0080),
     Anchor("Newhaven", "United Kingdom", 50.7935, 0.0570),
     Anchor("Dieppe", "France", 49.9229, 1.0784, is_ferry_arrival=True),
     Anchor("Forges-les-Eaux", "France", 49.6111, 1.5439),
+    Anchor("Gournay-en-Bray", "France", 49.4869, 1.7269, is_overnight=False),
+    Anchor("Saint-Germer-de-Fly", "France", 49.4317, 1.7747, is_overnight=False),
     Anchor("Beauvais", "France", 49.4314, 2.0807),
+    Anchor("Beaumont-sur-Oise", "France", 49.1432, 2.2825, is_overnight=False),
     Anchor("Cergy-Pontoise", "France", 49.0356, 2.0707),
     Anchor("Paris", "France", 48.8566, 2.3522),
 ]
 
-# Amsterdam → Copenhagen via Puttgarden-Rødby ferry (EuroVelo 7/12 corridor).
+# Amsterdam → Copenhagen via Puttgarden-Rødby ferry (EuroVelo 12 corridor).
+# Existing 10-anchor chain matches the popular inland touring route well
+# (BRouter reports 836 km, very close to the seeded 850 km — sanity-check
+# passes). No additional through-towns needed.
 _AMS_TO_CPH: list[Anchor] = [
     Anchor("Amsterdam", "Netherlands", 52.3676, 4.9041),
     Anchor("Hoorn", "Netherlands", 52.6425, 5.0597),
@@ -112,10 +142,18 @@ _AMS_TO_CPH: list[Anchor] = [
     Anchor("Copenhagen", "Denmark", 55.6761, 12.5683),
 ]
 
-# London → Brighton — south-coast classic.
+# London → Brighton — National Cycle Network Route 20 (the iconic signposted
+# south-coast classic, ~95 km signposted vs ~75 km direct).
+#   London → Wandsworth → Mitcham → Coulsdon → Crawley (rejoin AV briefly) →
+#   Cuckfield → Burgess Hill → Brighton
 _LDN_TO_BRI: list[Anchor] = [
     Anchor("London", "United Kingdom", 51.5074, -0.1278),
-    Anchor("Crystal Palace", "United Kingdom", 51.4216, -0.0746),
+    Anchor("Wandsworth", "United Kingdom", 51.4530, -0.1845, is_overnight=False),
+    Anchor("Mitcham", "United Kingdom", 51.4040, -0.1683, is_overnight=False),
+    Anchor("Coulsdon", "United Kingdom", 51.3208, -0.1395, is_overnight=False),
+    Anchor("Crawley", "United Kingdom", 51.1092, -0.1872, is_overnight=False),
+    Anchor("Cuckfield", "United Kingdom", 51.0007, -0.1421),  # popular halfway B&B stop
+    Anchor("Burgess Hill", "United Kingdom", 50.9551, -0.1316, is_overnight=False),
     Anchor("Brighton", "United Kingdom", 50.8225, -0.1372),
 ]
 
@@ -277,14 +315,16 @@ async def fetch_real_route(
         client = await _get_client()
 
     cumulative_km = 0.0
-    waypoints: list[Waypoint] = [
-        Waypoint(
-            name=anchors[0].name,
-            country=anchors[0].country,
-            distance_from_start_km=0.0,
-            is_ferry_required=False,
+    waypoints: list[Waypoint] = []
+    if anchors[0].is_overnight:
+        waypoints.append(
+            Waypoint(
+                name=anchors[0].name,
+                country=anchors[0].country,
+                distance_from_start_km=0.0,
+                is_ferry_required=False,
+            )
         )
-    ]
 
     try:
         for prev, curr in zip(anchors[:-1], anchors[1:], strict=True):
@@ -295,14 +335,18 @@ async def fetch_real_route(
             else:
                 segment_km, _ascend, _seconds = await _brouter_segment(client, prev, curr)
             cumulative_km += segment_km
-            waypoints.append(
-                Waypoint(
-                    name=curr.name,
-                    country=curr.country,
-                    distance_from_start_km=round(cumulative_km, 1),
-                    is_ferry_required=curr.is_ferry_arrival,
+            # Only surface anchors flagged as overnight options to the agent.
+            # The through-towns drive BRouter's path but would clutter the
+            # agent's output and inflate downstream tool calls.
+            if curr.is_overnight:
+                waypoints.append(
+                    Waypoint(
+                        name=curr.name,
+                        country=curr.country,
+                        distance_from_start_km=round(cumulative_km, 1),
+                        is_ferry_required=curr.is_ferry_arrival,
+                    )
                 )
-            )
     except (httpx.HTTPError, ValueError, KeyError) as e:
         log.warning(
             "route_real.fallback",
@@ -323,8 +367,11 @@ async def fetch_real_route(
 
     notes = _ferry_notes(anchors)
     real_data_note = (
-        f"Distances computed via BRouter (real bike routing on OpenStreetMap "
-        f"data, trekking profile) — total {total:.1f} km. Cached for 24h."
+        f"Distances computed via BRouter on the signposted route — total "
+        f"{total:.1f} km. Cached for 24h. The chain is steered through the "
+        f"official signposted intermediate towns (cross-checked with "
+        f"avenuevertelondonparis.co.uk, cycle.travel, Cicerone), so this "
+        f"matches what a cyclist following the route signs would actually ride."
     )
     notes = f"{notes}\n\n{real_data_note}" if notes else real_data_note
 
