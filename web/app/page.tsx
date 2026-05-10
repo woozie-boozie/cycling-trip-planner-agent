@@ -115,19 +115,22 @@ export default function Home() {
   // Fetch the trace for the current session whenever a turn settles. Kept as
   // a separate function (not a hook) so we can call it imperatively from
   // handleSubmit's transition without re-creating dependencies.
+  //
+  // A /trace 404 is BENIGN — it can fire when the streaming session-preamble
+  // event lands before the backend has persisted state mid-stream. In that
+  // case the session is real and in-flight; clearing the id would orphan
+  // the next turn into a fresh session and look like amnesia. Only /chat
+  // 404 is a real "session lost" signal; that's handled in handleSubmit.
   const refreshTrace = useCallback(async (id: string) => {
     setIsTraceLoading(true);
     try {
       const data = await getTrace(id);
       setTrace(data);
     } catch (err) {
-      // 404 means the backend doesn't know this session anymore (e.g. server
-      // restarted). Clear the stale id so the next /chat starts fresh.
-      // Other errors are non-fatal — leave the existing panel as-is.
+      // Don't clear sessionId on 404 here — see comment above. Trace will
+      // refresh on the next turn's `done` event.
       if (err instanceof ApiError && err.status === 404) {
-        clearSessionId();
-        setSessionId(null);
-        setTrace(null);
+        // benign — leave sessionId + trace alone
       }
     } finally {
       setIsTraceLoading(false);
