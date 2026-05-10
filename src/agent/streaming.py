@@ -112,6 +112,12 @@ async def run_turn_stream(
     tool_call_summary: list[dict[str, Any]] = []
     final_stop_reason = "end_turn"
 
+    log.info(
+        "agent.stream.start",
+        session_id=state.session_id,
+        messages_in=len(state.messages),
+    )
+
     for iteration in range(1, settings.max_loop_iterations + 1):
         log.info(
             "agent.stream.iteration",
@@ -120,11 +126,25 @@ async def run_turn_stream(
             messages=len(state.messages),
         )
 
-        # `messages.stream()` is an async context manager that yields
-        # structured events. We translate them to our flat dict protocol.
-        # Track which content-block index is the currently-open tool_use
-        # so we know which one to emit complete-events for.
-        open_tool_blocks: dict[int, dict[str, Any]] = {}
+        # We accumulate the assistant message ourselves from the streamed
+        # events instead of relying on `stream.get_final_message()`. The
+        # SDK's get_final_message() can return content blocks with empty
+        # `.text` when called inside the async-with — a multi-turn amnesia
+        # bug we hit in production (commit prior to fix shipped flat input
+        # tokens across turns 6.99k → 6.96k → 7.13k because the assistant
+        # turn was being persisted with empty text content).
+        #
+        # Per content-block index:
+        #   accumulated_text[i]  → joined text from text_delta events
+        #   accumulated_tool[i]  → {id, name, input} for tool_use blocks
+        accumulated_text: dict[int, str] = {}
+        accumulated_tool: dict[int, dict[str, Any]] = {}
+        # block_order preserves insertion order so we can rebuild content[]
+        # in the same sequence Claude emitted it.
+        block_order: list[int] = []
+        iteration_input_tokens = 0
+        iteration_output_tokens = 0
+        iteration_stop_reason: str | None = None
 
         async with client.messages.stream(
             model=settings.anthropic_model,
@@ -136,12 +156,24 @@ async def run_turn_stream(
             async for event in stream:
                 event_type = getattr(event, "type", None)
 
-                if event_type == "content_block_start":
+                if event_type == "message_start":
+                    msg = getattr(event, "message", None)
+                    usage = getattr(msg, "usage", None) if msg else None
+                    if usage is not None:
+                        iteration_input_tokens = usage.input_tokens
+                        iteration_output_tokens = usage.output_tokens
+
+                elif event_type == "content_block_start":
                     block = event.content_block
-                    if block.type == "tool_use":
-                        open_tool_blocks[event.index] = {
+                    if event.index not in block_order:
+                        block_order.append(event.index)
+                    if block.type == "text":
+                        accumulated_text[event.index] = ""
+                    elif block.type == "tool_use":
+                        accumulated_tool[event.index] = {
                             "id": block.id,
                             "name": block.name,
+                            "input": {},
                         }
                         yield {
                             "type": "tool_use_start",
@@ -154,26 +186,25 @@ async def run_turn_stream(
                     delta = event.delta
                     delta_type = getattr(delta, "type", None)
                     if delta_type == "text_delta":
+                        accumulated_text[event.index] = (
+                            accumulated_text.get(event.index, "") + delta.text
+                        )
                         yield {
                             "type": "text_delta",
                             "iteration": iteration,
                             "text": delta.text,
                         }
-                    # input_json_delta events stream tool args incrementally —
-                    # we emit the assembled input on content_block_stop instead
-                    # of streaming partial JSON, which the frontend can't
-                    # usefully render mid-build.
+                    # input_json_delta accumulates into the SDK's
+                    # current_message_snapshot; we read the assembled input
+                    # on content_block_stop (next branch).
 
                 elif event_type == "content_block_stop":
-                    if event.index in open_tool_blocks:
-                        # Pull the assembled tool_use block from the snapshot
-                        # so we have the full input dict.
+                    if event.index in accumulated_tool:
                         snapshot = stream.current_message_snapshot
+                        target_id = accumulated_tool[event.index]["id"]
                         for sblock in snapshot.content:
-                            if (
-                                sblock.type == "tool_use"
-                                and sblock.id == open_tool_blocks[event.index]["id"]
-                            ):
+                            if sblock.type == "tool_use" and sblock.id == target_id:
+                                accumulated_tool[event.index]["input"] = dict(sblock.input)
                                 yield {
                                     "type": "tool_use_complete",
                                     "iteration": iteration,
@@ -182,36 +213,81 @@ async def run_turn_stream(
                                     "input": dict(sblock.input),
                                 }
                                 break
-                        del open_tool_blocks[event.index]
 
-            final_message = await stream.get_final_message()
+                elif event_type == "message_delta":
+                    delta_obj = getattr(event, "delta", None)
+                    if delta_obj is not None:
+                        sr = getattr(delta_obj, "stop_reason", None)
+                        if sr:
+                            iteration_stop_reason = sr
+                    usage = getattr(event, "usage", None)
+                    if usage is not None:
+                        # message_delta usage carries cumulative output
+                        # tokens for the message — assign, don't add.
+                        iteration_output_tokens = usage.output_tokens
 
-        # Token accounting (same as run_turn).
-        turn_input_tokens += final_message.usage.input_tokens
-        turn_output_tokens += final_message.usage.output_tokens
-        state.total_input_tokens += final_message.usage.input_tokens
-        state.total_output_tokens += final_message.usage.output_tokens
+        # Build the assistant content array from OUR accumulators. Each block
+        # carries the actual text we received via text_delta events (not the
+        # empty-string blocks get_final_message() would have given us).
+        assistant_content: list[dict[str, Any]] = []
+        # Synthesise minimal content blocks for tool_use entries we missed
+        # (defensive — shouldn't happen but keeps Pydantic happy on next call)
+        for idx in block_order:
+            if idx in accumulated_text:
+                text = accumulated_text[idx]
+                # Drop empty text blocks (Claude rarely emits them, but
+                # Anthropic's API rejects messages with content=[]).
+                if text:
+                    assistant_content.append({"type": "text", "text": text})
+            elif idx in accumulated_tool:
+                tb = accumulated_tool[idx]
+                assistant_content.append({
+                    "type": "tool_use",
+                    "id": tb["id"],
+                    "name": tb["name"],
+                    "input": tb["input"],
+                })
 
-        # Append the assistant message verbatim so the next iteration sees it.
-        assistant_content = [_block_to_dict(b) for b in final_message.content]
+        if not assistant_content:
+            # Anthropic's API rejects assistant turns with empty content.
+            # Insert a minimal text block so the conversation remains valid
+            # for the next /chat call. Surfaces the silent-failure mode in
+            # the trace as well.
+            log.warning(
+                "agent.stream.empty_content",
+                session_id=state.session_id,
+                iteration=iteration,
+            )
+            assistant_content = [{"type": "text", "text": ""}]
+
+        # Token accounting from streamed events (input from message_start,
+        # output from cumulative message_delta).
+        turn_input_tokens += iteration_input_tokens
+        turn_output_tokens += iteration_output_tokens
+        state.total_input_tokens += iteration_input_tokens
+        state.total_output_tokens += iteration_output_tokens
+
+        # Persist the assistant turn so the next iteration sees it.
         state.messages.append({"role": "assistant", "content": assistant_content})
 
-        # Trace text + tool_use blocks (same as run_turn).
-        for block in final_message.content:
-            if block.type == "text":
-                _trace(state, iteration, "assistant_text", {"text": block.text})
-            elif block.type == "tool_use":
+        # Trace text + tool_use blocks. We iterate our accumulators rather
+        # than the SDK's final_message — same shape, more reliable.
+        for idx in block_order:
+            if idx in accumulated_text and accumulated_text[idx]:
+                _trace(state, iteration, "assistant_text", {"text": accumulated_text[idx]})
+            elif idx in accumulated_tool:
+                tb = accumulated_tool[idx]
                 _trace(
                     state,
                     iteration,
                     "tool_use",
-                    {"id": block.id, "name": block.name, "input": dict(block.input)},
+                    {"id": tb["id"], "name": tb["name"], "input": tb["input"]},
                 )
                 tool_call_summary.append(
-                    {"name": block.name, "args": list(dict(block.input).keys())}
+                    {"name": tb["name"], "args": list(tb["input"].keys())}
                 )
 
-        stop_reason = final_message.stop_reason or "end_turn"
+        stop_reason = iteration_stop_reason or "end_turn"
         final_stop_reason = stop_reason
         yield {
             "type": "iteration_end",
@@ -223,6 +299,14 @@ async def run_turn_stream(
             _trace(state, iteration, "stop", {"reason": stop_reason})
             state.total_turns += 1
             state.touch()
+            log.info(
+                "agent.stream.done",
+                session_id=state.session_id,
+                messages_out=len(state.messages),
+                iterations=iteration,
+                input_tokens=turn_input_tokens,
+                output_tokens=turn_output_tokens,
+            )
             yield {
                 "type": "done",
                 "session_id": state.session_id,
@@ -236,17 +320,18 @@ async def run_turn_stream(
 
         # Otherwise, dispatch every tool_use block and yield results.
         tool_result_blocks: list[dict[str, Any]] = []
-        for block in final_message.content:
-            if block.type != "tool_use":
+        for idx in block_order:
+            if idx not in accumulated_tool:
                 continue
+            tb = accumulated_tool[idx]
             t0 = time.perf_counter()
-            result = await dispatch(block.name, dict(block.input))
+            result = await dispatch(tb["name"], tb["input"])
             latency_ms = int((time.perf_counter() - t0) * 1000)
 
             tool_result_blocks.append(
                 {
                     "type": "tool_result",
-                    "tool_use_id": block.id,
+                    "tool_use_id": tb["id"],
                     "content": json.dumps(result.content),
                     "is_error": result.is_error,
                 }
@@ -256,8 +341,8 @@ async def run_turn_stream(
                 iteration,
                 "tool_result",
                 {
-                    "tool_use_id": block.id,
-                    "name": block.name,
+                    "tool_use_id": tb["id"],
+                    "name": tb["name"],
                     "is_error": result.is_error,
                     "latency_ms": latency_ms,
                 },
@@ -265,8 +350,8 @@ async def run_turn_stream(
             yield {
                 "type": "tool_result",
                 "iteration": iteration,
-                "id": block.id,
-                "name": block.name,
+                "id": tb["id"],
+                "name": tb["name"],
                 "is_error": result.is_error,
                 "latency_ms": latency_ms,
             }
