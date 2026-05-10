@@ -339,10 +339,17 @@ async def chat_stream(
             async for event in run_turn_stream(
                 state, user_message, client=client, profile=profile
             ):
+                # Race condition fix: persist state BEFORE yielding `done` so
+                # the frontend's immediate `refreshTrace(session_id)` finds
+                # the session. Otherwise the trace fetch races the finally
+                # block, returns 404, and the frontend treats it as a stale
+                # session (clears the id, blanks the trace panel).
+                if event.get("type") == "done":
+                    await store.put(state)
                 yield f"data: {json.dumps(event)}\n\n"
         finally:
-            # Persist state regardless of completion path so /trace works
-            # even on errors mid-stream.
+            # Backstop persist for error paths and partial streams (when the
+            # agent loop hits an exception before yielding `done`).
             await store.put(state)
             log.info(
                 "chat.stream.turn.done",
