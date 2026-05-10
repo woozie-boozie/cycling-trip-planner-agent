@@ -17,12 +17,6 @@ interface ChatInputProps {
   onAttachImage: (image: PreparedImage | null) => void;
 }
 
-const SUGGESTIONS = [
-  "Plan a 4-day cycle from London to Paris on the Avenue Verte, 100km/day, prefer camping but a hostel every 3rd night, traveling in June.",
-  "Plan a London to Brighton ride for Saturday June 14, 100km/day, hostel both nights.",
-  "I want to cycle from Amsterdam to Copenhagen, ~100km a day, prefer camping but a hostel every 4th night, June.",
-];
-
 export function ChatInput({
   value,
   onChange,
@@ -97,7 +91,6 @@ export function ChatInput({
     setIsDraggingOver(false);
   }, []);
 
-  const showSuggestions = value.length === 0 && !isPending && attachedImage === null;
   const canSubmit = !disabled && !isPending;
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -115,21 +108,6 @@ export function ChatInput({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
-        {showSuggestions ? (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {SUGGESTIONS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => onChange(s)}
-                className="rounded-full border border-border/40 bg-card/50 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:bg-card hover:text-foreground"
-              >
-                {s.slice(0, 60)}…
-              </button>
-            ))}
-          </div>
-        ) : null}
-
         {/* Attached image preview */}
         {attachedImage ? (
           <div className="mb-3 flex items-start gap-3 rounded-lg border border-border/40 bg-card p-2.5">
