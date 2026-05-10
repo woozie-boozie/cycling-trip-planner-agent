@@ -26,17 +26,14 @@ export function Header({
 
   return (
     <header className="surface-glass sticky top-0 z-30 border-b border-border/50">
-      <div className="mx-auto flex h-12 max-w-7xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-14 max-w-[1480px] items-center gap-4 px-4 lg:px-10 xl:px-14">
         {/* Brand */}
-        <div className="flex shrink-0 items-center gap-2">
-          <div className="relative flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-paper">
+        <div className="flex shrink-0 items-center gap-2.5">
+          <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-[0_2px_8px_-2px_rgba(255,61,20,0.5)]">
             <Bike className="h-3.5 w-3.5" aria-hidden />
           </div>
-          <span
-            className="font-heading text-base italic text-foreground"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
-            Cycling planner
+          <span className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
+            Cyclepath
           </span>
         </div>
 
@@ -52,11 +49,11 @@ export function Header({
         </div>
 
         {/* Right cluster */}
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1.5">
           {hasProfile && (
             <Badge
               variant="outline"
-              className="hidden border-primary/40 bg-primary/10 text-[9.5px] uppercase tracking-wider text-primary sm:inline-flex"
+              className="hidden border-primary/30 bg-primary/[0.08] text-[9.5px] font-semibold uppercase tracking-[0.08em] text-primary sm:inline-flex"
             >
               personalised
             </Badge>

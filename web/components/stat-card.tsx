@@ -32,10 +32,9 @@ export function StatCard({ label, value, hint, icon: Icon, accent = "default" }:
       </div>
       <div
         className={[
-          "mt-1 font-heading text-2xl italic tabular-nums leading-none",
+          "mt-1 text-2xl font-bold tabular-nums leading-none tracking-[-0.02em]",
           accent === "primary" ? "text-primary" : "text-foreground",
         ].join(" ")}
-        style={{ fontFamily: "var(--font-heading)" }}
       >
         {value}
       </div>

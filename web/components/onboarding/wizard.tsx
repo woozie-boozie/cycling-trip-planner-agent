@@ -343,7 +343,7 @@ function ChipPickerStep<T extends string>({
         })}
       </div>
       {maxNote && (
-        <p className="text-[11px] italic text-muted-foreground">{maxNote}</p>
+        <p className="text-[11px] text-muted-foreground">{maxNote}</p>
       )}
     </div>
   );

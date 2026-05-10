@@ -30,10 +30,7 @@ export function ItineraryCard({ days, title, subtitle }: ItineraryCardProps) {
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Day-by-day plan · {days.length} days
         </p>
-        <h3
-          className="font-heading mt-0.5 text-xl italic leading-tight text-foreground"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
+        <h3 className="mt-0.5 text-xl font-bold leading-tight tracking-[-0.02em] text-foreground">
           {title ?? "Trip plan"}
         </h3>
         {subtitle && (
@@ -80,12 +77,7 @@ function DayRowComponent({ day }: { day: DayRow }) {
     <div className="grid grid-cols-[28px_1fr_auto] items-start gap-2 px-3 py-2 transition-colors hover:bg-muted/30">
       {/* Day number */}
       <div className="flex h-7 w-7 items-center justify-center text-muted-foreground">
-        <span
-          className="font-heading text-base italic"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          {day.n}
-        </span>
+        <span className="text-base font-bold tabular-nums">{day.n}</span>
       </div>
 
       {/* Route + accommodation */}

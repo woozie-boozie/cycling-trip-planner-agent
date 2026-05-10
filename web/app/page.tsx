@@ -5,11 +5,8 @@ import { Header } from "@/components/header";
 import { MessageBubble } from "@/components/message-bubble";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
-import { ContextCard } from "@/components/context-card";
-import { LiveTracePanel } from "@/components/live-trace-panel";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { RouteGallery } from "@/components/route-gallery";
-import { StackCard } from "@/components/stack-card";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
@@ -37,7 +34,6 @@ export default function Home() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
-  const [isTraceLoading, setIsTraceLoading] = useState(false);
   const [attachedImage, setAttachedImage] = useState<PreparedImage | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -128,7 +124,6 @@ export default function Home() {
   // the next turn into a fresh session and look like amnesia. Only /chat
   // 404 is a real "session lost" signal; that's handled in handleSubmit.
   const refreshTrace = useCallback(async (id: string) => {
-    setIsTraceLoading(true);
     try {
       const data = await getTrace(id);
       setTrace(data);
@@ -138,8 +133,6 @@ export default function Home() {
       if (err instanceof ApiError && err.status === 404) {
         // benign — leave sessionId + trace alone
       }
-    } finally {
-      setIsTraceLoading(false);
     }
   }, []);
 
@@ -455,66 +448,36 @@ export default function Home() {
       )}
 
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1480px] px-4 py-8 sm:py-10 lg:px-10 xl:px-14">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-10 xl:gap-14">
-            {/* Main column — empty state OR conversation */}
-            <div>
-              {isEmpty ? (
-                <RouteGallery
-                  profile={profile}
-                  onPlan={(prompt) => handleSubmit(prompt)}
-                  onCustomPrompt={() => {
-                    /* free-text path — chat input auto-focuses */
-                  }}
-                />
-              ) : (
-                <div className="space-y-5">
-                  {messages.map((m) => (
-                    <MessageBubble
-                      key={m.id}
-                      message={m}
-                      viewMode={viewMode}
-                      corridor={corridor}
-                    />
-                  ))}
-                  {isPending ? <LoadingIndicator /> : null}
-                  {error ? (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                      {error}
-                    </div>
-                  ) : null}
-                  <div ref={scrollAnchorRef} />
-                </div>
-              )}
-            </div>
-
-            {/* Right rail — sticky stack of:
-                  - LiveTracePanel (dark) → live whenever a session exists,
-                    demo only on truly fresh first-time users
-                  - ContextCard → user profile + provenance info
-            */}
-            <aside className="hidden lg:block">
-              <div className="sticky top-20 space-y-3">
-                <LiveTracePanel
-                  // Switch to live the moment we have any session — even on
-                  // the empty state. Most "empty" states aren't truly fresh
-                  // (the user has a localStorage session id from a previous
-                  // visit). Only fall back to demo when sessionId is null.
-                  mode={sessionId ? "live" : "demo"}
-                  sessionId={sessionId}
-                  trace={trace}
-                  isPending={isPending || isTraceLoading}
-                />
-                <ContextCard
-                  profile={profile}
-                  isEmpty={isEmpty}
+        {isEmpty ? (
+          // Empty state — full-width hero + 3-up gallery, no sidebar
+          <div className="mx-auto max-w-[1200px] px-4 py-12 sm:py-16 lg:px-10">
+            <RouteGallery
+              profile={profile}
+              onPlan={(prompt) => handleSubmit(prompt)}
+            />
+          </div>
+        ) : (
+          // Conversation — centred message column, no sidebar
+          <div className="mx-auto max-w-3xl px-4 py-8 sm:py-10 lg:px-6">
+            <div className="space-y-5">
+              {messages.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  viewMode={viewMode}
                   corridor={corridor}
                 />
-                <StackCard />
-              </div>
-            </aside>
+              ))}
+              {isPending ? <LoadingIndicator trace={trace} /> : null}
+              {error ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              ) : null}
+              <div ref={scrollAnchorRef} />
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       <ChatInput

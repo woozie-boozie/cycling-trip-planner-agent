@@ -181,10 +181,7 @@ export function RouteCanvas({
               Route map ·{" "}
               {subtitle ?? `${corridor.total_km} km · ${activeWaypoints.length} waypoints`}
             </p>
-            <h3
-              className="font-heading mt-0.5 text-xl italic leading-tight text-foreground"
-              style={{ fontFamily: "var(--font-heading)" }}
-            >
+            <h3 className="mt-0.5 text-xl font-bold leading-tight tracking-[-0.02em] text-foreground">
               {title ?? corridor.label}
             </h3>
           </div>

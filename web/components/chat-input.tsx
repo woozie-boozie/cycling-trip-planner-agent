@@ -103,7 +103,7 @@ export function ChatInput({
   return (
     <div className="surface-glass border-t border-border/50">
       <div
-        className="mx-auto max-w-5xl px-4 py-4"
+        className="mx-auto max-w-3xl px-4 py-4"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
@@ -149,12 +149,12 @@ export function ChatInput({
           </div>
         ) : null}
 
-        {/* Drop overlay */}
+        {/* Composer — modern floating dock with subtle shadow */}
         <div
           className={
             isDraggingOver
               ? "flex items-end gap-2 rounded-2xl border-2 border-dashed border-primary bg-primary/10 p-2 transition-colors"
-              : "flex items-end gap-2 rounded-2xl border border-border/50 bg-card/40 p-2 transition-colors focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/30"
+              : "flex items-end gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-paper transition-colors focus-within:border-foreground/30 focus-within:shadow-lift"
           }
         >
           <Button

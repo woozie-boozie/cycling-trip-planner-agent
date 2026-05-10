@@ -34,10 +34,7 @@ export function PoiSheet({ poi, onClose, onAdd }: PoiSheetProps) {
           >
             {meta.label}
           </div>
-          <div
-            className="font-heading text-lg italic leading-tight text-foreground"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
+          <div className="text-lg font-bold leading-tight tracking-[-0.015em] text-foreground">
             {poi.label}
           </div>
           <p className="mt-0.5 text-xs leading-snug text-muted-foreground">

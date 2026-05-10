@@ -60,12 +60,9 @@ export function RouteComparisonCard({
       <div className="flex items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Route variants · {variants.length} found
+            Routes · {variants.length} found
           </p>
-          <h3
-            className="font-heading mt-0.5 text-xl italic leading-tight text-foreground"
-            style={{ fontFamily: "var(--font-heading)" }}
-          >
+          <h3 className="mt-0.5 text-xl font-bold leading-tight tracking-[-0.02em] text-foreground">
             {corridor.label}
           </h3>
         </div>
@@ -101,10 +98,7 @@ export function RouteComparisonCard({
                   style={{ background: v.color }}
                   aria-hidden
                 />
-                <span
-                  className="font-heading text-base italic leading-tight text-foreground"
-                  style={{ fontFamily: "var(--font-heading)" }}
-                >
+                <span className="text-base font-semibold leading-tight tracking-[-0.01em] text-foreground">
                   {v.title}
                 </span>
                 {isRecommended && (
@@ -175,13 +169,13 @@ export function RouteComparisonCard({
               )}
 
               {/* Best for */}
-              <p className="mt-1 text-[11px] italic leading-snug text-muted-foreground">
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
                 Best for: {v.best_for}
               </p>
 
               {onPick && isSelected && (
                 <div className="mt-1 flex items-center gap-1 text-xs font-semibold text-primary">
-                  Plan this variant
+                  Plan this route
                   <ArrowRight
                     className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5"
                     aria-hidden
