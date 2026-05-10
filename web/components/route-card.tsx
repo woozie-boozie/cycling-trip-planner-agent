@@ -13,6 +13,9 @@ interface RouteCardProps {
   /** When true: emphasised treatment — primary border, glow, "Recommended" badge,
    * extras row showing elevation/ferry/paved metrics, primary-coloured CTA. */
   featured?: boolean;
+  /** When true: tighter spacing for side-by-side rendering in the grid below
+   * the featured card. Smaller map, fewer highlights, smaller body. */
+  compact?: boolean;
 }
 
 const HIGHLIGHT_LAYERS: PoiLayer[] = ["heritage", "wildlife", "food"];
@@ -26,11 +29,12 @@ const HIGHLIGHT_LAYERS: PoiLayer[] = ["heritage", "wildlife", "food"];
  *   - Highlights as bullet points with primary-coloured ◆ markers
  *   - Dark CTA button (primary on featured) — full-width, confident
  */
-export function RouteCard({ corridor, onSelect, featured = false }: RouteCardProps) {
-  const mapHeight = featured ? 320 : 240;
+export function RouteCard({ corridor, onSelect, featured = false, compact = false }: RouteCardProps) {
+  const mapHeight = featured ? 320 : compact ? 160 : 240;
   const mapUrl = staticMapUrl(corridor, { width: 720, height: mapHeight + 40 });
   const days = corridor.estimated_days.at_100km;
   const variants = getVariants(corridor.id);
+  const highlightCount = featured ? 4 : compact ? 2 : 3;
 
   // Pick highlight POIs for the corridor
   const highlights = useMemo(() => {
@@ -44,16 +48,16 @@ export function RouteCard({ corridor, onSelect, featured = false }: RouteCardPro
         seen.add(found.label);
       }
     }
-    if (picks.length < 3) {
+    if (picks.length < highlightCount) {
       for (const p of pois) {
-        if (picks.length >= (featured ? 4 : 3)) break;
+        if (picks.length >= highlightCount) break;
         if (seen.has(p.label)) continue;
         picks.push({ layer: p.layer, label: p.label });
         seen.add(p.label);
       }
     }
-    return picks.slice(0, featured ? 4 : 3);
-  }, [corridor.id, featured]);
+    return picks.slice(0, highlightCount);
+  }, [corridor.id, highlightCount]);
 
   const hasFerry = corridor.waypoints.some((w) => w.is_ferry);
 
@@ -158,13 +162,18 @@ export function RouteCard({ corridor, onSelect, featured = false }: RouteCardPro
       )}
 
       {/* Body */}
-      <div className="flex flex-1 flex-col gap-3.5 px-5 py-4">
+      <div
+        className={[
+          "flex flex-1 flex-col",
+          compact ? "gap-2.5 px-4 py-3" : "gap-3.5 px-5 py-4",
+        ].join(" ")}
+      >
         {/* Title — bold sans, primary arrow */}
         <div>
           <h3
             className={[
               "font-bold leading-[1.05] tracking-[-0.025em] text-foreground",
-              featured ? "text-[26px]" : "text-[22px]",
+              featured ? "text-[26px]" : compact ? "text-[18px]" : "text-[22px]",
             ].join(" ")}
           >
             {corridor.label.split("→").map((part, i, arr) => (

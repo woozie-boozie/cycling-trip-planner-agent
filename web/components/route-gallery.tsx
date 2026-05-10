@@ -98,9 +98,10 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
         </span>
       </div>
 
-      {/* Vertical route stack — narrower column now that the dark panel is
-          page-level. Featured card first, then the others. */}
-      <div className="grid gap-4">
+      {/* Featured card spans the full main column; the two other corridors
+          sit side-by-side below it. Less wasted vertical space + better
+          visual rhythm than a single-column stack. */}
+      <div className="space-y-4">
         {featured && (
           <RouteCard
             key={featured.id}
@@ -109,9 +110,11 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
             featured
           />
         )}
-        {others.map((c) => (
-          <RouteCard key={c.id} corridor={c} onSelect={setSelected} />
-        ))}
+        <div className="grid gap-4 sm:grid-cols-2">
+          {others.map((c) => (
+            <RouteCard key={c.id} corridor={c} onSelect={setSelected} compact />
+          ))}
+        </div>
       </div>
 
       {/* "Or describe your own" — section break */}
