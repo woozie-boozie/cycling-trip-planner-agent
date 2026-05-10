@@ -27,7 +27,7 @@ from src.db import get_async_session
 from src.db.models import Route as RouteRow
 from src.db.models import Waypoint as WaypointRow
 from src.tools.base import register_tool
-from src.tools.route_real import fetch_real_route, use_real_routes
+from src.tools.route_real import _suggest_day_plan, fetch_real_route, use_real_routes
 from src.tools.schemas import GetRouteInput, GetRouteOutput, RouteVariant, Waypoint
 
 # (name, country, cumulative_km_from_start, ferry_required)
@@ -218,6 +218,7 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
         total_distance_km=total,
         estimated_days=estimated_days,
         waypoints=waypoints,
+        suggested_day_plan=_suggest_day_plan(waypoints, input.daily_km_target),
         distinguishing_features=[],
         trade_offs=[],
         best_for="quick demo / offline mode",

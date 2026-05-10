@@ -83,6 +83,44 @@ class GetRouteInput(BaseModel):
     )
 
 
+class DayPlan(BaseModel):
+    """Pre-computed daily breakdown for a route variant at the user's daily km
+    target. Saves the agent from doing per-day arithmetic and prevents the
+    "agent confidently sums 4 numbers wrong" failure mode that LLMs fall into
+    even when the underlying data is correct.
+
+    The agent should treat this as the canonical day split for the variant.
+    Per-day deeper info (elevation, weather, accommodation) is added by the
+    agent on top — it's the SPLIT itself that's pre-computed here.
+    """
+
+    day: int = Field(ge=1, description="1-indexed day number")
+    from_city: str = Field(description="Name of the overnight stop the day starts from")
+    to_city: str = Field(description="Name of the overnight stop the day ends at")
+    cycling_km: float = Field(
+        ge=0,
+        description=(
+            "Real cycling distance for the day (excludes ferry time). Computed "
+            "by summing segment_km across every waypoint visited on this day, "
+            "INCLUDING any pre-ferry leg. Trust this number — don't recompute."
+        ),
+    )
+    has_ferry: bool = Field(
+        default=False, description="True if the day includes a ferry crossing"
+    )
+    waypoints_visited: list[str] = Field(
+        default_factory=list,
+        description="Ordered city names visited on this day (start city first, end city last)",
+    )
+    notes: str | None = Field(
+        default=None,
+        description=(
+            "Free-text flag if the day deviates materially from the daily km "
+            "target (e.g. 'long day, +25% vs target', 'ferry day, short cycling')"
+        ),
+    )
+
+
 class RouteVariant(BaseModel):
     """A single way to cycle the corridor — its own road choice, distance,
     and waypoint chain. Most signposted long-distance routes have multiple
@@ -103,6 +141,16 @@ class RouteVariant(BaseModel):
     estimated_days: int = Field(ge=1, description="Total days at the user's daily_km_target")
     waypoints: list[Waypoint] = Field(
         description="Ordered list including start and end. Used for day planning."
+    )
+    suggested_day_plan: list[DayPlan] = Field(
+        default_factory=list,
+        description=(
+            "Pre-computed balanced day-by-day split at the user's daily_km_target. "
+            "The agent SHOULD use this as the canonical breakdown — don't recompute "
+            "per-day distances from cumulative km, that's where LLM math errors "
+            "creep in. Each DayPlan carries from_city, to_city, cycling_km, "
+            "has_ferry, and a deviation note when materially off-target."
+        ),
     )
     distinguishing_features: list[str] = Field(
         default_factory=list,

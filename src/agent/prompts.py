@@ -42,18 +42,22 @@ Plan in steps. For a real trip-planning request, your typical flow is:
 
    Once a variant is chosen (or `len(variants) == 1`), use that variant's `waypoints` for everything downstream. Read the variant's `notes` — it may flag ferries or other constraints.
 
-3. **Plan each daily segment.** For each segment between adjacent waypoints, gather:
-   - `get_elevation_profile(start, end)` — terrain difficulty
-   - `get_weather(location, month)` — typical conditions at the day's overnight stop
+3. **Plan each daily segment.** For each day in the variant's `suggested_day_plan`, gather:
+   - `get_elevation_profile(start, end)` — terrain difficulty for that day's start→end cities
+   - `get_weather(location, month)` — typical conditions at the day's overnight stop (the `to_city`)
    - `find_accommodation(location, types)` — places to stay, filtered by the user's stated preferences (e.g. `types=['camping']`, with `types=['hostel']` on the days the user wants a hostel)
    These are independent calls — call them in parallel where you can.
 
-   **Computing per-day cycling distance — read this carefully.** Each `Waypoint` has a `segment_km` field: cycling distance from the *previous* waypoint to this one. To compute a day's total cycling, **sum `segment_km` across every waypoint visited on that day, including any pre-ferry leg.** Do NOT subtract `distance_from_start_km` between consecutive overnight stops — that approach silently drops the pre-ferry cycling on ferry days because the ferry's arrival waypoint shares the same cumulative km as the pre-ferry departure waypoint. Worked example for an Avenue Verte day that crosses the Channel:
-     - Overnight at East Grinstead the night before (cumulative 83.3 km, segment 83.3)
-     - Day's waypoints visited: Lewes (segment 41.7) → Newhaven (segment 12.5) → Dieppe (segment 0, ferry) → Forges-les-Eaux (segment 54.5)
-     - Day's cycling distance = 41.7 + 12.5 + 0 + 54.5 = **108.7 km**, not 54.5 km.
+   **DO NOT recompute per-day distances. Use `suggested_day_plan` directly.** Each variant ships with a pre-computed list of `DayPlan` objects, balanced against the user's daily km target. Each `DayPlan` carries:
+     - `day` (1-indexed)
+     - `from_city` and `to_city` (the day's start and end overnight stops)
+     - `cycling_km` — the canonical cycling distance for the day (already includes any pre-ferry leg; trust this number)
+     - `has_ferry` (true if the day spans a ferry crossing)
+     - `notes` — flags long/short days vs target
 
-   **Picking overnight stops to honour the user's daily km target.** The corridor's overnight waypoints are points the user can sleep at. Pick the one whose cumulative distance puts the day's `segment_km` total *closest* to the target — and when two are equally close, prefer the one that *just exceeds* the target over one that undershoots. Stopping 17 km short of the target means the next day takes the slack; stopping 17 km over hits the target on the day's average. This matters most for casual riders: if the user said "100 km/day," don't put them at 83 km on Day 1 when 110 km is also an option.
+   **Why this matters:** computing per-day distances by subtracting cumulative waypoint km is where LLMs frequently drop pre-ferry legs or sum 4 numbers wrong. The tool already did the math correctly. Just read `suggested_day_plan[i].cycling_km` and use it.
+
+   **When to override the suggested split:** only when the user's constraints force it — e.g. *"I want a hostel night on Day 3"* and the suggested plan ends Day 3 at a city without a hostel. In that case, you may pick a different overnight stop, but recompute the day's `cycling_km` by summing the `segment_km` of every Waypoint visited on that day (including pre-ferry legs that share a cumulative-km value with the ferry-arrival waypoint).
 
 4. **Self-critique BEFORE returning the plan.** Once you have all the data and have drafted your day-by-day plan internally, call `critique_trip_plan` with your draft as a structured `days` list. The critique tool is a deterministic Python check (not another LLM call) — it's fast, free, and visible in the trace. It looks for:
    - days that exceed the user's daily km target

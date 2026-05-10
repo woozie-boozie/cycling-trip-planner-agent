@@ -44,7 +44,7 @@ from dataclasses import dataclass
 import httpx
 import structlog
 
-from src.tools.schemas import GetRouteOutput, RouteVariant, Waypoint
+from src.tools.schemas import DayPlan, GetRouteOutput, RouteVariant, Waypoint
 
 log = structlog.get_logger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -551,6 +551,96 @@ def _ferry_notes(anchors: list[Anchor]) -> str | None:
     return "Route includes a ferry crossing — check schedules in advance."
 
 
+def _suggest_day_plan(
+    waypoints: list[Waypoint], daily_km_target: float
+) -> list[DayPlan]:
+    """Balanced greedy day-allocation.
+
+    Algorithm: pick n_days = round(total_km / daily_km_target), then assign
+    each day's overnight stop to the waypoint whose cumulative distance is
+    closest to (day_index * total_km / n_days). Last day always ends at the
+    destination. The math is deterministic so the agent doesn't have to
+    derive day distances from cumulative km — a step where LLMs frequently
+    drop pre-ferry legs or sum 4 numbers wrong.
+
+    Notes per day flag deviations from target (>15% over/under) so the agent
+    can surface them honestly in the Heads-up section.
+    """
+    if len(waypoints) < 2:
+        return []
+    total_km = waypoints[-1].distance_from_start_km
+    raw_n_days = max(1, round(total_km / daily_km_target))
+    # Can't have more days than there are unique stops to end them at
+    # (start + each waypoint we end a day at). For corridors with few
+    # overnight options at a low target km/day, cap to what's feasible.
+    n_days = min(raw_n_days, len(waypoints) - 1)
+
+    if n_days == 1:
+        overnight_indices: list[int] = [0, len(waypoints) - 1]
+    else:
+        # Pick n_days - 1 intermediate overnight stops by snapping each to
+        # the waypoint whose cumulative km is closest to the ideal pacing
+        # boundary. The candidate range is constrained to leave enough
+        # later waypoints for the remaining picks plus the final destination.
+        ideal_per_day = total_km / n_days
+        overnight_indices = [0]
+        for d in range(1, n_days):
+            target_cum = d * ideal_per_day
+            last_used = overnight_indices[-1]
+            # Reserve enough slots after this pick for the remaining
+            # (n_days - 1 - d) intermediates plus the final destination.
+            min_idx = last_used + 1
+            max_idx = len(waypoints) - 1 - (n_days - d)
+            if max_idx < min_idx:
+                max_idx = min_idx
+            best_idx = min_idx
+            best_diff = float("inf")
+            for k in range(min_idx, max_idx + 1):
+                diff = abs(waypoints[k].distance_from_start_km - target_cum)
+                if diff < best_diff:
+                    best_diff = diff
+                    best_idx = k
+            overnight_indices.append(best_idx)
+        overnight_indices.append(len(waypoints) - 1)
+
+    days: list[DayPlan] = []
+    for i in range(len(overnight_indices) - 1):
+        start_idx = overnight_indices[i]
+        end_idx = overnight_indices[i + 1]
+        day_waypoints = waypoints[start_idx + 1 : end_idx + 1]
+        cycling_km = round(sum(w.segment_km for w in day_waypoints), 1)
+        has_ferry = any(w.is_ferry_required for w in day_waypoints)
+
+        deviation_pct = ((cycling_km / daily_km_target) - 1) * 100 if daily_km_target else 0
+        notes_parts: list[str] = []
+        # If the day is dominated by a ferry crossing (cycling < 30% of target),
+        # describe it as a ferry day instead of flagging it as "short" against
+        # the target — the rider isn't expected to clock target km on a ferry day.
+        if has_ferry and cycling_km < daily_km_target * 0.3:
+            notes_parts.append(f"ferry crossing day ({cycling_km:.0f} km cycling)")
+        else:
+            if cycling_km > daily_km_target * 1.15:
+                notes_parts.append(f"long day, {deviation_pct:+.0f}% vs target")
+            elif cycling_km < daily_km_target * 0.5:
+                notes_parts.append(f"short day, {deviation_pct:+.0f}% vs target")
+            if has_ferry:
+                notes_parts.append("includes ferry crossing")
+        notes = "; ".join(notes_parts) if notes_parts else None
+
+        days.append(
+            DayPlan(
+                day=i + 1,
+                from_city=waypoints[start_idx].name,
+                to_city=waypoints[end_idx].name,
+                cycling_km=cycling_km,
+                has_ferry=has_ferry,
+                waypoints_visited=[w.name for w in waypoints[start_idx : end_idx + 1]],
+                notes=notes,
+            )
+        )
+    return days
+
+
 async def _build_variant(
     client: httpx.AsyncClient,
     cv: CorridorVariant,
@@ -593,6 +683,7 @@ async def _build_variant(
     total = round(cumulative_km, 1)
     estimated_days = max(1, math.ceil(total / daily_km_target))
     notes = _ferry_notes(cv.anchors)
+    day_plan = _suggest_day_plan(waypoints, daily_km_target)
 
     return RouteVariant(
         name=cv.name,
@@ -601,6 +692,7 @@ async def _build_variant(
         total_distance_km=total,
         estimated_days=estimated_days,
         waypoints=waypoints,
+        suggested_day_plan=day_plan,
         distinguishing_features=list(cv.distinguishing_features),
         trade_offs=list(cv.trade_offs),
         best_for=cv.best_for,
