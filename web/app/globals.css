@@ -127,8 +127,44 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Subtle ambient lighting — ellipses of warm + cool tints fading
+       to transparent. Adds depth without competing with content. */
+    background-image:
+      radial-gradient(
+        ellipse 70% 50% at 0% 0%,
+        color-mix(in oklab, var(--primary) 5%, transparent) 0%,
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 60% 40% at 100% 100%,
+        color-mix(in oklab, var(--secondary) 60%, transparent) 0%,
+        transparent 70%
+      );
+    background-attachment: fixed;
   }
   html {
     @apply font-sans;
+  }
+
+  /* Modern multi-layer shadow utility — layered close + far shadows
+     give surfaces credible elevation without the 2010s drop-shadow look. */
+  .shadow-paper {
+    box-shadow:
+      0 1px 2px -1px rgb(20 19 15 / 0.06),
+      0 4px 12px -4px rgb(20 19 15 / 0.05),
+      0 16px 40px -8px rgb(20 19 15 / 0.04);
+  }
+  .shadow-lift {
+    box-shadow:
+      0 1px 3px -1px rgb(20 19 15 / 0.08),
+      0 8px 24px -6px rgb(20 19 15 / 0.10),
+      0 24px 60px -12px rgb(20 19 15 / 0.08);
+  }
+
+  /* Frosted-glass surface for sticky panels (header, chat input). */
+  .surface-glass {
+    background: color-mix(in oklab, var(--background) 75%, transparent);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
   }
 }

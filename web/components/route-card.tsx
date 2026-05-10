@@ -62,7 +62,7 @@ export function RouteCard({ corridor, onSelect }: RouteCardProps) {
     <button
       type="button"
       onClick={() => onSelect(corridor)}
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/50 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      className="shadow-paper group relative flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-card text-left transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-primary/50 hover:[box-shadow:0_2px_4px_-1px_rgb(20_19_15_/0.10),0_16px_32px_-8px_rgb(20_19_15_/0.14),0_32px_72px_-16px_rgb(20_19_15_/0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       {/* Thumbnail */}
       <div className="relative aspect-[16/11] w-full overflow-hidden bg-muted">

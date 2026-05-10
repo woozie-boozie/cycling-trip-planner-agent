@@ -25,37 +25,47 @@ export function Header({
   const sessionLabel = sessionId ? sessionId.slice(0, 8) : "new";
 
   return (
-    <header className="border-b border-border/40 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-primary/15 p-2 text-primary ring-1 ring-primary/20">
-            <Bike className="h-5 w-5" aria-hidden />
+    <header className="surface-glass sticky top-0 z-30 border-b border-border/50">
+      <div className="mx-auto flex h-12 max-w-7xl items-center gap-3 px-4">
+        {/* Brand */}
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="relative flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-paper">
+            <Bike className="h-3.5 w-3.5" aria-hidden />
           </div>
-          <div>
-            <h1 className="text-base font-semibold leading-tight tracking-tight text-foreground">
-              Cycling Trip Planner
-            </h1>
-            <p className="text-xs text-muted-foreground leading-tight">
-              An AI agent that plans multi-day rides
-            </p>
-          </div>
+          <span
+            className="font-heading text-base italic text-foreground"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            Cycling planner
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Center — session metadata, monospace, dim by default */}
+        <div className="flex flex-1 items-center justify-center gap-2 font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">
+          <span className="hidden sm:inline">session</span>
+          <span className="hidden text-muted-foreground/60 sm:inline">·</span>
+          <span className="rounded bg-muted/40 px-1.5 py-0.5 normal-case tracking-normal text-foreground/80">
+            {sessionLabel}
+          </span>
+          <span className="hidden text-muted-foreground/60 sm:inline">·</span>
+          <span className="hidden sm:inline">claude-sonnet-4-5</span>
+        </div>
+
+        {/* Right cluster */}
+        <div className="flex shrink-0 items-center gap-1">
           {hasProfile && (
             <Badge
               variant="outline"
-              className="hidden border-primary/40 bg-primary/10 text-[10px] text-primary sm:inline-flex"
+              className="hidden border-primary/40 bg-primary/10 text-[9.5px] uppercase tracking-wider text-primary sm:inline-flex"
             >
               personalised
             </Badge>
           )}
           {onToggleViewMode && viewMode && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              type="button"
               onClick={onToggleViewMode}
-              className="text-muted-foreground hover:text-foreground"
+              className="inline-flex h-7 items-center gap-1 rounded-full border border-border bg-card px-2 text-[11px] font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:text-foreground"
               title={
                 viewMode === "visual"
                   ? "Switch to text mode (markdown)"
@@ -63,30 +73,24 @@ export function Header({
               }
             >
               {viewMode === "visual" ? (
-                <Map className="h-3.5 w-3.5" aria-hidden />
+                <Map className="h-3 w-3 text-primary" aria-hidden />
               ) : (
-                <Type className="h-3.5 w-3.5" aria-hidden />
+                <Type className="h-3 w-3" aria-hidden />
               )}
               <span className="hidden sm:inline">
                 {viewMode === "visual" ? "Visual" : "Text"}
               </span>
-            </Button>
+            </button>
           )}
-          <Badge variant="secondary" className="font-mono text-[10px] tracking-wider">
-            session · {sessionLabel}
-          </Badge>
           {onEditProfile && (
             <Button
               variant="ghost"
               size="sm"
               onClick={onEditProfile}
-              className="text-muted-foreground hover:text-foreground"
+              className="h-7 px-2 text-muted-foreground hover:text-foreground"
               title={hasProfile ? "Edit your profile" : "Set up your profile"}
             >
               <UserCog className="h-3.5 w-3.5" aria-hidden />
-              <span className="hidden sm:inline">
-                {hasProfile ? "Edit profile" : "Set up profile"}
-              </span>
             </Button>
           )}
           <Button
@@ -94,10 +98,10 @@ export function Header({
             size="sm"
             onClick={onReset}
             disabled={!sessionId}
-            className="text-muted-foreground hover:text-foreground"
+            className="h-7 px-2 text-muted-foreground hover:text-foreground"
+            title="Start a new conversation"
           >
             <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-            <span className="hidden sm:inline">New conversation</span>
           </Button>
         </div>
       </div>

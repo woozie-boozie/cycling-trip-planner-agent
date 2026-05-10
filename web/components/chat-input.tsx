@@ -101,7 +101,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="border-t border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <div className="surface-glass border-t border-border/50">
       <div
         className="mx-auto max-w-5xl px-4 py-4"
         onDragOver={handleDragOver}
