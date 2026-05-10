@@ -83,17 +83,16 @@ type Detection =
 
 /**
  * Returns "comparison" when:
- *   1. We have a corridor matched from conversation context
+ *   1. We have a corridor matched from conversation context (or message)
  *   2. The corridor has 2+ known variants in route-variants.ts
- *   3. The message contains 2+ "Option N" or "Option N:" markers
+ *   3. EITHER 2+ variant titles appear in the message (case-insensitive),
+ *      OR 2+ "Option N" markers appear (legacy pattern).
  *
  * Otherwise returns "markdown".
  */
 function detectResponseShape(content: string, corridor: Corridor | null): Detection {
   if (!corridor) {
-    // No corridor in conversation context yet — fall back even if the
-    // message itself has option-like patterns. We need a corridor to know
-    // which variant set to render.
+    // No corridor in conversation context yet. Try the message itself.
     const fromMessage = matchCorridor(content);
     if (!fromMessage) return { kind: "markdown" };
     corridor = fromMessage;
@@ -102,18 +101,32 @@ function detectResponseShape(content: string, corridor: Corridor | null): Detect
   const variants = getVariants(corridor.id);
   if (!variants) return { kind: "markdown" };
 
-  // Count "Option N" markers — robust to "Option 1:", "**Option 1:**",
-  // "## Option 1: Title", "Option 1 — Title".
+  const lowered = content.toLowerCase();
+
+  // Primary signal: how many variant titles appear in the message?
+  // Agent's actual responses use bold titles like "**INLAND EV7/12 HYBRID**"
+  // or headings like "## Coastal EV12 North Sea", not "Option 1/2".
+  const titleHits = variants.filter((v) =>
+    lowered.includes(v.title.toLowerCase()),
+  ).length;
+
+  // Fallback signal: legacy "Option N" markers (some agent runs use these).
   const optionMarkerRegex = /\bOption\s+\d+\b/gi;
-  const matches = content.match(optionMarkerRegex);
-  if (!matches || matches.length < 2) return { kind: "markdown" };
+  const optionHits = (content.match(optionMarkerRegex) ?? []).length;
+
+  // Need at least 2 of either signal to show a comparison card.
+  const isComparison = titleHits >= 2 || optionHits >= 2;
+  if (!isComparison) return { kind: "markdown" };
 
   // Try to detect which variant the agent recommended (if any).
   const recommendedName = inferRecommended(content, variants);
 
   // Trim the variant-comparison block off the front and pass the
   // remaining "recommendation" prose through MarkdownRenderer below.
-  const afterText = content.split(/\bWhich (?:would|route|variant)\b/i).slice(1).join("");
+  const afterText = content
+    .split(/\bWhich (?:would|route|variant)\b/i)
+    .slice(1)
+    .join("");
 
   return {
     kind: "comparison",
@@ -125,31 +138,48 @@ function detectResponseShape(content: string, corridor: Corridor | null): Detect
 }
 
 /**
- * Look for phrases like "I'd recommend Option 1" or "Go with the V16a"
- * and map back to a variant name. Best-effort; returns undefined if we
- * can't infer.
+ * Best-effort recommendation extraction. Returns the variant.name the
+ * agent appears to be recommending, or undefined.
  */
 function inferRecommended(
   content: string,
   variants: RouteVariantSummary[],
 ): string | undefined {
   const lower = content.toLowerCase();
-  // Try title match
+
+  // Pattern 1: explicit recommend / go with / choose <title>
   for (const v of variants) {
-    const titleLower = v.title.toLowerCase();
+    const t = v.title.toLowerCase();
     if (
-      lower.includes(`recommend ${titleLower}`) ||
-      lower.includes(`go with ${titleLower}`) ||
-      lower.includes(`choose ${titleLower}`)
+      lower.includes(`recommend ${t}`) ||
+      lower.includes(`go with ${t}`) ||
+      lower.includes(`choose ${t}`)
     ) {
       return v.name;
     }
   }
-  // Try "recommend Option N"
+
+  // Pattern 2: "recommend Option N" (legacy)
   const m = content.match(/\brecommend(?:ation)?[^.]*\bOption\s+(\d+)/i);
   if (m) {
     const idx = parseInt(m[1], 10) - 1;
     if (idx >= 0 && idx < variants.length) return variants[idx].name;
   }
+
+  // Pattern 3: distinctive keyword in title that appears next to "fits"
+  // or "best for your". Captures "**The inland route** fits your 11-day".
+  for (const v of variants) {
+    // Pull a signature word from the title (e.g. "Inland EV7/12 hybrid" → "inland")
+    const firstWord = v.title.split(/\s+/)[0]?.toLowerCase();
+    if (!firstWord || firstWord.length < 4) continue;
+    const sig = firstWord;
+    const fitsPatterns = [
+      new RegExp(`\\b${sig}\\b[^.]*\\bfits\\b`, "i"),
+      new RegExp(`\\b${sig}\\s+route\\b[^.]*\\b(perfect|ideal|matches|best)\\b`, "i"),
+      new RegExp(`\\bbest[^.]*\\b${sig}\\b`, "i"),
+    ];
+    if (fitsPatterns.some((re) => re.test(content))) return v.name;
+  }
+
   return undefined;
 }
