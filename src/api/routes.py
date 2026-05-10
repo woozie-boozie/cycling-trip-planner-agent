@@ -17,9 +17,12 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+import json
+
 import structlog
 from anthropic import AsyncAnthropic
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from src.agent import (
@@ -28,6 +31,7 @@ from src.agent import (
     ConversationState,
     TraceEvent,
     run_turn,
+    run_turn_stream,
 )
 from src.api.dependencies import (
     get_anthropic_client,
@@ -246,6 +250,115 @@ async def chat(
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
         tool_calls=response.tool_calls,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Streaming chat — Phase 1.10c · Server-Sent Events for live agent thinking
+# ---------------------------------------------------------------------------
+
+
+@router.post("/chat/stream", tags=["chat"])
+async def chat_stream(
+    request: ChatRequest,
+    store: SessionStore = Depends(get_session_store),
+    profile_store: ProfileStore = Depends(get_profile_store),
+    client: AsyncAnthropic = Depends(get_anthropic_client),
+) -> StreamingResponse:
+    """Server-Sent Events variant of /chat — streams the agent's reasoning live.
+
+    Each SSE event is a JSON object: see ``src/agent/streaming.py`` for the
+    full event protocol (text_delta / tool_use_start / tool_use_complete /
+    tool_result / iteration_end / done).
+
+    Headers:
+      - ``Cache-Control: no-cache`` — proxies must not cache the stream
+      - ``X-Accel-Buffering: no`` — nginx/Cloud Run buffer-disable hint
+      - ``Connection: keep-alive``
+    """
+    # Session resolution mirrors POST /chat exactly so the streaming path
+    # has the same semantics (404 on unknown session_id, fresh otherwise).
+    if request.session_id is None:
+        state = ConversationState()
+        is_new = True
+    else:
+        existing = await store.get(request.session_id)
+        if existing is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"session {request.session_id!r} not found",
+            )
+        state = existing
+        is_new = False
+
+    # Profile soft-miss — same contract as /chat.
+    profile: UserProfile | None = None
+    if request.profile_id is not None:
+        profile = await profile_store.get(request.profile_id)
+        if profile is None:
+            log.info(
+                "chat.stream.profile.unknown",
+                session_id=state.session_id,
+                profile_id=request.profile_id,
+            )
+
+    log.info(
+        "chat.stream.turn.start",
+        session_id=state.session_id,
+        is_new=is_new,
+        message_len=len(request.message),
+        has_image=request.image is not None,
+        has_profile=profile is not None,
+    )
+
+    # Multimodal user-message construction — same pattern as /chat.
+    user_message: str | list[dict[str, Any]]
+    if request.image is not None:
+        user_message = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": request.image.media_type,
+                    "data": request.image.base64_data,
+                },
+            },
+            {"type": "text", "text": request.message},
+        ]
+    else:
+        user_message = request.message
+
+    async def event_stream() -> Any:
+        # Always emit a "session_id" preamble so the frontend can persist
+        # it before the first text_delta arrives. Avoids a "session is null"
+        # window in the UI when the user starts a fresh conversation.
+        yield (
+            f"data: {json.dumps({'type': 'session', 'session_id': state.session_id})}\n\n"
+        )
+        try:
+            async for event in run_turn_stream(
+                state, user_message, client=client, profile=profile
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        finally:
+            # Persist state regardless of completion path so /trace works
+            # even on errors mid-stream.
+            await store.put(state)
+            log.info(
+                "chat.stream.turn.done",
+                session_id=state.session_id,
+                total_input_tokens=state.total_input_tokens,
+                total_output_tokens=state.total_output_tokens,
+            )
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 
