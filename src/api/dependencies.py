@@ -12,6 +12,7 @@ Two stores wired here:
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from anthropic import AsyncAnthropic
@@ -20,13 +21,32 @@ from src.agent.config import get_settings
 from src.sessions import (
     InMemorySessionStore,
     PostgresProfileStore,
+    PostgresSessionStore,
     ProfileStore,
     SessionStore,
 )
 
-# Process-singleton for v1. When session-Postgres lands, this becomes a real
-# PostgresSessionStore. ProfileStore already uses Postgres (or SQLite in tests).
-_session_store: SessionStore = InMemorySessionStore()
+
+def _make_session_store() -> SessionStore:
+    """Pick the right SessionStore for the environment.
+
+    Postgres when `DATABASE_URL` is set (Cloud Run, local dev with .env),
+    InMemory otherwise. Tests don't set `DATABASE_URL`, and the test
+    fixture provisions its own SQLite engine via `set_engine`, so the
+    in-memory store remains the safe default for tests.
+
+    Why env-driven and not a config flag: Cloud Run sets `DATABASE_URL`
+    automatically when we --update-env-vars at deploy. One env var, one
+    decision point, zero code changes between environments.
+    """
+    if os.getenv("DATABASE_URL"):
+        return PostgresSessionStore()
+    return InMemorySessionStore()
+
+
+# Process-singletons. ProfileStore already routed through Postgres (or
+# SQLite in tests via fixture). SessionStore now mirrors that pattern.
+_session_store: SessionStore = _make_session_store()
 _profile_store: ProfileStore = PostgresProfileStore()
 
 

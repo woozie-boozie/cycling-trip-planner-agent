@@ -17,11 +17,13 @@ from src.sessions.profile_store import (
     UserProfile,
     UserProfileCreate,
 )
+from src.sessions.postgres_store import PostgresSessionStore
 from src.sessions.store import InMemorySessionStore, SessionStore
 
 __all__ = [
     # Sessions
     "InMemorySessionStore",
+    "PostgresSessionStore",
     "SessionStore",
     # Profiles
     "DietaryRestriction",
