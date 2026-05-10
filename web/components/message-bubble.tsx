@@ -4,7 +4,6 @@ import Image from "next/image";
 import { Bike, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
-import { InlineTraceStrip } from "@/components/inline-trace-strip";
 import { VisualResponse } from "@/components/visual-response";
 import type { Corridor } from "@/lib/corridors";
 import type { UiMessage } from "@/lib/types";
@@ -35,11 +34,6 @@ export function MessageBubble({ message, viewMode = "text", corridor = null }: M
       </div>
 
       <div className="min-w-0 max-w-[85%] flex-1">
-        {/* Inline trace pills (assistant only) — render before the bubble */}
-        {!isUser && message.liveTrace && message.liveTrace.length > 0 && (
-          <InlineTraceStrip items={message.liveTrace} />
-        )}
-
       {/* Bubble */}
       <div
         className={
