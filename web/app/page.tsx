@@ -7,6 +7,7 @@ import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
 import { TracePanel } from "@/components/trace-panel";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
+import { RouteGallery } from "@/components/route-gallery";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
@@ -66,7 +67,6 @@ export default function Home() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileId(stored);
     } else if (!loadWizardDismissed()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWizardOpen(true);
     }
   }, []);
@@ -76,6 +76,7 @@ export default function Home() {
   // clear it and let the wizard re-prompt next time.
   useEffect(() => {
     if (!profileId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfile(null);
       return;
     }
@@ -84,7 +85,6 @@ export default function Home() {
       try {
         const p = await getProfile(profileId);
         if (!aborted) {
-          // eslint-disable-next-line react-hooks/set-state-in-effect
           setProfile(p);
         }
       } catch (err) {
@@ -137,8 +137,11 @@ export default function Home() {
     }
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    const text = input.trim();
+  const handleSubmit = useCallback((textOverride?: string) => {
+    // Accept an optional override so callers (e.g. the route gallery) can
+    // dispatch a curated prompt without first round-tripping through the
+    // textarea state. When no override is passed, use the textarea value.
+    const text = (textOverride ?? input).trim();
     // Allow send when there's text OR an image (both are valid turns).
     if ((!text && !attachedImage) || isPending) return;
 
@@ -378,7 +381,15 @@ export default function Home() {
           <div className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto px-4 py-6">
               {isEmpty ? (
-                <EmptyState profile={profile} />
+                <RouteGallery
+                  profile={profile}
+                  onPlan={(prompt) => handleSubmit(prompt)}
+                  onCustomPrompt={() => {
+                    // Focus the chat input — let the existing auto-focus
+                    // effect grab it; nothing to do here besides give the
+                    // user a visual nudge that the textarea is ready.
+                  }}
+                />
               ) : (
                 <div className="space-y-5">
                   {messages.map((m) => (
@@ -421,97 +432,6 @@ export default function Home() {
   );
 }
 
-/* Defined at module level (not inside Home) to keep a stable function
-   reference across renders — see `rerender-no-inline-components`. */
-function EmptyState({ profile }: { profile: UserProfile | null }) {
-  if (profile) {
-    return <PersonalisedEmptyState profile={profile} />;
-  }
-  return (
-    <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center text-center">
-      <div className="mb-5 rounded-full bg-primary/15 p-4 ring-1 ring-primary/20">
-        <span className="text-3xl" aria-hidden>
-          🚲
-        </span>
-      </div>
-      <h2 className="mb-2 text-xl font-semibold tracking-tight text-foreground">
-        Plan a multi-day cycling trip
-      </h2>
-      <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-        Tell me where you&apos;re riding, how far per day, what time of year, and your accommodation
-        preferences. I&apos;ll build you a day-by-day plan with route, terrain, weather, and
-        accommodation.
-      </p>
-      <p className="mt-4 text-xs text-muted-foreground/70">
-        Try one of the suggestions below to get started.
-      </p>
-    </div>
-  );
-}
-
-const EXPERIENCE_LABEL: Record<UserProfile["experience"], string> = {
-  beginner: "beginner",
-  casual: "casual rider",
-  intermediate: "intermediate cyclist",
-  experienced: "experienced rider",
-  racer: "endurance / racer",
-};
-const TRIP_STYLE_LABEL: Record<UserProfile["trip_styles"][number], string> = {
-  weekend: "weekend tours",
-  touring: "multi-day touring",
-  commute: "commuting",
-  charity: "charity rides",
-  special: "special-occasion trips",
-  solo: "solo trips",
-};
-const PRIORITY_LABEL: Record<UserProfile["priorities"][number], string> = {
-  scenery: "scenery",
-  distance: "distance",
-  food_drink: "food & drink",
-  wild_camping: "wild camping",
-  quiet_roads: "quiet roads",
-  pubs_culture: "pubs & culture",
-  cheap: "low-budget rides",
-  iconic: "iconic routes",
-  photography: "photography stops",
-};
-
-function joinHuman(items: string[]): string {
-  if (items.length === 0) return "";
-  if (items.length === 1) return items[0];
-  if (items.length === 2) return `${items[0]} and ${items[1]}`;
-  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
-}
-
-function PersonalisedEmptyState({ profile }: { profile: UserProfile }) {
-  const experience = EXPERIENCE_LABEL[profile.experience];
-  const styles = profile.trip_styles.map((s) => TRIP_STYLE_LABEL[s]);
-  const priorities = profile.priorities.map((p) => PRIORITY_LABEL[p]);
-
-  const stylePhrase = styles.length > 0 ? ` who likes ${joinHuman(styles)}` : "";
-  const priorityPhrase =
-    priorities.length > 0 ? ` Bias toward ${joinHuman(priorities)}.` : "";
-
-  return (
-    <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center text-center">
-      <div className="mb-5 rounded-full bg-primary/15 p-4 ring-1 ring-primary/20">
-        <span className="text-3xl" aria-hidden>
-          🚴
-        </span>
-      </div>
-      <h2 className="mb-2 text-xl font-semibold tracking-tight text-foreground">
-        Welcome back, {experience}
-        {stylePhrase}.
-      </h2>
-      <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-        I&apos;ll plan within your{" "}
-        <span className="font-medium text-foreground">{profile.max_daily_km_comfort} km/day</span>{" "}
-        comfort zone.
-        {priorityPhrase} Where to next?
-      </p>
-      <p className="mt-4 text-xs text-muted-foreground/70">
-        Try a suggestion below — or describe your own trip in your own words.
-      </p>
-    </div>
-  );
-}
+// EmptyState + PersonalisedEmptyState were replaced by RouteGallery
+// (Phase 2E · UI redesign). The gallery's Hero block carries any
+// personalisation cue based on the loaded profile.
