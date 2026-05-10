@@ -252,15 +252,25 @@ export default function Home() {
         { id: assistantId, role: "assistant", content: "" },
       ]);
 
-      await postChatStream(
-        {
-          message: messageText,
-          session_id: sessionId ?? undefined,
-          image: image?.payload,
-          profile_id: profileId ?? undefined,
-        },
-        (event) => {
-          switch (event.type) {
+      // Stream call factory so we can retry once on a stale-session 404.
+      // Mirror of the runSynchronousTurn 404-retry path: the in-memory
+      // session store gets wiped on uvicorn restart, leaving the client
+      // holding a stale session_id in localStorage. Clear and retry as
+      // a fresh session — the user's first turn just becomes the seed
+      // turn of the new session.
+      const dispatch = (sid: string | null) =>
+        postChatStream(
+          {
+            message: messageText,
+            session_id: sid ?? undefined,
+            image: image?.payload,
+            profile_id: profileId ?? undefined,
+          },
+          handleEvent,
+        );
+
+      function handleEvent(event: Parameters<Parameters<typeof postChatStream>[1]>[0]) {
+        switch (event.type) {
             case "session":
               if (event.session_id !== sessionId) {
                 saveSessionId(event.session_id);
@@ -306,9 +316,30 @@ export default function Home() {
               );
               void refreshTrace(event.session_id);
               break;
-          }
-        },
-      );
+        }
+      }
+
+      try {
+        await dispatch(sessionId);
+      } catch (firstErr) {
+        if (firstErr instanceof ApiError && firstErr.status === 404 && sessionId) {
+          // Stale session_id (uvicorn restart wiped the in-memory store).
+          // Clear it and retry as a fresh session — same recovery as the
+          // synchronous path, just on the streaming flow.
+          clearSessionId();
+          setSessionId(null);
+          setTrace(null);
+          // Reset the optimistic assistant bubble so the retry's text_delta
+          // events accumulate from empty rather than appending to a leftover.
+          liveTextRef.current = "";
+          setMessages((prev) =>
+            prev.map((m) => (m.id === assistantId ? { ...m, content: "" } : m)),
+          );
+          await dispatch(null);
+        } else {
+          throw firstErr;
+        }
+      }
     }
   }, [input, isPending, sessionId, attachedImage, refreshTrace, profileId]);
 
