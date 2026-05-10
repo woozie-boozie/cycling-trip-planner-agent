@@ -1,11 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Bike, Compass, Globe, MapPin } from "lucide-react";
 import { CORRIDORS, type Corridor } from "@/lib/corridors";
 import { RouteCard } from "@/components/route-card";
 import { RouteConfigForm } from "@/components/route-config-form";
 import type { UserProfile } from "@/lib/types";
+
+interface PromptCard {
+  header: string;
+  text: string;
+  Icon: typeof Bike;
+}
+
+const SAMPLE_PROMPTS: PromptCard[] = [
+  {
+    header: "Multi-day · charity",
+    text: "Plan London → Paris on the Avenue Verte, 4 days at 100 km/day, June, camping mostly.",
+    Icon: MapPin,
+  },
+  {
+    header: "Weekend · scenic",
+    text: "Best 2-day loop from Bristol with hilly climbs and pub stops.",
+    Icon: Bike,
+  },
+  {
+    header: "International · flat",
+    text: "Amsterdam to Copenhagen, 8 days, prefer hostels, July.",
+    Icon: Globe,
+  },
+  {
+    header: "UK · classic",
+    text: "London to Brighton this Saturday — what's the safest route at my 80 km/day pace?",
+    Icon: Compass,
+  },
+];
 
 interface RouteGalleryProps {
   profile: UserProfile | null;
@@ -43,84 +72,187 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
     );
   }
 
+  // Featured corridor = London → Paris (the headline corridor for the
+  // brief; most-tested, full multi-variant data, recommended state).
+  const featuredId: Corridor["id"] = "ldn-par";
+  const featured = CORRIDORS.find((c) => c.id === featuredId);
+  const others = CORRIDORS.filter((c) => c.id !== featuredId);
+
   return (
-    <div
-      className="relative mx-auto w-full max-w-6xl px-3 py-10 sm:py-14"
-      style={{
-        backgroundImage:
-          "radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in oklab, var(--primary) 8%, transparent) 0%, transparent 60%)",
-      }}
-    >
+    <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16">
       <Hero profile={profile} />
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {CORRIDORS.map((c) => (
+      {/* Section header — left-aligned, modern */}
+      <div className="mb-6 flex items-baseline justify-between gap-4">
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
+          Pick a route{" "}
+          <span
+            className="font-normal italic text-muted-foreground"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            matched to your profile
+          </span>
+        </h2>
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-muted-foreground">
+          3 corridors · seeded data
+        </span>
+      </div>
+
+      {/* Asymmetric route grid — featured wider, recommended badge */}
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+        {featured && (
+          <RouteCard
+            key={featured.id}
+            corridor={featured}
+            onSelect={setSelected}
+            featured
+          />
+        )}
+        {others.map((c) => (
           <RouteCard key={c.id} corridor={c} onSelect={setSelected} />
         ))}
       </div>
 
-      <div className="mt-10 flex flex-col items-center gap-3 text-center">
-        <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          <span className="h-px w-12 bg-border/70" aria-hidden />
-          or
-          <span className="h-px w-12 bg-border/70" aria-hidden />
-        </div>
-        <button
-          type="button"
-          onClick={onCustomPrompt}
-          className="font-heading text-base italic text-foreground/85 transition-colors hover:text-primary"
-          style={{ fontFamily: "var(--font-heading)" }}
-        >
-          describe your own trip ↓
-        </button>
-        <p className="text-[11px] text-muted-foreground">
-          The agent handles arbitrary corridors with seed-data fallback.
+      {/* "Or describe your own" — section break */}
+      <div className="mt-16 mb-6 flex items-center justify-center gap-4">
+        <span className="h-px max-w-[80px] flex-1 bg-border" aria-hidden />
+        <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          or describe your own
+        </span>
+        <span className="h-px max-w-[80px] flex-1 bg-border" aria-hidden />
+      </div>
+
+      <div className="mb-6 text-center">
+        <h3 className="text-[28px] font-extrabold leading-tight tracking-[-0.025em] text-foreground sm:text-[32px]">
+          Tell the agent{" "}
+          <span
+            className="font-normal italic text-primary"
+            style={{ fontFamily: "var(--font-heading)" }}
+          >
+            where you&apos;d like
+          </span>
+          <br className="hidden sm:block" />
+          to ride.
+        </h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Arbitrary corridors are handled with seed-data fallback. Try one of these:
         </p>
+      </div>
+
+      <div className="mx-auto grid max-w-3xl gap-2.5 sm:grid-cols-2">
+        {SAMPLE_PROMPTS.map((p, i) => (
+          <PromptCardComponent
+            key={i}
+            prompt={p}
+            onClick={() => onCustomPrompt()}
+          />
+        ))}
       </div>
     </div>
   );
 }
 
+function PromptCardComponent({
+  prompt,
+  onClick,
+}: {
+  prompt: PromptCard;
+  onClick: () => void;
+}) {
+  const { Icon } = prompt;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/[0.04] hover:shadow-md"
+    >
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground/80 transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+        <Icon className="h-4 w-4" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-mono text-[9.5px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          {prompt.header}
+        </span>
+        <span className="mt-0.5 block text-[13px] font-medium leading-snug text-foreground">
+          {prompt.text}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function Hero({ profile }: { profile: UserProfile | null }) {
   const isReturning = Boolean(profile);
+  const km = profile?.max_daily_km_comfort ?? 80;
 
   return (
-    <div className="mx-auto mb-9 flex max-w-3xl flex-col items-center text-center">
-      <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
-        <Sparkles className="h-3 w-3" aria-hidden />
-        Real route data · live weather · curated accommodation
+    <div className="mb-12 max-w-3xl">
+      {/* Status pill — top-aligned, hot */}
+      <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-primary">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inset-0 animate-ping rounded-full bg-primary opacity-75" />
+          <span className="relative h-1.5 w-1.5 rounded-full bg-primary" />
+        </span>
+        {isReturning ? `welcome back, ${km} km/day rider` : "live · production system"}
       </div>
-      <h1
-        className="font-heading text-4xl font-normal leading-[1.05] tracking-tight text-foreground sm:text-5xl md:text-6xl"
-        style={{ fontFamily: "var(--font-heading)" }}
-      >
+
+      {/* Headline — bold sans + italic-serif accent + strikethrough flourish */}
+      <h1 className="text-[44px] font-extrabold leading-[0.95] tracking-[-0.035em] text-foreground sm:text-[56px] md:text-[68px]">
         {isReturning ? (
           <>
-            <span className="italic">Welcome back.</span>{" "}
-            <span className="italic text-primary">Pick a route.</span>
+            The agent&apos;s{" "}
+            <span
+              className="font-normal italic text-primary"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              read
+            </span>{" "}
+            your saved preferences.
+            <br />
+            <span className="text-primary">Now pick a route.</span>
           </>
         ) : (
           <>
-            <span className="italic">Tell me where you&apos;d like to</span>{" "}
-            <span className="italic text-primary">ride.</span>
+            Plan a{" "}
+            <span
+              className="font-normal italic text-primary"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              real
+            </span>{" "}
+            multi-day cycling trip.
+            <br />
+            <span className="text-primary">In one chat.</span>
           </>
         )}
       </h1>
-      <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
+
+      <p className="mt-5 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-[17px]">
         {isReturning
-          ? `${profile!.max_daily_km_comfort} km/day comfort zone · the agent honours your saved preferences.`
-          : `Pick one of the three signposted corridors below — or describe your own. The agent fans out 15+ tool calls per turn to plan it real.`}
+          ? `${km} km/day comfort zone, your preferences honoured. Real BRouter distances, ECMWF climate, curated accommodation — and a self-critique loop that catches its own mistakes before you do.`
+          : `Real BRouter distances, ECMWF climate norms, Google Places accommodation, Anthropic Claude orchestrating it all — with a self-critique loop that catches its own mistakes before you do.`}
       </p>
-      {/* Provenance bar — shows the system's depth without screaming */}
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80">
-        <span>BRouter routes</span>
-        <span aria-hidden>·</span>
-        <span>ECMWF ERA5 climate</span>
-        <span aria-hidden>·</span>
-        <span>Google Places</span>
-        <span aria-hidden>·</span>
-        <span>Anthropic Claude</span>
+
+      {/* Provenance tags — small chips with coloured swatch */}
+      <div className="mt-6 flex flex-wrap gap-1.5">
+        <ProvenanceTag dot="#FF3D14" label="BRouter routes" />
+        <ProvenanceTag dot="#5C9AC4" label="ECMWF ERA5 climate" />
+        <ProvenanceTag dot="#18A957" label="Google Places POI" />
+        <ProvenanceTag dot="#0A0A09" label="Anthropic Claude" />
       </div>
     </div>
+  );
+}
+
+function ProvenanceTag({ dot, label }: { dot: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 font-mono text-[10.5px] font-medium text-foreground/85">
+      <span
+        className="h-1.5 w-1.5 rounded-full"
+        style={{ background: dot }}
+        aria-hidden
+      />
+      {label}
+    </span>
   );
 }
