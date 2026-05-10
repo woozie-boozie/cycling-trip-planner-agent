@@ -17,6 +17,15 @@ interface MessageBubbleProps {
   corridor?: Corridor | null;
 }
 
+/**
+ * Bubble layout for a single message.
+ *
+ *   - User messages stay right-aligned and capped at ~640px so short
+ *     prompts don't sprawl across the 1200px conversation column.
+ *   - Assistant messages fill the column width so visual responses
+ *     (maps, itinerary cards) get room to breathe; markdown text inside
+ *     self-caps at a comfortable reading measure (~70 chars).
+ */
 export function MessageBubble({ message, viewMode = "text", corridor = null }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
@@ -33,57 +42,67 @@ export function MessageBubble({ message, viewMode = "text", corridor = null }: M
         {isUser ? <User className="h-4 w-4" aria-hidden /> : <Bike className="h-4 w-4" aria-hidden />}
       </div>
 
-      <div className="min-w-0 max-w-[85%] flex-1">
-      {/* Bubble */}
       <div
         className={
           isUser
-            ? "max-w-[85%] rounded-2xl rounded-tr-sm bg-primary/15 px-4 py-2.5 text-foreground ring-1 ring-primary/20"
-            : "min-w-0 rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-foreground ring-1 ring-border/40"
+            ? "flex min-w-0 max-w-[640px] flex-col items-end"
+            : "min-w-0 flex-1"
         }
       >
-        {isUser ? (
-          <>
-            {message.imageDataUrl ? (
-              <div className="mb-2 overflow-hidden rounded-lg ring-1 ring-border/30">
-                <Image
-                  src={message.imageDataUrl}
-                  alt="Attached"
-                  width={400}
-                  height={300}
-                  className="h-auto w-full object-cover"
-                  unoptimized
-                />
-              </div>
-            ) : null}
-            {message.content ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-            ) : null}
-          </>
-        ) : viewMode === "visual" ? (
-          <VisualResponse content={message.content} corridor={corridor} />
-        ) : (
-          <MarkdownRenderer content={message.content} />
-        )}
+        {/* Bubble */}
+        <div
+          className={
+            isUser
+              ? "rounded-2xl rounded-tr-sm bg-primary/15 px-4 py-2.5 text-foreground ring-1 ring-primary/20"
+              : "min-w-0 rounded-2xl rounded-tl-sm bg-card px-5 py-4 text-foreground ring-1 ring-border/40"
+          }
+        >
+          {isUser ? (
+            <>
+              {message.imageDataUrl ? (
+                <div className="mb-2 overflow-hidden rounded-lg ring-1 ring-border/30">
+                  <Image
+                    src={message.imageDataUrl}
+                    alt="Attached"
+                    width={400}
+                    height={300}
+                    className="h-auto w-full object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : null}
+              {message.content ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+              ) : null}
+            </>
+          ) : viewMode === "visual" ? (
+            <VisualResponse content={message.content} corridor={corridor} />
+          ) : (
+            // Cap markdown text at a comfortable reading measure within
+            // the wide bubble. Visual responses ignore this and fill width.
+            <div className="max-w-[72ch]">
+              <MarkdownRenderer content={message.content} />
+            </div>
+          )}
 
-        {/* Per-turn meta for assistant messages */}
-        {!isUser && message.meta ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.iterations} iter
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.tool_calls.length} tools
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.input_tokens.toLocaleString()} in
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.output_tokens.toLocaleString()} out
-            </Badge>
-          </div>
-        ) : null}
-      </div>
+          {/* Per-turn meta for assistant messages */}
+          {!isUser && message.meta ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.iterations} iter
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.tool_calls.length} tools
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.input_tokens.toLocaleString()} in
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.output_tokens.toLocaleString()} out
+              </Badge>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

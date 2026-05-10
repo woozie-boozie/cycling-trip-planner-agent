@@ -355,6 +355,21 @@ export default function Home() {
               );
               void refreshTrace(event.session_id);
               break;
+            case "error": {
+              // Mid-stream error from backend (rate-limit, timeout, etc.).
+              // Surface a user-friendly message with a kind-specific hint
+              // and drop the empty assistant bubble so the thread doesn't
+              // show a hanging "" reply.
+              const hint =
+                event.kind === "rate_limit"
+                  ? " Tip: click \"+ New trip\" to start fresh and shrink the context."
+                  : "";
+              setError(`${event.message}${hint}`);
+              setMessages((prev) =>
+                prev.filter((m) => !(m.id === assistantId && !m.content)),
+              );
+              break;
+            }
         }
       }
 
@@ -467,8 +482,10 @@ export default function Home() {
             />
           </div>
         ) : (
-          // Conversation — centred message column, no sidebar
-          <div className="mx-auto max-w-3xl px-4 py-8 sm:py-10 lg:px-6">
+          // Conversation — same wide container as the landing for visual
+          // responses (maps, itineraries) to breathe. Individual bubbles
+          // self-cap text width inside; visual content fills the column.
+          <div className="mx-auto max-w-[1200px] px-4 py-10 sm:py-14 lg:px-10">
             <div className="space-y-5">
               {messages.map((m) => (
                 <MessageBubble

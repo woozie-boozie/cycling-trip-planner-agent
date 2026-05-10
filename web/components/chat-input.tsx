@@ -103,7 +103,7 @@ export function ChatInput({
   return (
     <div className="surface-glass border-t border-border/50">
       <div
-        className="mx-auto max-w-3xl px-4 py-4"
+        className="mx-auto max-w-4xl px-4 py-4 lg:px-10"
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

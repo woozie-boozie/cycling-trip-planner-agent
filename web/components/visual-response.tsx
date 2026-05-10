@@ -70,6 +70,7 @@ export function VisualResponse({ content, corridor, onPickVariant }: VisualRespo
             days={detection.days}
             title={detection.corridor?.label}
             subtitle={detection.subtitle}
+            corridor={detection.corridor ?? null}
           />
           {detection.afterText && (
             <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">

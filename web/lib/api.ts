@@ -119,6 +119,14 @@ export type ChatStreamEvent =
       output_tokens: number;
       tool_calls: { name: string; args: string[] }[];
       error?: string;
+    }
+  /** Mid-stream error from the backend — emitted instead of raising so the
+   *  SSE connection can deliver a structured message. `kind` lets the UI
+   *  pick a specific recovery hint. */
+  | {
+      type: "error";
+      kind: "rate_limit" | "timeout" | "network" | "unknown";
+      message: string;
     };
 
 /**
