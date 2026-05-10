@@ -178,3 +178,44 @@ class UserProfileRow(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ---------------------------------------------------------------------------
+# Phase 1.12b · Session store — Cloud Run cold-starts wipe in-memory dicts
+# ---------------------------------------------------------------------------
+
+
+class SessionRow(SQLModel, table=True):
+    """Persisted ConversationState — the agent loop's memory across requests.
+
+    The whole ConversationState is serialised to JSON (TEXT) rather than mapped
+    field-by-field. ConversationState is Pydantic top-to-bottom (messages,
+    trace events, token counters), so a JSON blob is loss-free and lets us
+    evolve the state schema without touching the SQLModel.
+
+    Why we didn't relationally model trace events:
+      - Trace events are append-only and consumed in-order. Relational
+        querying would mean N+1 fetches per /trace call. JSON blob is one
+        row, one parse.
+      - Anthropic's `messages` content-block format (text, tool_use,
+        tool_result, image) is nested and recursive — relational
+        decomposition would be 3+ tables for one thread. Lossy round-trips
+        inevitable.
+      - We never search inside a session — only fetch by session_id and
+        update the whole thing. Document-shape is the right shape.
+
+    Same datetime convention as `UserProfileRow`: tz-aware UTC at the
+    Pydantic boundary, naive UTC in Postgres `TIMESTAMP WITHOUT TIME ZONE`.
+    """
+
+    __tablename__ = "sessions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    session_id: str = Field(
+        index=True, unique=True, description="UUID4 — the same id the agent emits"
+    )
+    state_json: str = Field(
+        description="ConversationState serialised via .model_dump_json()"
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
