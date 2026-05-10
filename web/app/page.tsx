@@ -5,7 +5,7 @@ import { Header } from "@/components/header";
 import { MessageBubble } from "@/components/message-bubble";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
-import { TracePanel } from "@/components/trace-panel";
+import { LiveTracePanel } from "@/components/live-trace-panel";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { RouteGallery } from "@/components/route-gallery";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
@@ -452,52 +452,65 @@ export default function Home() {
         />
       )}
 
-      <main className="flex-1 overflow-hidden">
-        <div className="mx-auto flex h-full max-w-7xl">
-          {/* Chat column — full width on mobile, ~7/10ths on desktop */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-4 py-6">
-              {isEmpty ? (
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:px-8">
+          {isEmpty ? (
+            // Empty-state: 2-column grid with gallery on the left,
+            // dark live-trace panel sticky on the right.
+            <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-10">
+              <div>
                 <RouteGallery
                   profile={profile}
                   onPlan={(prompt) => handleSubmit(prompt)}
                   onCustomPrompt={() => {
-                    // Focus the chat input — let the existing auto-focus
-                    // effect grab it; nothing to do here besides give the
-                    // user a visual nudge that the textarea is ready.
+                    /* free-text path — chat input auto-focuses */
                   }}
                 />
-              ) : (
-                <div className="space-y-5">
-                  {messages.map((m) => (
-                    <MessageBubble
-                      key={m.id}
-                      message={m}
-                      viewMode={viewMode}
-                      corridor={corridor}
-                    />
-                  ))}
-                  {isPending ? <LoadingIndicator /> : null}
-                  {error ? (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                      {error}
-                    </div>
-                  ) : null}
-                  <div ref={scrollAnchorRef} />
+              </div>
+              <aside className="hidden lg:block">
+                <div className="sticky top-20">
+                  <LiveTracePanel
+                    mode="demo"
+                    sessionId={sessionId}
+                    trace={trace}
+                    isPending={isPending}
+                  />
                 </div>
-              )}
+              </aside>
             </div>
-          </div>
-
-          {/* Trace panel — hidden on mobile, ~3/10ths on lg+ */}
-          <aside className="hidden w-[360px] shrink-0 overflow-y-auto border-l border-border/40 bg-card/30 p-4 lg:block">
-            <TracePanel
-              trace={trace}
-              isLoading={isTraceLoading || isPending}
-              hasSession={Boolean(sessionId)}
-              corridor={corridor}
-            />
-          </aside>
+          ) : (
+            // Conversation: messages on the left, dark live-trace panel
+            // sticky on the right, full-bleed on mobile.
+            <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-10">
+              <div className="space-y-5">
+                {messages.map((m) => (
+                  <MessageBubble
+                    key={m.id}
+                    message={m}
+                    viewMode={viewMode}
+                    corridor={corridor}
+                  />
+                ))}
+                {isPending ? <LoadingIndicator /> : null}
+                {error ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    {error}
+                  </div>
+                ) : null}
+                <div ref={scrollAnchorRef} />
+              </div>
+              <aside className="hidden lg:block">
+                <div className="sticky top-20">
+                  <LiveTracePanel
+                    mode="live"
+                    sessionId={sessionId}
+                    trace={trace}
+                    isPending={isPending || isTraceLoading}
+                  />
+                </div>
+              </aside>
+            </div>
+          )}
         </div>
       </main>
 

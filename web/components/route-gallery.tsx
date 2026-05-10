@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Bike, Compass, Globe, MapPin } from "lucide-react";
 import { CORRIDORS, type Corridor } from "@/lib/corridors";
-import { LiveTraceShowcase } from "@/components/live-trace-showcase";
 import { RouteCard } from "@/components/route-card";
 import { RouteConfigForm } from "@/components/route-config-form";
 import type { UserProfile } from "@/lib/types";
@@ -80,7 +79,7 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
   const others = CORRIDORS.filter((c) => c.id !== featuredId);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-12 sm:py-16">
+    <div className="w-full">
       <Hero profile={profile} />
 
       {/* Section header — left-aligned, modern */}
@@ -99,8 +98,9 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
         </span>
       </div>
 
-      {/* Asymmetric route grid — featured wider, recommended badge */}
-      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+      {/* Vertical route stack — narrower column now that the dark panel is
+          page-level. Featured card first, then the others. */}
+      <div className="grid gap-4">
         {featured && (
           <RouteCard
             key={featured.id}
@@ -187,76 +187,68 @@ function Hero({ profile }: { profile: UserProfile | null }) {
   const km = profile?.max_daily_km_comfort ?? 80;
 
   return (
-    <div className="mb-12 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_400px] lg:gap-12 lg:items-start">
-      {/* Left column — headline + lede + tags */}
-      <div>
-        {/* Status pill — top-aligned, hot */}
-        <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-primary">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inset-0 animate-ping rounded-full bg-primary opacity-75" />
-            <span className="relative h-1.5 w-1.5 rounded-full bg-primary" />
-          </span>
-          {isReturning ? `welcome back, akhil` : "live · production system"}
-        </div>
-
-        {/* Headline — bold sans + italic-serif accent flourishes */}
-        <h1 className="text-[40px] font-extrabold leading-[0.95] tracking-[-0.035em] text-foreground sm:text-[52px] md:text-[60px]">
-          {isReturning ? (
-            <>
-              The agent&apos;s{" "}
-              <span
-                className="font-normal italic text-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                read
-              </span>
-              <br />
-              your saved preferences.{" "}
-              <span
-                className="font-normal italic text-primary"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                Now pick a route.
-              </span>
-            </>
-          ) : (
-            <>
-              Plan a{" "}
-              <span
-                className="font-normal italic text-foreground"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                real
-              </span>{" "}
-              multi-day cycling trip.{" "}
-              <span
-                className="font-normal italic text-primary"
-                style={{ fontFamily: "var(--font-heading)" }}
-              >
-                In one chat.
-              </span>
-            </>
-          )}
-        </h1>
-
-        <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-[16px]">
-          {isReturning
-            ? `${km} km/day comfort zone. Camping over hotels. Real BRouter distances, ECMWF climate norms, curated accommodation — and a self-critique loop that catches its own mistakes before you do.`
-            : `Real BRouter distances, ECMWF climate norms, curated accommodation — and a self-critique loop that catches its own mistakes before you do.`}
-        </p>
-
-        {/* Provenance tags */}
-        <div className="mt-6 flex flex-wrap gap-1.5">
-          <ProvenanceTag dot="#FF3D14" label="BRouter routes" />
-          <ProvenanceTag dot="#5C9AC4" label="ECMWF ERA5 climate" />
-          <ProvenanceTag dot="#18A957" label="Google Places POI" />
-          <ProvenanceTag dot="#0A0A09" label="Anthropic Claude" />
-        </div>
+    <div className="mb-10">
+      {/* Status pill — top-aligned, hot */}
+      <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-primary">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inset-0 animate-ping rounded-full bg-primary opacity-75" />
+          <span className="relative h-1.5 w-1.5 rounded-full bg-primary" />
+        </span>
+        {isReturning ? `welcome back, akhil` : "live · production system"}
       </div>
 
-      {/* Right column — dark live trace showcase */}
-      <div className="lg:pt-1">
-        <LiveTraceShowcase />
+      {/* Headline — bold sans + italic-serif accent flourishes */}
+      <h1 className="text-[40px] font-extrabold leading-[0.95] tracking-[-0.035em] text-foreground sm:text-[52px] md:text-[60px]">
+        {isReturning ? (
+          <>
+            The agent&apos;s{" "}
+            <span
+              className="font-normal italic text-foreground"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              read
+            </span>
+            <br />
+            your saved preferences.{" "}
+            <span
+              className="font-normal italic text-primary"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              Now pick a route.
+            </span>
+          </>
+        ) : (
+          <>
+            Plan a{" "}
+            <span
+              className="font-normal italic text-foreground"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              real
+            </span>{" "}
+            multi-day cycling trip.{" "}
+            <span
+              className="font-normal italic text-primary"
+              style={{ fontFamily: "var(--font-heading)" }}
+            >
+              In one chat.
+            </span>
+          </>
+        )}
+      </h1>
+
+      <p className="mt-5 max-w-xl text-[15px] leading-relaxed text-muted-foreground sm:text-[16px]">
+        {isReturning
+          ? `${km} km/day comfort zone. Camping over hotels. Real BRouter distances, ECMWF climate norms, curated accommodation — and a self-critique loop that catches its own mistakes before you do.`
+          : `Real BRouter distances, ECMWF climate norms, curated accommodation — and a self-critique loop that catches its own mistakes before you do.`}
+      </p>
+
+      {/* Provenance tags */}
+      <div className="mt-6 flex flex-wrap gap-1.5">
+        <ProvenanceTag dot="#FF3D14" label="BRouter routes" />
+        <ProvenanceTag dot="#5C9AC4" label="ECMWF ERA5 climate" />
+        <ProvenanceTag dot="#18A957" label="Google Places POI" />
+        <ProvenanceTag dot="#0A0A09" label="Anthropic Claude" />
       </div>
     </div>
   );
