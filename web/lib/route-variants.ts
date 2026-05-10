@@ -18,6 +18,13 @@
 
 import type { CorridorId } from "@/lib/corridors";
 
+export interface VariantWaypoint {
+  name: string;
+  lat: number;
+  lon: number;
+  is_ferry?: boolean;
+}
+
 export interface RouteVariantSummary {
   /** Short identifier matching backend `route_real.py:CorridorVariant.name` */
   name: string;
@@ -41,7 +48,23 @@ export interface RouteVariantSummary {
    * authoritative; OK to reword without backend coordination.
    */
   vibes?: string[];
+  /**
+   * Per-variant waypoint list — each variant takes a physically different
+   * path even though the start/end and several mid-points are shared.
+   * The map renders this list when a variant is selected; falls back to
+   * the corridor's default waypoints when no variant context is available.
+   * Mirrors backend `src/tools/route_real.py:CorridorVariant.anchors`.
+   */
+  waypoints: VariantWaypoint[];
 }
+
+// Shared UK side: London → Newhaven (every variant uses the same NCN 20)
+const _UK_AVENUE_VERTE: VariantWaypoint[] = [
+  { name: "London", lat: 51.5074, lon: -0.1278 },
+  { name: "East Grinstead", lat: 51.1283, lon: -0.0094 },
+  { name: "Lewes", lat: 50.8736, lon: 0.008 },
+  { name: "Newhaven", lat: 50.7935, lon: 0.057 },
+];
 
 export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
   "ldn-par": [
@@ -64,6 +87,14 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       vibes: ["fast roads", "one cathedral", "gentle gradients"],
       color: "#5C9AC4",
       is_default: true,
+      waypoints: [
+        ..._UK_AVENUE_VERTE,
+        { name: "Dieppe", lat: 49.9239, lon: 1.0775, is_ferry: true },
+        { name: "Forges-les-Eaux", lat: 49.6173, lon: 1.546 },
+        { name: "Beauvais", lat: 49.4295, lon: 2.0808 },
+        { name: "Cergy-Pontoise", lat: 49.0398, lon: 2.0712 },
+        { name: "Paris", lat: 48.8566, lon: 2.3522 },
+      ],
     },
     {
       name: "oise_chantilly",
@@ -83,6 +114,15 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       best_for: "Heritage + photography over distance; special-occasion trips",
       vibes: ["heritage stops", "longer days", "stunning"],
       color: "#D4942A",
+      waypoints: [
+        ..._UK_AVENUE_VERTE,
+        { name: "Dieppe", lat: 49.9239, lon: 1.0775, is_ferry: true },
+        { name: "Forges-les-Eaux", lat: 49.6173, lon: 1.546 },
+        { name: "Beauvais", lat: 49.4295, lon: 2.0808 },
+        { name: "Chantilly", lat: 49.1939, lon: 2.4811 },
+        { name: "Senlis", lat: 49.2069, lon: 2.5851 },
+        { name: "Paris", lat: 48.8566, lon: 2.3522 },
+      ],
     },
     {
       name: "gisors",
@@ -103,6 +143,15 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       best_for: "Solitude + rural Normandy/Vexin over headline stops",
       vibes: ["solitude", "wildlife", "rural Normandy"],
       color: "#FF4A1C",
+      waypoints: [
+        ..._UK_AVENUE_VERTE,
+        { name: "Dieppe", lat: 49.9239, lon: 1.0775, is_ferry: true },
+        { name: "Forges-les-Eaux", lat: 49.6173, lon: 1.546 },
+        { name: "Gisors", lat: 49.2856, lon: 1.7791 },
+        { name: "Magny-en-Vexin", lat: 49.1556, lon: 1.7847 },
+        { name: "Cergy-Pontoise", lat: 49.0398, lon: 2.0712 },
+        { name: "Paris", lat: 48.8566, lon: 2.3522 },
+      ],
     },
   ],
   "ams-cph": [
@@ -126,6 +175,18 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       vibes: ["flat", "well-signposted", "city-rich"],
       color: "#5C9AC4",
       is_default: true,
+      waypoints: [
+        { name: "Amsterdam", lat: 52.3676, lon: 4.9041 },
+        { name: "Hoorn", lat: 52.6422, lon: 5.0594 },
+        { name: "Groningen", lat: 53.2194, lon: 6.5665 },
+        { name: "Bremen", lat: 53.0793, lon: 8.8017 },
+        { name: "Hamburg", lat: 53.5511, lon: 9.9937 },
+        { name: "Lübeck", lat: 53.8654, lon: 10.6866 },
+        { name: "Puttgarden", lat: 54.5092, lon: 11.2226 },
+        { name: "Rødby", lat: 54.6906, lon: 11.3539, is_ferry: true },
+        { name: "Vordingborg", lat: 55.0084, lon: 11.9098 },
+        { name: "Copenhagen", lat: 55.6761, lon: 12.5683 },
+      ],
     },
     {
       name: "ev12_coastal",
@@ -147,6 +208,22 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
         "Riders who want the EuroVelo 12 'proper' experience with time to enjoy the coast",
       vibes: ["coastal", "wildlife-rich", "headwind country"],
       color: "#FF4A1C",
+      waypoints: [
+        { name: "Amsterdam", lat: 52.3676, lon: 4.9041 },
+        { name: "Den Helder", lat: 52.9594, lon: 4.7589 },
+        { name: "Harlingen", lat: 53.1736, lon: 5.4239 },
+        { name: "Leeuwarden", lat: 53.2012, lon: 5.7999 },
+        { name: "Emden", lat: 53.3672, lon: 7.2061 },
+        { name: "Wilhelmshaven", lat: 53.5232, lon: 8.1131 },
+        { name: "Bremerhaven", lat: 53.5396, lon: 8.5810 },
+        { name: "Cuxhaven", lat: 53.8675, lon: 8.6886 },
+        { name: "Hamburg", lat: 53.5511, lon: 9.9937 },
+        { name: "Lübeck", lat: 53.8654, lon: 10.6866 },
+        { name: "Puttgarden", lat: 54.5092, lon: 11.2226 },
+        { name: "Rødby", lat: 54.6906, lon: 11.3539, is_ferry: true },
+        { name: "Vordingborg", lat: 55.0084, lon: 11.9098 },
+        { name: "Copenhagen", lat: 55.6761, lon: 12.5683 },
+      ],
     },
   ],
   "ldn-bri": [
@@ -168,6 +245,11 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       vibes: ["classic", "one big climb", "seafront finish"],
       color: "#FF4A1C",
       is_default: true,
+      waypoints: [
+        { name: "London", lat: 51.5074, lon: -0.1278 },
+        { name: "Crystal Palace", lat: 51.4189, lon: -0.0735 },
+        { name: "Brighton", lat: 50.8225, lon: -0.1372 },
+      ],
     },
   ],
 };

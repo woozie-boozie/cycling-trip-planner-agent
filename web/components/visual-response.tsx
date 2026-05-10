@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ItineraryCard } from "@/components/itinerary-card";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { RouteCanvas } from "@/components/route-canvas";
@@ -48,20 +48,10 @@ export function VisualResponse({ content, corridor, onPickVariant }: VisualRespo
   switch (detection.kind) {
     case "comparison":
       return (
-        <div className="space-y-3">
-          <RouteCanvas corridor={detection.corridor} />
-          <RouteComparisonCard
-            corridor={detection.corridor}
-            variants={detection.variants}
-            recommendedName={detection.recommendedName}
-            onPick={onPickVariant}
-          />
-          {detection.afterText && (
-            <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
-              <MarkdownRenderer content={detection.afterText} />
-            </div>
-          )}
-        </div>
+        <ComparisonResponse
+          detection={detection}
+          onPickVariant={onPickVariant}
+        />
       );
     case "single-route":
       return (
@@ -92,6 +82,50 @@ export function VisualResponse({ content, corridor, onPickVariant }: VisualRespo
     default:
       return <MarkdownRenderer content={content} />;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Comparison sub-component — owns the selected variant so the map redraws
+// when the user clicks a different card.
+// ---------------------------------------------------------------------------
+
+function ComparisonResponse({
+  detection,
+  onPickVariant,
+}: {
+  detection: Extract<Detection, { kind: "comparison" }>;
+  onPickVariant?: (v: RouteVariantSummary) => void;
+}) {
+  const initial =
+    detection.recommendedName ??
+    detection.variants.find((v) => v.is_default)?.name ??
+    detection.variants[0].name;
+  const [selectedName, setSelectedName] = useState<string>(initial);
+  const selected = detection.variants.find((v) => v.name === selectedName) ?? detection.variants[0];
+
+  return (
+    <div className="space-y-3">
+      <RouteCanvas
+        corridor={detection.corridor}
+        variantWaypoints={selected.waypoints}
+        title={`${detection.corridor.label} · ${selected.title}`}
+        subtitle={`${selected.total_distance_km} km · ${selected.estimated_days} d · ${selected.tagline}`}
+      />
+      <RouteComparisonCard
+        corridor={detection.corridor}
+        variants={detection.variants}
+        recommendedName={detection.recommendedName}
+        onPick={onPickVariant}
+        selectedName={selectedName}
+        onSelect={(v) => setSelectedName(v.name)}
+      />
+      {detection.afterText && (
+        <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
+          <MarkdownRenderer content={detection.afterText} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------

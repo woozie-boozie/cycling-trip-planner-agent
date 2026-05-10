@@ -15,6 +15,22 @@ interface RouteCanvasProps {
   corridor: Corridor;
   /** When false, renders without the layer-chip toolbar (for inline embedding) */
   showLayers?: boolean;
+  /**
+   * Optional override for the route polyline + waypoints. When provided
+   * (e.g. user selected a specific variant in the comparison card), the
+   * map traces these instead of the corridor's default waypoints.
+   * Each entry: `{ name, lat, lon, is_ferry? }`.
+   */
+  variantWaypoints?: Array<{
+    name: string;
+    lat: number;
+    lon: number;
+    is_ferry?: boolean;
+  }>;
+  /** Optional title override for the header (e.g. "London → Paris · V16a Beauvais") */
+  title?: string;
+  /** Optional subtitle override (e.g. "364 km · 4 days") */
+  subtitle?: string;
 }
 
 const VIEW_W = 720;
@@ -40,12 +56,28 @@ const DEFAULT_ACTIVE: PoiLayer[] = ["heritage", "wildlife", "camp"];
  * Visible only in visual mode. The Leaflet-based RouteMap stays in
  * the right-rail trace panel — different surface, different purpose.
  */
-export function RouteCanvas({ corridor, showLayers = true }: RouteCanvasProps) {
+export function RouteCanvas({
+  corridor,
+  showLayers = true,
+  variantWaypoints,
+  title,
+  subtitle,
+}: RouteCanvasProps) {
   const [active, setActive] = useState<Set<PoiLayer>>(
     () => new Set(DEFAULT_ACTIVE),
   );
   const [hoverPoi, setHoverPoi] = useState<Poi | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
+
+  // Use variant waypoints when provided (selection from RouteComparisonCard);
+  // fall back to corridor's default waypoint set otherwise.
+  const activeWaypoints = useMemo(
+    () =>
+      variantWaypoints && variantWaypoints.length > 0
+        ? variantWaypoints
+        : corridor.waypoints,
+    [variantWaypoints, corridor.waypoints],
+  );
 
   const corridorPois = useMemo(
     () => POIS_BY_CORRIDOR[corridor.id] ?? [],
@@ -61,14 +93,14 @@ export function RouteCanvas({ corridor, showLayers = true }: RouteCanvasProps) {
     return out;
   }, [corridorPois]);
 
-  // Project all corridor lat/lon + POI lat/lon → SVG coords.
+  // Project all waypoint + POI lat/lon → SVG coords.
   const projected = useMemo(() => {
     const allLats = [
-      ...corridor.waypoints.map((w) => w.lat),
+      ...activeWaypoints.map((w) => w.lat),
       ...corridorPois.map((p) => p.lat),
     ];
     const allLons = [
-      ...corridor.waypoints.map((w) => w.lon),
+      ...activeWaypoints.map((w) => w.lon),
       ...corridorPois.map((p) => p.lon),
     ];
     const minLat = Math.min(...allLats);
@@ -105,13 +137,13 @@ export function RouteCanvas({ corridor, showLayers = true }: RouteCanvasProps) {
 
     return {
       project,
-      waypoints: corridor.waypoints.map((w) => ({
+      waypoints: activeWaypoints.map((w) => ({
         ...w,
         ...project(w.lat, w.lon),
       })),
       pois: corridorPois.map((p) => ({ ...p, ...project(p.lat, p.lon) })),
     };
-  }, [corridor, corridorPois]);
+  }, [activeWaypoints, corridorPois]);
 
   // Smoothed polyline through waypoints
   const polylinePath = useMemo(() => {
@@ -146,14 +178,14 @@ export function RouteCanvas({ corridor, showLayers = true }: RouteCanvasProps) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Route map · {corridor.total_km} km · {corridor.waypoints.length}{" "}
-              waypoints
+              Route map ·{" "}
+              {subtitle ?? `${corridor.total_km} km · ${activeWaypoints.length} waypoints`}
             </p>
             <h3
               className="font-heading mt-0.5 text-xl italic leading-tight text-foreground"
               style={{ fontFamily: "var(--font-heading)" }}
             >
-              {corridor.label}
+              {title ?? corridor.label}
             </h3>
           </div>
           <span className="font-mono text-[11px] text-muted-foreground">

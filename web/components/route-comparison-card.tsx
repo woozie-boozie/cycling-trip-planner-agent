@@ -12,6 +12,15 @@ interface RouteComparisonCardProps {
   recommendedName?: string;
   /** Optional CTA fired when the user picks a variant */
   onPick?: (variant: RouteVariantSummary) => void;
+  /**
+   * Currently-selected variant (controlled). When omitted the card
+   * manages its own selection state. When provided, the parent owns
+   * the selection — this is how the RouteCanvas above the card
+   * reflects which variant the user has clicked.
+   */
+  selectedName?: string;
+  /** Fired on every selection change so the parent can sync the map */
+  onSelect?: (variant: RouteVariantSummary) => void;
 }
 
 /**
@@ -31,10 +40,19 @@ export function RouteComparisonCard({
   variants,
   recommendedName,
   onPick,
+  selectedName: controlledSelectedName,
+  onSelect,
 }: RouteComparisonCardProps) {
-  const [selectedName, setSelectedName] = useState<string>(
+  const [internalSelectedName, setInternalSelectedName] = useState<string>(
     recommendedName ?? variants.find((v) => v.is_default)?.name ?? variants[0].name,
   );
+  const selectedName = controlledSelectedName ?? internalSelectedName;
+  const handleSelect = (variant: RouteVariantSummary) => {
+    if (controlledSelectedName === undefined) {
+      setInternalSelectedName(variant.name);
+    }
+    onSelect?.(variant);
+  };
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -65,7 +83,7 @@ export function RouteComparisonCard({
             <button
               key={v.name}
               type="button"
-              onClick={() => setSelectedName(v.name)}
+              onClick={() => handleSelect(v)}
               className={[
                 "group relative flex flex-col gap-2 overflow-hidden rounded-lg border bg-card p-3 text-left transition-all",
                 isSelected
