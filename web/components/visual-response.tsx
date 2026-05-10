@@ -123,23 +123,33 @@ function detectResponseShape(content: string, corridor: Corridor | null): Detect
 
   // Trim the variant-comparison block off the front and pass the
   // remaining "recommendation" prose through MarkdownRenderer below.
-  const afterText = content
-    .split(/\bWhich (?:would|route|variant)\b/i)
-    .slice(1)
-    .join("");
+  // Cuts cleanly past the agent's "Which variant would you like?"
+  // question + any trailing markdown markers (**, whitespace).
+  let afterText = "";
+  const cutMatch = content.match(
+    /\bWhich (?:variant|route|option|one)\b[^?]*\?[*_\s]*/i,
+  );
+  if (cutMatch && cutMatch.index !== undefined) {
+    afterText = content.slice(cutMatch.index + cutMatch[0].length).trim();
+  }
 
   return {
     kind: "comparison",
     corridor,
     variants,
     recommendedName,
-    afterText: afterText.trim() || undefined,
+    afterText: afterText || undefined,
   };
 }
 
 /**
  * Best-effort recommendation extraction. Returns the variant.name the
  * agent appears to be recommending, or undefined.
+ *
+ * Tiered: stronger signals override weaker ones. Within a tier, the
+ * first variant matching wins. The variant signature word is derived
+ * from `title.split(' ')[0]` (e.g. "Inland EV7/12 hybrid" → "inland",
+ * "Coastal EV12 North Sea" → "coastal").
  */
 function inferRecommended(
   content: string,
@@ -147,38 +157,68 @@ function inferRecommended(
 ): string | undefined {
   const lower = content.toLowerCase();
 
-  // Pattern 1: explicit recommend / go with / choose <title>
+  // Helper: signature word for a variant (lowercase, ≥4 chars).
+  const sigOf = (v: RouteVariantSummary): string | null => {
+    const w = v.title.split(/\s+/)[0]?.toLowerCase();
+    return w && w.length >= 4 ? w : null;
+  };
+
+  // ── Tier 1 · "is/feels more aligned" / "matches your priorities" ──
+  // Strongest signal — explicit alignment with the user's profile.
+  for (const v of variants) {
+    const sig = sigOf(v);
+    if (!sig) continue;
+    const t1 = [
+      new RegExp(`\\b${sig}\\b[^.]*\\b(more|best|better|much|properly)\\s+aligned\\b`, "i"),
+      new RegExp(`\\b${sig}\\b[^.]*\\bmatches your\\b`, "i"),
+      new RegExp(`\\b${sig}\\b[^.]*\\bhonors your priorities\\b`, "i"),
+    ];
+    if (t1.some((re) => re.test(content))) return v.name;
+  }
+
+  // ── Tier 2 · explicit recommend / go with / choose <title> ──
   for (const v of variants) {
     const t = v.title.toLowerCase();
     if (
       lower.includes(`recommend ${t}`) ||
+      lower.includes(`recommend the ${t}`) ||
       lower.includes(`go with ${t}`) ||
-      lower.includes(`choose ${t}`)
+      lower.includes(`go with the ${t}`) ||
+      lower.includes(`choose ${t}`) ||
+      lower.includes(`my pick is ${t}`)
     ) {
       return v.name;
     }
   }
 
-  // Pattern 2: "recommend Option N" (legacy)
+  // ── Tier 3 · "recommend Option N" (legacy) ──
   const m = content.match(/\brecommend(?:ation)?[^.]*\bOption\s+(\d+)/i);
   if (m) {
     const idx = parseInt(m[1], 10) - 1;
     if (idx >= 0 && idx < variants.length) return variants[idx].name;
   }
 
-  // Pattern 3: distinctive keyword in title that appears next to "fits"
-  // or "best for your". Captures "**The inland route** fits your 11-day".
+  // ── Tier 4 · "best fits / ideal for / perfect for" ──
   for (const v of variants) {
-    // Pull a signature word from the title (e.g. "Inland EV7/12 hybrid" → "inland")
-    const firstWord = v.title.split(/\s+/)[0]?.toLowerCase();
-    if (!firstWord || firstWord.length < 4) continue;
-    const sig = firstWord;
-    const fitsPatterns = [
-      new RegExp(`\\b${sig}\\b[^.]*\\bfits\\b`, "i"),
-      new RegExp(`\\b${sig}\\s+route\\b[^.]*\\b(perfect|ideal|matches|best)\\b`, "i"),
-      new RegExp(`\\bbest[^.]*\\b${sig}\\b`, "i"),
+    const sig = sigOf(v);
+    if (!sig) continue;
+    const t4 = [
+      new RegExp(`\\b${sig}\\s+route\\b[^.]*\\b(ideal|perfect)\\b`, "i"),
+      new RegExp(`\\bbest fit\\b[^.]*\\b${sig}\\b`, "i"),
+      new RegExp(`\\b${sig}\\b[^.]*\\bbest fits\\b`, "i"),
     ];
-    if (fitsPatterns.some((re) => re.test(content))) return v.name;
+    if (t4.some((re) => re.test(content))) return v.name;
+  }
+
+  // ── Tier 5 (weakest) · "<X> fits your <something>" ──
+  // Only fires when no stronger signal won — used to be Tier 1, demoted
+  // because it incorrectly matched when both variants had a "fits" line.
+  for (const v of variants) {
+    const sig = sigOf(v);
+    if (!sig) continue;
+    if (new RegExp(`\\b${sig}\\b[^.]*\\bfits\\b`, "i").test(content)) {
+      return v.name;
+    }
   }
 
   return undefined;
