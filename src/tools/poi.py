@@ -16,6 +16,7 @@ Mock data per known city, same fallback pattern as `find_accommodation`.
 from __future__ import annotations
 
 from src.tools.base import register_tool
+from src.tools.places_real import fetch_real_pois, use_real_places
 from src.tools.schemas import (
     POI,
     GetPointsOfInterestInput,
@@ -846,6 +847,20 @@ def _generic_results(location: str) -> list[POI]:
     output_model=GetPointsOfInterestOutput,
 )
 async def get_points_of_interest(input: GetPointsOfInterestInput) -> GetPointsOfInterestOutput:
+    # Real-data path: opt-in via USE_REAL_PLACES + GOOGLE_PLACES_API_KEY.
+    # If the user filtered to seed-only categories (water_fountain, toilet),
+    # fetch_real_pois returns None and we fall through to the seed catalog.
+    if use_real_places():
+        live = await fetch_real_pois(
+            input.location, input.categories, input.max_results
+        )
+        if live is not None:
+            return GetPointsOfInterestOutput(
+                location=input.location,
+                categories_searched=list(input.categories) if input.categories else [],
+                results=live,
+            )
+
     rows = _CATALOG.get(_normalize(input.location))
 
     pois: list[POI]

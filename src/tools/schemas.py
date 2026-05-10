@@ -221,6 +221,25 @@ class Accommodation(BaseModel):
         default=True, description="True if secure bike storage / repair is available"
     )
     notes: str | None = None
+    # Rich fields populated by the Google Places real-data path. None on seed
+    # data so the agent can tell the difference (and downstream UI can show
+    # photos/ratings only when present).
+    rating: float | None = Field(
+        default=None, ge=0, le=5, description="Aggregate user rating (1-5), None on seed"
+    )
+    review_count: int | None = Field(
+        default=None, ge=0, description="Number of user reviews, None on seed"
+    )
+    price_level: str | None = Field(
+        default=None,
+        description="Google price tier — INEXPENSIVE / MODERATE / EXPENSIVE / VERY_EXPENSIVE",
+    )
+    photo_url: str | None = Field(
+        default=None, description="Single-photo URL (Google Places photo endpoint)"
+    )
+    place_id: str | None = Field(
+        default=None, description="Google place_id for deeplinks (e.g. https://maps.google.com/?cid=...)"
+    )
 
 
 class FindAccommodationInput(BaseModel):
@@ -419,6 +438,11 @@ class POI(BaseModel):
         description="True if known to welcome cyclists (bike racks, repair stand, etc.)",
     )
     notes: str | None = None
+    # Rich fields populated by the Google Places real-data path.
+    rating: float | None = Field(default=None, ge=0, le=5)
+    review_count: int | None = Field(default=None, ge=0)
+    photo_url: str | None = None
+    place_id: str | None = None
 
 
 class GetPointsOfInterestInput(BaseModel):

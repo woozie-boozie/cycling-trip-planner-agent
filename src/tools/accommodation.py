@@ -13,6 +13,7 @@ from sqlmodel import select
 from src.db import get_async_session
 from src.db.models import Accommodation as AccommodationRow
 from src.tools.base import register_tool
+from src.tools.places_real import fetch_real_accommodations, use_real_places
 from src.tools.schemas import (
     Accommodation,
     AccommodationType,
@@ -525,6 +526,17 @@ def _row_to_schema(row: AccommodationRow) -> Accommodation:
 )
 async def find_accommodation(input: FindAccommodationInput) -> FindAccommodationOutput:
     location_lower = _normalize(input.location)
+
+    # Real-data path: opt-in via USE_REAL_PLACES + GOOGLE_PLACES_API_KEY. Falls
+    # back to the DB catalog on any failure — same shape, agent never sees
+    # the difference. Rich fields (rating, photo_url, etc.) are populated
+    # on the real path and None on seed.
+    if use_real_places():
+        live = await fetch_real_accommodations(
+            input.location, input.types, input.max_results
+        )
+        if live is not None:
+            return FindAccommodationOutput(location=input.location, results=live)
 
     async with get_async_session() as session:
         result = await session.execute(
