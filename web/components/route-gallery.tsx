@@ -98,10 +98,10 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
         </span>
       </div>
 
-      {/* Featured card spans the full main column; the two other corridors
-          sit side-by-side below it. Less wasted vertical space + better
-          visual rhythm than a single-column stack. */}
-      <div className="space-y-4">
+      {/* Three-up at xl: featured wider, two compact beside it.
+          At sm: featured full-width with the two compacts below in a
+          2-col row. At base: stacked. */}
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr_1fr]">
         {featured && (
           <RouteCard
             key={featured.id}
@@ -110,7 +110,7 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
             featured
           />
         )}
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 xl:contents">
           {others.map((c) => (
             <RouteCard key={c.id} corridor={c} onSelect={setSelected} compact />
           ))}

@@ -9,6 +9,7 @@ import { ContextCard } from "@/components/context-card";
 import { LiveTracePanel } from "@/components/live-trace-panel";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { RouteGallery } from "@/components/route-gallery";
+import { StackCard } from "@/components/stack-card";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
@@ -454,8 +455,8 @@ export default function Home() {
       )}
 
       <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10 lg:px-8">
-          <div className="grid gap-8 lg:grid-cols-[1fr_400px] lg:gap-10">
+        <div className="mx-auto max-w-[1480px] px-4 py-8 sm:py-10 lg:px-10 xl:px-14">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-10 xl:gap-14">
             {/* Main column — empty state OR conversation */}
             <div>
               {isEmpty ? (
@@ -509,6 +510,7 @@ export default function Home() {
                   isEmpty={isEmpty}
                   corridor={corridor}
                 />
+                <StackCard />
               </div>
             </aside>
           </div>
