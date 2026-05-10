@@ -64,8 +64,8 @@ export function RouteGallery({ profile, onPlan }: RouteGalleryProps) {
         </span>
       </div>
 
-      {/* Three-up: featured wider, two compact beside it at xl. At sm: stacked. */}
-      <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr_1fr]">
+      {/* Three equal columns at md+; stacked on mobile. All cards same size. */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {featured && (
           <RouteCard
             key={featured.id}
@@ -74,11 +74,9 @@ export function RouteGallery({ profile, onPlan }: RouteGalleryProps) {
             featured
           />
         )}
-        <div className="grid gap-4 sm:grid-cols-2 xl:contents">
-          {others.map((c) => (
-            <RouteCard key={c.id} corridor={c} onSelect={setSelected} compact />
-          ))}
-        </div>
+        {others.map((c) => (
+          <RouteCard key={c.id} corridor={c} onSelect={setSelected} />
+        ))}
       </div>
     </div>
   );

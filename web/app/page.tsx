@@ -382,12 +382,21 @@ export default function Home() {
     }
   }, [input, isPending, sessionId, attachedImage, refreshTrace, profileId]);
 
-  const handleWizardComplete = useCallback((id: string) => {
+  const handleWizardComplete = useCallback(async (id: string) => {
     saveProfileId(id);
     setProfileId(id);
     setWizardOpen(false);
     // If they explicitly onboarded, clear the dismissed flag — they came back.
     clearWizardDismissed();
+    // Refetch — when editing, the id is unchanged so the [profileId] effect
+    // won't fire on its own. Pull the canonical updated profile so the
+    // header reflects the change immediately.
+    try {
+      const p = await getProfile(id);
+      setProfile(p);
+    } catch {
+      // benign — the [profileId] effect will retry on next render cycle
+    }
   }, []);
 
   const handleWizardDismiss = useCallback(() => {
@@ -435,7 +444,7 @@ export default function Home() {
       <Header
         sessionId={sessionId}
         onReset={handleReset}
-        hasProfile={Boolean(profile)}
+        profile={profile}
         onEditProfile={handleEditProfile}
         viewMode={viewMode}
         onToggleViewMode={toggleViewMode}
@@ -444,6 +453,7 @@ export default function Home() {
         <OnboardingWizard
           onComplete={handleWizardComplete}
           onDismiss={handleWizardDismiss}
+          existing={profile}
         />
       )}
 

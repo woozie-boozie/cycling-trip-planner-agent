@@ -6,39 +6,42 @@ import type { Corridor } from "@/lib/corridors";
 import { staticMapUrl } from "@/lib/mapbox";
 import { LAYER_META, POIS_BY_CORRIDOR, type PoiLayer } from "@/lib/pois";
 import { getVariants } from "@/lib/route-variants";
+import { ROUTE_DETAILS } from "@/lib/route-details";
+import { ElevationSparkline } from "@/components/elevation-sparkline";
 
 interface RouteCardProps {
   corridor: Corridor;
   onSelect: (corridor: Corridor) => void;
-  /** When true: emphasised treatment — subtle gradient, "Recommended"
-   *  chip, extras row showing elevation/ferry/paved metrics, primary CTA. */
+  /** Featured = the recommended pick. All cards are the same size; featured
+   *  differentiates only with a tinted background, "Recommended" chip, and a
+   *  primary-coloured CTA. No size or content-density differences. */
   featured?: boolean;
-  /** When true: tighter spacing, smaller map, fewer highlights. */
-  compact?: boolean;
 }
 
 const HIGHLIGHT_LAYERS: PoiLayer[] = ["heritage", "wildlife", "food"];
+const HIGHLIGHT_COUNT = 3;
+const MAP_HEIGHT = 200;
 
 /**
- * Empty-state route gallery card — modernised v3.
+ * Empty-state route gallery card — modernised v5.
  *
- *   - One single border treatment across all cards (no double-border on
- *     featured). Differentiation comes from a soft tinted background +
- *     "Recommended" chip, not louder shadows.
- *   - Map sits in a rounded inner frame inside the card (modern bento
- *     feel, not full-bleed top).
- *   - Stats overlay on the map is a single horizontal pill.
- *   - Highlights are bullet rows with coloured dot markers.
- *   - CTA is a quiet link with an arrow — the card itself is the button.
+ * All cards are the same size and content-density so a 3-up row aligns
+ * cleanly. Featured differentiates only by:
+ *   - "Recommended" chip on the map
+ *   - subtle tinted background gradient
+ *   - primary-coloured CTA arrow
+ *
+ * Stats live in a 2-row stack so they fit any card width:
+ *   row 1 = elevation sparkline (full width)
+ *   row 2 = ferry · routes (2 equal cells)
  */
-export function RouteCard({ corridor, onSelect, featured = false, compact = false }: RouteCardProps) {
-  const mapHeight = featured ? 240 : compact ? 170 : 200;
-  const mapUrl = staticMapUrl(corridor, { width: 720, height: mapHeight + 40 });
+export function RouteCard({ corridor, onSelect, featured = false }: RouteCardProps) {
+  const mapUrl = staticMapUrl(corridor, { width: 720, height: MAP_HEIGHT + 40 });
   const days = corridor.estimated_days.at_100km;
   const variants = getVariants(corridor.id);
-  const highlightCount = featured ? 4 : compact ? 3 : 3;
+  const details = ROUTE_DETAILS[corridor.id];
 
-  // Pick highlight POIs for the corridor
+  // Pick highlight POIs for the corridor — always 3, so heights align.
   const highlights = useMemo(() => {
     const pois = POIS_BY_CORRIDOR[corridor.id] ?? [];
     const picks: { layer: PoiLayer; label: string }[] = [];
@@ -50,47 +53,35 @@ export function RouteCard({ corridor, onSelect, featured = false, compact = fals
         seen.add(found.label);
       }
     }
-    if (picks.length < highlightCount) {
+    if (picks.length < HIGHLIGHT_COUNT) {
       for (const p of pois) {
-        if (picks.length >= highlightCount) break;
+        if (picks.length >= HIGHLIGHT_COUNT) break;
         if (seen.has(p.label)) continue;
         picks.push({ layer: p.layer, label: p.label });
         seen.add(p.label);
       }
     }
-    return picks.slice(0, highlightCount);
-  }, [corridor.id, highlightCount]);
+    return picks.slice(0, HIGHLIGHT_COUNT);
+  }, [corridor.id]);
 
-  const hasFerry = corridor.waypoints.some((w) => w.is_ferry);
-
-  // Featured-only extras row
-  const extras = featured
-    ? [
-        { v: hasFerry ? "1,490" : "850", u: "m", l: "elevation" },
-        { v: hasFerry ? "€68" : "free", u: "", l: "ferry cost" },
-        {
-          v: variants ? String(variants.length) : "1",
-          u: "",
-          l: variants && variants.length === 1 ? "route" : "routes",
-        },
-      ]
-    : null;
+  const hasFerry = details.ferry_cost_eur != null;
+  const routeCount = variants?.length ?? 1;
 
   return (
     <button
       type="button"
       onClick={() => onSelect(corridor)}
       className={[
-        "group relative flex flex-col gap-4 overflow-hidden rounded-2xl border p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+        "group relative flex h-full flex-col gap-4 overflow-hidden rounded-2xl border p-4 text-left transition-all duration-300 ease-out hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
         featured
           ? "border-foreground/10 bg-[linear-gradient(180deg,rgba(255,61,20,0.04)_0%,rgba(255,255,255,1)_60%)] shadow-[0_1px_2px_-1px_rgb(20_19_15_/0.06),0_8px_24px_-8px_rgb(255_61_20_/0.18)] hover:shadow-[0_2px_4px_-1px_rgb(20_19_15_/0.08),0_24px_48px_-12px_rgb(255_61_20_/0.28)]"
           : "border-border/80 bg-card shadow-paper hover:border-foreground/15 hover:shadow-lift",
       ].join(" ")}
     >
-      {/* Map — rounded inner frame, modern bento feel */}
+      {/* Map — same height across all cards */}
       <div
         className="relative w-full overflow-hidden rounded-xl bg-muted ring-1 ring-foreground/5"
-        style={{ height: `${mapHeight}px` }}
+        style={{ height: `${MAP_HEIGHT}px` }}
       >
         {mapUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -106,7 +97,7 @@ export function RouteCard({ corridor, onSelect, featured = false, compact = fals
           </div>
         )}
 
-        {/* Recommended chip — top-left, modern pill */}
+        {/* Recommended chip — top-left */}
         {featured && (
           <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1.5 rounded-full bg-foreground/95 px-2.5 py-1 font-mono text-[9.5px] font-semibold uppercase tracking-[0.08em] text-background backdrop-blur-md">
             <Sparkles className="h-2.5 w-2.5 text-primary" aria-hidden />
@@ -123,14 +114,9 @@ export function RouteCard({ corridor, onSelect, featured = false, compact = fals
         </div>
       </div>
 
-      {/* Title */}
+      {/* Title — same size across all cards */}
       <div>
-        <h3
-          className={[
-            "font-bold leading-[1.05] tracking-[-0.025em] text-foreground",
-            featured ? "text-[24px]" : compact ? "text-[18px]" : "text-[20px]",
-          ].join(" ")}
-        >
+        <h3 className="text-[20px] font-bold leading-[1.05] tracking-[-0.025em] text-foreground">
           {corridor.label.split("→").map((part, i, arr) => (
             <span key={i}>
               {part.trim()}
@@ -145,61 +131,48 @@ export function RouteCard({ corridor, onSelect, featured = false, compact = fals
         </p>
       </div>
 
-      {/* Featured-only extras row — clean stat trio */}
-      {featured && extras && (
-        <div className="grid grid-cols-3 divide-x divide-border/60 rounded-xl border border-border/60 bg-bg-soft/60">
-          {extras.map((e, i) => (
-            <div key={i} className="px-3 py-2.5 text-center">
-              <div className="text-[18px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
-                {e.v}
-                {e.u && (
-                  <span className="ml-0.5 text-[11px] font-medium text-muted-foreground">
-                    {e.u}
-                  </span>
-                )}
-              </div>
-              <div className="mt-1 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-muted-foreground/80">
-                {e.l}
-              </div>
-            </div>
-          ))}
+      {/* Stats — 2-row stack so they fit any card width.
+          Row 1 = elevation sparkline (full width)
+          Row 2 = ferry · routes (2 equal cells) */}
+      <div className="overflow-hidden rounded-xl border border-border/60">
+        <ElevationStat climbM={details.total_climb_m} elevation={details.elevation} />
+        <div className="grid grid-cols-2 border-t border-border/60 bg-card">
+          <FerryStat
+            cost={details.ferry_cost_eur}
+            label={details.ferry_label ?? null}
+          />
+          <div className="border-l border-border/60">
+            <RoutesStat count={routeCount} />
+          </div>
         </div>
-      )}
+      </div>
 
-      {/* Highlights */}
-      {highlights.length > 0 && (
-        <ul className="space-y-1.5">
-          {highlights.map((h, i) => {
-            const meta = LAYER_META[h.layer];
-            return (
-              <li
-                key={i}
-                className="flex items-center gap-2 text-[13px] leading-none text-foreground/85"
-              >
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ background: meta.color }}
-                  aria-hidden
-                />
-                <span className="truncate">{h.label}</span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      {/* Highlights — always 3 for consistent height */}
+      <ul className="space-y-1.5">
+        {highlights.map((h, i) => {
+          const meta = LAYER_META[h.layer];
+          return (
+            <li
+              key={i}
+              className="flex items-center gap-2 text-[13px] leading-none text-foreground/85"
+            >
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ background: meta.color }}
+                aria-hidden
+              />
+              <span className="truncate">{h.label}</span>
+            </li>
+          );
+        })}
+      </ul>
 
-      {/* Footer — CTA arrow link, no chip noise */}
+      {/* Footer — meta + CTA arrow */}
       <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-3">
         <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
           <span>signposted</span>
           <span className="text-muted-foreground/30">·</span>
           <span>{hasFerry ? "ferry" : "land only"}</span>
-          {variants && variants.length > 1 && (
-            <>
-              <span className="text-muted-foreground/30">·</span>
-              <span className="text-primary">{variants.length} routes</span>
-            </>
-          )}
         </div>
         <span
           className={[
@@ -215,6 +188,64 @@ export function RouteCard({ corridor, onSelect, featured = false, compact = fals
         </span>
       </div>
     </button>
+  );
+}
+
+function ElevationStat({ climbM, elevation }: { climbM: number; elevation: number[] }) {
+  return (
+    <div
+      className="bg-card px-3 py-2.5"
+      title="Indicative profile — derived from segment-level gain/loss. The agent fetches BRouter-precise samples per segment when you plan the route."
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+          Elevation
+        </span>
+        <span className="font-mono text-[10px] font-semibold tabular-nums text-foreground/80">
+          ↑{climbM.toLocaleString()} m total
+        </span>
+      </div>
+      <div className="mt-2 h-8 w-full">
+        <ElevationSparkline
+          points={elevation}
+          width={300}
+          height={32}
+          className="h-full w-full"
+        />
+      </div>
+    </div>
+  );
+}
+
+function FerryStat({ cost, label }: { cost: number | null; label: string | null }) {
+  return (
+    <div className="px-3 py-2.5 text-center">
+      <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        Ferry
+      </div>
+      <div className="mt-1 text-[16px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+        {cost == null ? "—" : `€${cost}`}
+      </div>
+      <div className="mt-1 truncate font-mono text-[9px] text-muted-foreground/80">
+        {cost == null ? "no crossing" : (label ?? "single fare")}
+      </div>
+    </div>
+  );
+}
+
+function RoutesStat({ count }: { count: number }) {
+  return (
+    <div className="px-3 py-2.5 text-center">
+      <div className="font-mono text-[9px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+        Routes
+      </div>
+      <div className="mt-1 text-[16px] font-bold leading-none tracking-[-0.02em] tabular-nums text-foreground">
+        {count}
+      </div>
+      <div className="mt-1 font-mono text-[9px] text-muted-foreground/80">
+        {count === 1 ? "single path" : "to compare"}
+      </div>
+    </div>
   );
 }
 
