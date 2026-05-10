@@ -166,6 +166,14 @@ class ChatResponse(BaseModel):
     iterations: int = Field(description="LLM round-trips required to resolve this turn.")
     input_tokens: int
     output_tokens: int
+    cache_read_tokens: int = Field(
+        default=0,
+        description="Input tokens served from Anthropic's prompt cache (billed at ~10% rate).",
+    )
+    cache_creation_tokens: int = Field(
+        default=0,
+        description="Input tokens written to prompt cache this turn (one-off ~125% cost).",
+    )
     tool_calls: list[dict[str, Any]] = Field(
         description="Summary of tools invoked this turn — names and argument keys."
     )
@@ -274,6 +282,8 @@ async def chat(
         iterations=response.iterations,
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
+        cache_read_tokens=response.cache_read_tokens,
+        cache_creation_tokens=response.cache_creation_tokens,
         tool_calls=response.tool_calls,
     )
 

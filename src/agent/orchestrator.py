@@ -207,6 +207,8 @@ async def run_turn(
                 iterations=iteration,
                 input_tokens=turn_input_tokens,
                 output_tokens=turn_output_tokens,
+                cache_read_tokens=turn_cache_read,
+                cache_creation_tokens=turn_cache_creation,
                 tool_calls=tool_call_summary,
             )
 
