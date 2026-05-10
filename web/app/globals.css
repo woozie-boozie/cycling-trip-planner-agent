@@ -24,14 +24,14 @@
   --color-foreground: var(--foreground);
 
   /*
-   * Geist fonts: literal names, NOT var(--font-geist-*).
-   * @theme inline resolves CSS vars at parse time, so runtime-injected
-   * vars from Next.js next/font/google never resolve here. We rely on
-   * the @font-face rules Next.js loads for "Geist" / "Geist Mono".
+   * Fonts use LITERAL names, NOT var(--font-*). @theme inline resolves
+   * at parse time; runtime-injected vars from Next.js next/font/google
+   * never resolve here. We rely on the @font-face rules Next.js loads
+   * for "Geist", "Geist Mono", and "Instrument Serif".
    */
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  --font-heading: var(--font-sans);
+  --font-heading: "Instrument Serif", "Instrument Serif Fallback", Georgia, "Times New Roman", serif;
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -82,8 +82,8 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.26 0.04 145);
 
-  /* PRIMARY — bright amber-orange (Strava-energy CTAs) */
-  --primary: oklch(0.69 0.19 50);
+  /* PRIMARY — sharp orange (mockup #FF4A1C, more saturated than the original amber) */
+  --primary: oklch(0.65 0.22 30);
   --primary-foreground: oklch(1 0 0);           /* white on orange */
 
   /* Secondary — light sage (subtle UI elements) */
@@ -100,10 +100,10 @@
 
   --border: oklch(0.26 0.04 145 / 14%);
   --input: oklch(0.26 0.04 145 / 10%);
-  --ring: oklch(0.69 0.19 50);                  /* amber focus ring */
+  --ring: oklch(0.65 0.22 30);                  /* orange focus ring */
 
   /* Categorical chart colors */
-  --chart-1: oklch(0.69 0.19 50);               /* amber */
+  --chart-1: oklch(0.65 0.22 30);               /* orange */
   --chart-2: oklch(0.55 0.13 140);              /* forest */
   --chart-3: oklch(0.65 0.16 130);              /* lime */
   --chart-4: oklch(0.58 0.13 230);              /* sky */
@@ -113,12 +113,12 @@
 
   --sidebar: oklch(0.96 0.015 85);
   --sidebar-foreground: oklch(0.26 0.04 145);
-  --sidebar-primary: oklch(0.69 0.19 50);
+  --sidebar-primary: oklch(0.65 0.22 30);
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.92 0.04 130);
   --sidebar-accent-foreground: oklch(0.26 0.04 145);
   --sidebar-border: oklch(0.26 0.04 145 / 14%);
-  --sidebar-ring: oklch(0.69 0.19 50);
+  --sidebar-ring: oklch(0.65 0.22 30);
 }
 
 @layer base {

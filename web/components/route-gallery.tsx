@@ -68,12 +68,6 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
 
 function Hero({ profile }: { profile: UserProfile | null }) {
   const isReturning = Boolean(profile);
-  const headline = isReturning
-    ? `Welcome back. Pick a route — we'll plan it your way.`
-    : `Plan a multi-day cycling trip`;
-  const sub = isReturning
-    ? `${profile!.max_daily_km_comfort} km/day comfort zone · agent honours your saved preferences.`
-    : `Pick a route to start, then tell us when you're riding and how you like to sleep.`;
 
   return (
     <div className="mx-auto mb-7 flex max-w-2xl flex-col items-center text-center">
@@ -81,11 +75,25 @@ function Hero({ profile }: { profile: UserProfile | null }) {
         <Sparkles className="h-3 w-3" aria-hidden />
         Real route data · live weather · curated accommodation
       </div>
-      <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-        {headline}
+      <h1
+        className="font-heading text-3xl font-normal italic leading-[1.1] tracking-tight text-foreground sm:text-4xl"
+        style={{ fontFamily: "var(--font-heading)" }}
+      >
+        {isReturning ? (
+          <>
+            Welcome back. <span className="text-primary">Pick a route.</span>
+          </>
+        ) : (
+          <>
+            Tell me where you&apos;d like to{" "}
+            <span className="text-primary">ride.</span>
+          </>
+        )}
       </h1>
-      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-muted-foreground">
-        {sub}
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+        {isReturning
+          ? `${profile!.max_daily_km_comfort} km/day comfort zone · agent honours your saved preferences.`
+          : `Pick a route to start, then tell us when you're riding and how you like to sleep.`}
       </p>
     </div>
   );

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Bike, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { InlineTraceStrip } from "@/components/inline-trace-strip";
 import type { UiMessage } from "@/lib/types";
 
 interface MessageBubbleProps {
@@ -26,12 +27,18 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {isUser ? <User className="h-4 w-4" aria-hidden /> : <Bike className="h-4 w-4" aria-hidden />}
       </div>
 
+      <div className="min-w-0 max-w-[85%] flex-1">
+        {/* Inline trace pills (assistant only) — render before the bubble */}
+        {!isUser && message.liveTrace && message.liveTrace.length > 0 && (
+          <InlineTraceStrip items={message.liveTrace} />
+        )}
+
       {/* Bubble */}
       <div
         className={
           isUser
             ? "max-w-[85%] rounded-2xl rounded-tr-sm bg-primary/15 px-4 py-2.5 text-foreground ring-1 ring-primary/20"
-            : "min-w-0 max-w-[85%] flex-1 rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-foreground ring-1 ring-border/40"
+            : "min-w-0 rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-foreground ring-1 ring-border/40"
         }
       >
         {isUser ? (
@@ -73,6 +80,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             </Badge>
           </div>
         ) : null}
+      </div>
       </div>
     </div>
   );

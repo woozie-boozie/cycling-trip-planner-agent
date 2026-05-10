@@ -1,14 +1,17 @@
 "use client";
 
-import { Bike, RotateCcw, UserCog } from "lucide-react";
+import { Bike, Map, RotateCcw, Type, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { ViewMode } from "@/lib/view-mode";
 
 interface HeaderProps {
   sessionId: string | null;
   onReset: () => void;
   hasProfile?: boolean;
   onEditProfile?: () => void;
+  viewMode?: ViewMode;
+  onToggleViewMode?: () => void;
 }
 
 export function Header({
@@ -16,6 +19,8 @@ export function Header({
   onReset,
   hasProfile = false,
   onEditProfile,
+  viewMode,
+  onToggleViewMode,
 }: HeaderProps) {
   const sessionLabel = sessionId ? sessionId.slice(0, 8) : "new";
 
@@ -44,6 +49,28 @@ export function Header({
             >
               personalised
             </Badge>
+          )}
+          {onToggleViewMode && viewMode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onToggleViewMode}
+              className="text-muted-foreground hover:text-foreground"
+              title={
+                viewMode === "visual"
+                  ? "Switch to text mode (markdown)"
+                  : "Switch to visual mode (cards + map)"
+              }
+            >
+              {viewMode === "visual" ? (
+                <Map className="h-3.5 w-3.5" aria-hidden />
+              ) : (
+                <Type className="h-3.5 w-3.5" aria-hidden />
+              )}
+              <span className="hidden sm:inline">
+                {viewMode === "visual" ? "Visual" : "Text"}
+              </span>
+            </Button>
           )}
           <Badge variant="secondary" className="font-mono text-[10px] tracking-wider">
             session · {sessionLabel}

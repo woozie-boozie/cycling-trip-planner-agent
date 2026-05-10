@@ -21,6 +21,7 @@ import {
 } from "@/lib/profile";
 import { clearSessionId, loadSessionId, saveSessionId } from "@/lib/session";
 import type { TraceResponse, UiMessage, UserProfile } from "@/lib/types";
+import { useViewMode } from "@/lib/view-mode";
 
 function makeId(): string {
   // Quick-and-light unique id for React keys; not the backend session_id.
@@ -39,6 +40,9 @@ export default function Home() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Visual ⇄ text view-mode toggle (Phase A · v2 redesign).
+  const { mode: viewMode, toggle: toggleViewMode } = useViewMode();
 
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
@@ -290,6 +294,46 @@ export default function Home() {
                 name: event.name,
                 args: Object.keys(event.input ?? {}),
               });
+              // Push a "running" pill for the inline trace strip — flips
+              // to "done" or "error" when the matching tool_result arrives.
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        liveTrace: [
+                          ...(m.liveTrace ?? []),
+                          {
+                            toolUseId: event.id,
+                            name: event.name,
+                            status: "running",
+                            argKeys: Object.keys(event.input ?? {}),
+                          },
+                        ],
+                      }
+                    : m,
+                ),
+              );
+              break;
+            case "tool_result":
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        liveTrace: (m.liveTrace ?? []).map((t) =>
+                          t.toolUseId === event.id
+                            ? {
+                                ...t,
+                                status: event.is_error ? "error" : "done",
+                                latencyMs: event.latency_ms,
+                              }
+                            : t,
+                        ),
+                      }
+                    : m,
+                ),
+              );
               break;
             case "iteration_end":
               iterations = event.iteration;
@@ -398,6 +442,8 @@ export default function Home() {
         onReset={handleReset}
         hasProfile={Boolean(profile)}
         onEditProfile={handleEditProfile}
+        viewMode={viewMode}
+        onToggleViewMode={toggleViewMode}
       />
       {wizardOpen && (
         <OnboardingWizard
