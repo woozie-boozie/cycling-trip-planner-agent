@@ -1,9 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
+import { ItineraryCard } from "@/components/itinerary-card";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { RouteCanvas } from "@/components/route-canvas";
 import { RouteComparisonCard } from "@/components/route-comparison-card";
 import { matchCorridor, type Corridor } from "@/lib/corridors";
+import { parseItinerary, type DayRow } from "@/lib/parse-itinerary";
 import { getVariants, type RouteVariantSummary } from "@/lib/route-variants";
 
 interface VisualResponseProps {
@@ -46,11 +49,37 @@ export function VisualResponse({ content, corridor, onPickVariant }: VisualRespo
     case "comparison":
       return (
         <div className="space-y-3">
+          <RouteCanvas corridor={detection.corridor} />
           <RouteComparisonCard
             corridor={detection.corridor}
             variants={detection.variants}
             recommendedName={detection.recommendedName}
             onPick={onPickVariant}
+          />
+          {detection.afterText && (
+            <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
+              <MarkdownRenderer content={detection.afterText} />
+            </div>
+          )}
+        </div>
+      );
+    case "single-route":
+      return (
+        <div className="space-y-3">
+          <RouteCanvas corridor={detection.corridor} />
+          <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
+            <MarkdownRenderer content={content} />
+          </div>
+        </div>
+      );
+    case "itinerary":
+      return (
+        <div className="space-y-3">
+          {detection.corridor && <RouteCanvas corridor={detection.corridor} />}
+          <ItineraryCard
+            days={detection.days}
+            title={detection.corridor?.label}
+            subtitle={detection.subtitle}
           />
           {detection.afterText && (
             <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
@@ -79,6 +108,21 @@ type Detection =
       /** Markdown that follows the variant block (the agent's recommendation prose) */
       afterText?: string;
     }
+  | {
+      /** Corridor matched but no multi-variant comparison block */
+      kind: "single-route";
+      corridor: Corridor;
+    }
+  | {
+      /** Multi-day plan parsed from markdown */
+      kind: "itinerary";
+      days: DayRow[];
+      /** Corridor inferred from the conversation (if any) — drives the map + title */
+      corridor: Corridor | null;
+      subtitle?: string;
+      /** Free-text that came AFTER the day list (e.g. "Heads up" section) */
+      afterText?: string;
+    }
   | { kind: "markdown" };
 
 /**
@@ -99,48 +143,71 @@ function detectResponseShape(content: string, corridor: Corridor | null): Detect
   }
 
   const variants = getVariants(corridor.id);
-  if (!variants) return { kind: "markdown" };
-
   const lowered = content.toLowerCase();
 
-  // Primary signal: how many variant titles appear in the message?
-  // Agent's actual responses use bold titles like "**INLAND EV7/12 HYBRID**"
-  // or headings like "## Coastal EV12 North Sea", not "Option 1/2".
-  const titleHits = variants.filter((v) =>
-    lowered.includes(v.title.toLowerCase()),
-  ).length;
+  // Multi-variant comparison detection (only when the corridor has 2+ variants
+  // AND the message references multiple of them).
+  if (variants) {
+    const titleHits = variants.filter((v) =>
+      lowered.includes(v.title.toLowerCase()),
+    ).length;
+    const optionMarkerRegex = /\bOption\s+\d+\b/gi;
+    const optionHits = (content.match(optionMarkerRegex) ?? []).length;
+    const isComparison = titleHits >= 2 || optionHits >= 2;
 
-  // Fallback signal: legacy "Option N" markers (some agent runs use these).
-  const optionMarkerRegex = /\bOption\s+\d+\b/gi;
-  const optionHits = (content.match(optionMarkerRegex) ?? []).length;
-
-  // Need at least 2 of either signal to show a comparison card.
-  const isComparison = titleHits >= 2 || optionHits >= 2;
-  if (!isComparison) return { kind: "markdown" };
-
-  // Try to detect which variant the agent recommended (if any).
-  const recommendedName = inferRecommended(content, variants);
-
-  // Trim the variant-comparison block off the front and pass the
-  // remaining "recommendation" prose through MarkdownRenderer below.
-  // Cuts cleanly past the agent's "Which variant would you like?"
-  // question + any trailing markdown markers (**, whitespace).
-  let afterText = "";
-  const cutMatch = content.match(
-    /\bWhich (?:variant|route|option|one)\b[^?]*\?[*_\s]*/i,
-  );
-  if (cutMatch && cutMatch.index !== undefined) {
-    afterText = content.slice(cutMatch.index + cutMatch[0].length).trim();
+    if (isComparison) {
+      const recommendedName = inferRecommended(content, variants);
+      let afterText = "";
+      const cutMatch = content.match(
+        /\bWhich (?:variant|route|option|one)\b[^?]*\?[*_\s]*/i,
+      );
+      if (cutMatch && cutMatch.index !== undefined) {
+        afterText = content.slice(cutMatch.index + cutMatch[0].length).trim();
+      }
+      return {
+        kind: "comparison",
+        corridor,
+        variants,
+        recommendedName,
+        afterText: afterText || undefined,
+      };
+    }
   }
 
-  return {
-    kind: "comparison",
-    corridor,
-    variants,
-    recommendedName,
-    afterText: afterText || undefined,
-  };
+  // Multi-day itinerary detection — overrides corridor-only single-route
+  // because day-by-day plans always reference multiple waypoints.
+  const days = parseItinerary(content);
+  if (days && days.length >= 3) {
+    // Try to extract any "Heads up" / final-section prose to render below
+    // the day list.
+    let afterText: string | undefined;
+    const headsUp = content.match(/(?:^|\n)#{0,3}\s*Heads up\b[\s\S]*$/i);
+    if (headsUp) afterText = headsUp[0].trim();
+    return {
+      kind: "itinerary",
+      days,
+      corridor,
+      subtitle: undefined,
+      afterText,
+    };
+  }
+
+  // No multi-variant comparison + no multi-day plan. If the corridor has
+  // been mentioned with at least 2 specific waypoints, show the map for
+  // geographic context.
+  const corridorRefHits = corridor.waypoints.filter((w) =>
+    lowered.includes(w.name.toLowerCase()),
+  ).length;
+  if (corridorRefHits >= 2) {
+    return { kind: "single-route", corridor };
+  }
+
+  return { kind: "markdown" };
 }
+
+// ---------------------------------------------------------------------------
+// Recommendation extraction (used inside detectResponseShape only)
+// ---------------------------------------------------------------------------
 
 /**
  * Best-effort recommendation extraction. Returns the variant.name the
