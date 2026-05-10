@@ -7,7 +7,7 @@ import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
 import { TracePanel } from "@/components/trace-panel";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
-import { ApiError, getProfile, getTrace, postChat } from "@/lib/api";
+import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
 import {
@@ -156,56 +156,21 @@ export default function Home() {
     setAttachedImage(null);
     setError(null);
 
+    // Streaming is opt-in via NEXT_PUBLIC_STREAMING; non-streaming path stays
+    // intact for environments without a streaming backend (e.g. some preview
+    // deploys or older Cloud Run revisions).
+    const useStreaming = process.env.NEXT_PUBLIC_STREAMING === "true";
+
     // useTransition keeps the input UI responsive during the in-flight call.
     startTransition(async () => {
       try {
         const messageText = text || "Plan this trip from the attached image.";
-        let res;
-        try {
-          res = await postChat({
-            message: messageText,
-            session_id: sessionId ?? undefined,
-            image: imageForRequest?.payload,
-            profile_id: profileId ?? undefined,
-          });
-        } catch (firstErr) {
-          // Session expired on the backend (e.g. process restart wiped the
-          // in-memory store). Drop the stale session_id and retry once as
-          // a fresh conversation. Same pattern as silent token refresh.
-          if (firstErr instanceof ApiError && firstErr.status === 404 && sessionId) {
-            clearSessionId();
-            setSessionId(null);
-            setTrace(null);
-            res = await postChat({
-              message: messageText,
-              image: imageForRequest?.payload,
-              profile_id: profileId ?? undefined,
-            });
-          } else {
-            throw firstErr;
-          }
+
+        if (useStreaming) {
+          await runStreamingTurn(messageText, imageForRequest);
+        } else {
+          await runSynchronousTurn(messageText, imageForRequest);
         }
-
-        if (res.session_id !== sessionId) {
-          saveSessionId(res.session_id);
-          setSessionId(res.session_id);
-        }
-
-        const assistantMessage: UiMessage = {
-          id: makeId(),
-          role: "assistant",
-          content: res.message,
-          meta: {
-            iterations: res.iterations,
-            input_tokens: res.input_tokens,
-            output_tokens: res.output_tokens,
-            tool_calls: res.tool_calls,
-          },
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-
-        // Fire-and-forget — don't block the UI on the trace fetch.
-        void refreshTrace(res.session_id);
       } catch (err) {
         const fallback = "Something went wrong talking to the agent.";
         if (err instanceof ApiError) {
@@ -217,6 +182,128 @@ export default function Home() {
         }
       }
     });
+
+    async function runSynchronousTurn(messageText: string, image: PreparedImage | null) {
+      let res;
+      try {
+        res = await postChat({
+          message: messageText,
+          session_id: sessionId ?? undefined,
+          image: image?.payload,
+          profile_id: profileId ?? undefined,
+        });
+      } catch (firstErr) {
+        // Session expired on the backend (e.g. process restart wiped the
+        // in-memory store). Drop the stale session_id and retry once.
+        if (firstErr instanceof ApiError && firstErr.status === 404 && sessionId) {
+          clearSessionId();
+          setSessionId(null);
+          setTrace(null);
+          res = await postChat({
+            message: messageText,
+            image: image?.payload,
+            profile_id: profileId ?? undefined,
+          });
+        } else {
+          throw firstErr;
+        }
+      }
+
+      if (res.session_id !== sessionId) {
+        saveSessionId(res.session_id);
+        setSessionId(res.session_id);
+      }
+
+      const assistantMessage: UiMessage = {
+        id: makeId(),
+        role: "assistant",
+        content: res.message,
+        meta: {
+          iterations: res.iterations,
+          input_tokens: res.input_tokens,
+          output_tokens: res.output_tokens,
+          tool_calls: res.tool_calls,
+        },
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      void refreshTrace(res.session_id);
+    }
+
+    async function runStreamingTurn(
+      messageText: string,
+      image: PreparedImage | null,
+    ) {
+      // Optimistic empty assistant bubble — text deltas append into it live.
+      const assistantId = makeId();
+      const liveTextRef = { current: "" };
+      const liveToolCalls: { name: string; args: string[] }[] = [];
+      let iterations = 0;
+      let inputTokens = 0;
+      let outputTokens = 0;
+
+      setMessages((prev) => [
+        ...prev,
+        { id: assistantId, role: "assistant", content: "" },
+      ]);
+
+      await postChatStream(
+        {
+          message: messageText,
+          session_id: sessionId ?? undefined,
+          image: image?.payload,
+          profile_id: profileId ?? undefined,
+        },
+        (event) => {
+          switch (event.type) {
+            case "session":
+              if (event.session_id !== sessionId) {
+                saveSessionId(event.session_id);
+                setSessionId(event.session_id);
+              }
+              break;
+            case "text_delta":
+              liveTextRef.current += event.text;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, content: liveTextRef.current } : m,
+                ),
+              );
+              break;
+            case "tool_use_complete":
+              liveToolCalls.push({
+                name: event.name,
+                args: Object.keys(event.input ?? {}),
+              });
+              break;
+            case "iteration_end":
+              iterations = event.iteration;
+              break;
+            case "done":
+              inputTokens = event.input_tokens;
+              outputTokens = event.output_tokens;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        meta: {
+                          iterations: iterations || event.iterations,
+                          input_tokens: inputTokens,
+                          output_tokens: outputTokens,
+                          tool_calls: event.tool_calls.length
+                            ? event.tool_calls
+                            : liveToolCalls,
+                        },
+                      }
+                    : m,
+                ),
+              );
+              void refreshTrace(event.session_id);
+              break;
+          }
+        },
+      );
+    }
   }, [input, isPending, sessionId, attachedImage, refreshTrace, profileId]);
 
   const handleWizardComplete = useCallback((id: string) => {

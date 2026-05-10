@@ -554,54 +554,80 @@ def _ferry_notes(anchors: list[Anchor]) -> str | None:
 def _suggest_day_plan(
     waypoints: list[Waypoint], daily_km_target: float
 ) -> list[DayPlan]:
-    """Balanced greedy day-allocation.
+    """Variance-minimising day-allocation via dynamic programming.
 
-    Algorithm: pick n_days = round(total_km / daily_km_target), then assign
-    each day's overnight stop to the waypoint whose cumulative distance is
-    closest to (day_index * total_km / n_days). Last day always ends at the
-    destination. The math is deterministic so the agent doesn't have to
-    derive day distances from cumulative km — a step where LLMs frequently
-    drop pre-ferry legs or sum 4 numbers wrong.
+    Picks n_days overnight boundaries that minimise the sum of squared
+    deviations from the user's daily km target. The previous greedy "snap
+    each boundary to the closest waypoint" approach occasionally produced
+    lopsided splits (e.g. Avenue Verte @ 80 km/day → 134/38 because Cergy
+    was 1.1 km closer to the d=4 ideal boundary than Beauvais). The DP
+    fixes this by considering all combinations.
 
-    Notes per day flag deviations from target (>15% over/under) so the agent
-    can surface them honestly in the Heads-up section.
+    State:
+        dp[d][i] = minimum sum-of-squared-deviations to end day d at
+                   waypoint index i (1 <= d <= n_days, d <= i <= len-1).
+    Transition:
+        dp[d][i] = min over k in [d-1, i)  of
+                   dp[d-1][k] + (cum[i] - cum[k] - target) ** 2
+    Base:
+        dp[0][0] = 0
+    Answer:
+        dp[n_days][len-1], with parent pointers for reconstruction.
+
+    Complexity: O(n_days · len² · ...) ≈ O(n_days · len²). For our sizes
+    (≤18 waypoints, ≤11 days) this is trivially fast.
+
+    Notes per day still flag long/short/ferry deviations.
     """
     if len(waypoints) < 2:
         return []
     total_km = waypoints[-1].distance_from_start_km
     raw_n_days = max(1, round(total_km / daily_km_target))
-    # Can't have more days than there are unique stops to end them at
-    # (start + each waypoint we end a day at). For corridors with few
-    # overnight options at a low target km/day, cap to what's feasible.
+    # Can't have more days than there are unique stops to end them at.
     n_days = min(raw_n_days, len(waypoints) - 1)
 
     if n_days == 1:
         overnight_indices: list[int] = [0, len(waypoints) - 1]
     else:
-        # Pick n_days - 1 intermediate overnight stops by snapping each to
-        # the waypoint whose cumulative km is closest to the ideal pacing
-        # boundary. The candidate range is constrained to leave enough
-        # later waypoints for the remaining picks plus the final destination.
-        ideal_per_day = total_km / n_days
-        overnight_indices = [0]
-        for d in range(1, n_days):
-            target_cum = d * ideal_per_day
-            last_used = overnight_indices[-1]
-            # Reserve enough slots after this pick for the remaining
-            # (n_days - 1 - d) intermediates plus the final destination.
-            min_idx = last_used + 1
-            max_idx = len(waypoints) - 1 - (n_days - d)
-            if max_idx < min_idx:
-                max_idx = min_idx
-            best_idx = min_idx
-            best_diff = float("inf")
-            for k in range(min_idx, max_idx + 1):
-                diff = abs(waypoints[k].distance_from_start_km - target_cum)
-                if diff < best_diff:
-                    best_diff = diff
-                    best_idx = k
-            overnight_indices.append(best_idx)
-        overnight_indices.append(len(waypoints) - 1)
+        n = len(waypoints)
+        target = daily_km_target
+        cum = [w.distance_from_start_km for w in waypoints]
+        INF = float("inf")
+
+        # dp[d][i] = min cost ending day d at waypoint i; parent[d][i] = k
+        dp = [[INF] * n for _ in range(n_days + 1)]
+        parent = [[-1] * n for _ in range(n_days + 1)]
+        dp[0][0] = 0.0
+
+        for d in range(1, n_days + 1):
+            # Day d ends somewhere in [d, n-1]; on the last day we MUST
+            # end at n-1, but we still compute all candidates and only
+            # use n-1 at reconstruction.
+            for i in range(d, n):
+                best = INF
+                best_k = -1
+                # Day d started at the prior boundary k in [d-1, i).
+                for k in range(d - 1, i):
+                    if dp[d - 1][k] >= INF:
+                        continue
+                    day_km = cum[i] - cum[k]
+                    cost = dp[d - 1][k] + (day_km - target) ** 2
+                    if cost < best:
+                        best = cost
+                        best_k = k
+                dp[d][i] = best
+                parent[d][i] = best_k
+
+        # Reconstruct: must end at n-1 after exactly n_days days.
+        overnight_indices = [n - 1]
+        d = n_days
+        i = n - 1
+        while d > 0:
+            k = parent[d][i]
+            overnight_indices.append(k)
+            i = k
+            d -= 1
+        overnight_indices.reverse()
 
     days: list[DayPlan] = []
     for i in range(len(overnight_indices) - 1):
