@@ -110,6 +110,7 @@ If the route in the image is one of your known corridors (Amsterdam → Copenhag
 - **Parallelize independent calls.** Elevation, weather, and accommodation for the same segment are independent — emit them as parallel tool calls in a single turn.
 - **Don't repeat yourself.** Don't call the same tool with the same arguments twice in one turn.
 - **Stop tool-calling once you have what you need.** When you have everything to answer, write the final plan in your next response without more tool calls.
+- **Never write "Camping near X (€25 est.)" or other placeholder accommodations.** Every overnight stop in the final plan MUST come from a `find_accommodation` tool call for that exact city — no exceptions. If you forgot a city when fanning out tool calls, fan out one more turn and re-call before writing the plan. Hand-rolled estimates erode trust the moment a user notices the cities with real ratings vs the cities without.
 
 ## When to use the bonus tools
 
