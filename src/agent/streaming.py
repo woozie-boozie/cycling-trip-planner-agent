@@ -50,6 +50,12 @@ from typing import Any
 import structlog
 from anthropic import AsyncAnthropic
 
+from src.agent.caching import (
+    cached_messages,
+    cached_system,
+    cached_tools,
+    extract_cache_usage,
+)
 from src.agent.config import get_settings
 from src.agent.prompts import SYSTEM_PROMPT, user_profile_context
 from src.agent.state import ConversationState, TraceEvent
@@ -96,6 +102,13 @@ async def run_turn_stream(
     if profile is not None:
         system_prompt = SYSTEM_PROMPT + "\n\n" + user_profile_context(profile)
 
+    # Pre-build cache-marked versions of system + tools once per turn —
+    # both are stable for the entire turn (and indeed the whole session,
+    # unless the profile changes). Marking the LAST tool with
+    # cache_control covers the entire tools array. See src/agent/caching.py.
+    cached_system_blocks = cached_system(system_prompt)
+    cached_tool_defs = cached_tools(tools)
+
     # Append the user's message to the conversation (same as run_turn).
     state.messages.append({"role": "user", "content": user_message})
 
@@ -109,6 +122,8 @@ async def run_turn_stream(
 
     turn_input_tokens = 0
     turn_output_tokens = 0
+    turn_cache_creation = 0
+    turn_cache_read = 0
     tool_call_summary: list[dict[str, Any]] = []
     final_stop_reason = "end_turn"
 
@@ -144,14 +159,19 @@ async def run_turn_stream(
         block_order: list[int] = []
         iteration_input_tokens = 0
         iteration_output_tokens = 0
+        iteration_cache_creation = 0
+        iteration_cache_read = 0
         iteration_stop_reason: str | None = None
 
+        # Re-mark the message history's last block on every iteration so
+        # the cache breakpoint moves forward as the conversation grows.
+        # state.messages is NOT mutated — cached_messages returns a copy.
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tools,
-            messages=state.messages,
+            system=cached_system_blocks,
+            tools=cached_tool_defs,
+            messages=cached_messages(state.messages),
         ) as stream:
             async for event in stream:
                 event_type = getattr(event, "type", None)
@@ -162,6 +182,10 @@ async def run_turn_stream(
                     if usage is not None:
                         iteration_input_tokens = usage.input_tokens
                         iteration_output_tokens = usage.output_tokens
+                        (
+                            iteration_cache_creation,
+                            iteration_cache_read,
+                        ) = extract_cache_usage(usage)
 
                 elif event_type == "content_block_start":
                     block = event.content_block
@@ -261,11 +285,24 @@ async def run_turn_stream(
             assistant_content = [{"type": "text", "text": ""}]
 
         # Token accounting from streamed events (input from message_start,
-        # output from cumulative message_delta).
+        # output from cumulative message_delta). Cache stats let us see at
+        # a glance how much of the input was hit-from-cache vs newly billed.
         turn_input_tokens += iteration_input_tokens
         turn_output_tokens += iteration_output_tokens
+        turn_cache_creation += iteration_cache_creation
+        turn_cache_read += iteration_cache_read
         state.total_input_tokens += iteration_input_tokens
         state.total_output_tokens += iteration_output_tokens
+
+        log.info(
+            "agent.stream.iteration.usage",
+            session_id=state.session_id,
+            iteration=iteration,
+            input_tokens=iteration_input_tokens,
+            output_tokens=iteration_output_tokens,
+            cache_creation=iteration_cache_creation,
+            cache_read=iteration_cache_read,
+        )
 
         # Persist the assistant turn so the next iteration sees it.
         state.messages.append({"role": "assistant", "content": assistant_content})
@@ -306,6 +343,8 @@ async def run_turn_stream(
                 iterations=iteration,
                 input_tokens=turn_input_tokens,
                 output_tokens=turn_output_tokens,
+                cache_creation=turn_cache_creation,
+                cache_read=turn_cache_read,
             )
             yield {
                 "type": "done",

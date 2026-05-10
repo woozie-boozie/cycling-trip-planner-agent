@@ -37,6 +37,24 @@ from src.sessions import (
 )
 
 
+def _system_text(value: Any) -> str:
+    """Helper for the chat-API tests below. The agent now passes ``system``
+    as a list of cache-marked text blocks (prompt caching) rather than a
+    bare string; this normalises both shapes back to a single concatenated
+    string for substring assertions."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "\n".join(
+            block.get("text", "")
+            for block in value
+            if isinstance(block, dict)
+        )
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Pydantic boundary
 # ---------------------------------------------------------------------------
@@ -365,11 +383,12 @@ def test_chat_with_known_profile_personalises_system_prompt(client: TestClient) 
     )
     assert resp.status_code == 200
 
-    system_prompt = captured.get("system", "")
-    assert isinstance(system_prompt, str)
-    assert "Cyclist profile" in system_prompt
-    assert "beginner" in system_prompt
-    assert "first multi-day trip" in system_prompt
+    # System is now sent as a list of cache-marked text blocks (prompt
+    # caching) — assert against the joined text rather than the raw value.
+    system_text = _system_text(captured.get("system"))
+    assert "Cyclist profile" in system_text
+    assert "beginner" in system_text
+    assert "first multi-day trip" in system_text
 
 
 def test_chat_without_profile_id_keeps_base_system_prompt(client: TestClient) -> None:
@@ -393,5 +412,5 @@ def test_chat_without_profile_id_keeps_base_system_prompt(client: TestClient) ->
     resp = client.post("/chat", json={"message": "hi"})
     assert resp.status_code == 200
 
-    system_prompt = captured.get("system", "")
-    assert "Cyclist profile" not in system_prompt
+    system_text = _system_text(captured.get("system"))
+    assert "Cyclist profile" not in system_text

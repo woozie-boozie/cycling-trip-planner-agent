@@ -26,6 +26,12 @@ from typing import Any
 import structlog
 from anthropic import AsyncAnthropic
 
+from src.agent.caching import (
+    cached_messages,
+    cached_system,
+    cached_tools,
+    extract_cache_usage,
+)
 from src.agent.config import get_settings
 from src.agent.prompts import SYSTEM_PROMPT, user_profile_context
 from src.agent.state import AgentResponse, ConversationState, TraceEvent
@@ -94,6 +100,11 @@ async def run_turn(
     if profile is not None:
         system_prompt = SYSTEM_PROMPT + "\n\n" + user_profile_context(profile)
 
+    # Pre-build cache-marked versions of the prefix (system + tools).
+    # Both are stable for the entire turn so we only build them once.
+    cached_system_blocks = cached_system(system_prompt)
+    cached_tool_defs = cached_tools(tools)
+
     # Append the user's message to the conversation.
     state.messages.append({"role": "user", "content": user_message})
 
@@ -112,6 +123,8 @@ async def run_turn(
 
     turn_input_tokens = 0
     turn_output_tokens = 0
+    turn_cache_creation = 0
+    turn_cache_read = 0
     tool_call_summary: list[dict[str, Any]] = []
 
     for iteration in range(1, settings.max_loop_iterations + 1):
@@ -122,19 +135,35 @@ async def run_turn(
             messages=len(state.messages),
         )
 
+        # Re-mark the message history's last block on every iteration so
+        # the cache breakpoint moves forward as the conversation grows.
+        # state.messages is NOT mutated — cached_messages returns a copy.
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tools,
-            messages=state.messages,
+            system=cached_system_blocks,
+            tools=cached_tool_defs,
+            messages=cached_messages(state.messages),
         )
 
         # Token accounting
         turn_input_tokens += response.usage.input_tokens
         turn_output_tokens += response.usage.output_tokens
+        cache_creation, cache_read = extract_cache_usage(response.usage)
+        turn_cache_creation += cache_creation
+        turn_cache_read += cache_read
         state.total_input_tokens += response.usage.input_tokens
         state.total_output_tokens += response.usage.output_tokens
+
+        log.info(
+            "agent.turn.iteration.usage",
+            session_id=state.session_id,
+            iteration=iteration,
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            cache_creation=cache_creation,
+            cache_read=cache_read,
+        )
 
         # Append the assistant message verbatim — the next iteration needs it
         # in the messages history so Claude can see its own prior turn.
@@ -162,6 +191,15 @@ async def run_turn(
             final_text = "".join(b.text for b in response.content if b.type == "text")
             state.total_turns += 1
             state.touch()
+            log.info(
+                "agent.turn.done",
+                session_id=state.session_id,
+                iterations=iteration,
+                input_tokens=turn_input_tokens,
+                output_tokens=turn_output_tokens,
+                cache_creation=turn_cache_creation,
+                cache_read=turn_cache_read,
+            )
             return AgentResponse(
                 session_id=state.session_id,
                 message=final_text,
