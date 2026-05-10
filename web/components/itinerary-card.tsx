@@ -248,19 +248,26 @@ function DayRowComponent({ day, maxKm }: { day: DayRow; maxKm: number }) {
 }
 
 /**
- * Friendly intensity label for a cycling day, based on km. Lets the user
- * tell at a glance whether a day is easy/hard without doing the math.
+ * Friendly intensity label for a cycling day. Lets the user tell at a
+ * glance whether a day is easy/hard without doing the math.
+ *
+ * Combines km + climb into a single score so a 200 km flat day and a
+ * 110 km climbing day are both correctly flagged as "Brutal". Distance-
+ * only would call the 110 km mountain day a "Long day" and miss the
+ * effort entirely. Each 100 m of climbing counts as ~5 km of extra
+ * effort — a rough heuristic that matches how cyclists self-report.
  */
 function labelForIntensity(
   km: number | undefined,
-  _climbM: number | undefined,
+  climbM: number | undefined,
   isFerry: boolean,
 ): string | null {
   if (isFerry) return null;
   if (km == null || km <= 0) return null;
-  if (km < 50) return "Easy day";
-  if (km < 80) return "Steady";
-  if (km < 110) return "Long day";
+  const score = km + (climbM ?? 0) * 0.05;
+  if (score < 50) return "Easy day";
+  if (score < 85) return "Steady";
+  if (score < 115) return "Long day";
   return "Brutal";
 }
 

@@ -227,6 +227,8 @@ export default function Home() {
           iterations: res.iterations,
           input_tokens: res.input_tokens,
           output_tokens: res.output_tokens,
+          cache_read_tokens: res.cache_read_tokens,
+          cache_creation_tokens: res.cache_creation_tokens,
           tool_calls: res.tool_calls,
         },
       };
@@ -245,6 +247,8 @@ export default function Home() {
       let iterations = 0;
       let inputTokens = 0;
       let outputTokens = 0;
+      let cacheReadTokens = 0;
+      let cacheCreationTokens = 0;
 
       setMessages((prev) => [
         ...prev,
@@ -336,6 +340,8 @@ export default function Home() {
             case "done":
               inputTokens = event.input_tokens;
               outputTokens = event.output_tokens;
+              cacheReadTokens = event.cache_read_tokens ?? 0;
+              cacheCreationTokens = event.cache_creation_tokens ?? 0;
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
@@ -345,6 +351,8 @@ export default function Home() {
                           iterations: iterations || event.iterations,
                           input_tokens: inputTokens,
                           output_tokens: outputTokens,
+                          cache_read_tokens: cacheReadTokens,
+                          cache_creation_tokens: cacheCreationTokens,
                           tool_calls: event.tool_calls.length
                             ? event.tool_calls
                             : liveToolCalls,

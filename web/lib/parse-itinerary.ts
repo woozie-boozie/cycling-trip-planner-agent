@@ -101,9 +101,15 @@ export function parseItinerary(content: string): DayRow[] | null {
 
     const km = section.match(DISTANCE_RE);
     const climb = section.match(CLIMB_RE);
-    const stay = section.match(STAY_RE);
+    // Try the strict regex first (catches `Stay: Foo (camping)`); if no
+    // type tag was emitted, fall back to a name-only match so we can at
+    // least extract the accommodation string.
+    const stay =
+      section.match(STAY_RE) ??
+      section.match(/Stay:?\s*\*{0,2}([^*\n]+)/i);
     const hasFerry = FERRY_HINT.test(headingText) || FERRY_HINT.test(section);
 
+    const accomName = stay?.[1]?.trim();
     const accomTypeFromMatch = stay?.[2]?.toLowerCase().trim();
     let accom_type: AccomType = "unknown";
     if (hasFerry) accom_type = "ferry";
@@ -115,6 +121,17 @@ export function parseItinerary(content: string): DayRow[] | null {
       accomTypeFromMatch === "guest house"
     )
       accom_type = "guesthouse";
+    else if (accomName) {
+      // Heuristic fallback when the agent forgot the `(type)` tag.
+      // The strict regex above is the contract; this is just a safety net.
+      const lower = accomName.toLowerCase();
+      if (/\bcamp(ing|site|sit)?\b|\bcamping\b/.test(lower)) accom_type = "camping";
+      else if (/\b(hostel|yha|auberge\s+de\s+jeunesse)\b/.test(lower))
+        accom_type = "hostel";
+      else if (/\b(hotel|hôtel|inn|lodge|resort)\b/.test(lower)) accom_type = "hotel";
+      else if (/\b(b&b|guesthouse|guest house|chambre d'hôtes)\b/.test(lower))
+        accom_type = "guesthouse";
+    }
 
     days.push({
       n: h.n,
@@ -123,7 +140,7 @@ export function parseItinerary(content: string): DayRow[] | null {
       to,
       km: km ? parseFloat(km[1]) : undefined,
       climb: climb ? parseInt(climb[1], 10) : undefined,
-      accommodation: stay?.[1]?.trim(),
+      accommodation: accomName,
       accom_type,
       has_ferry: hasFerry,
     });

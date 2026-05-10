@@ -117,6 +117,8 @@ export type ChatStreamEvent =
       iterations: number;
       input_tokens: number;
       output_tokens: number;
+      cache_read_tokens?: number;
+      cache_creation_tokens?: number;
       tool_calls: { name: string; args: string[] }[];
       error?: string;
     }

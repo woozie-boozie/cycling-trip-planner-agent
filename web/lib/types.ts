@@ -105,6 +105,10 @@ export interface ChatResponse {
   iterations: number;
   input_tokens: number;
   output_tokens: number;
+  /** Cumulative input tokens served from Anthropic's prompt cache this turn. */
+  cache_read_tokens?: number;
+  /** Cumulative input tokens used to write new cache entries this turn. */
+  cache_creation_tokens?: number;
   tool_calls: ToolCallSummary[];
 }
 
@@ -167,6 +171,10 @@ export interface UiMessage {
     iterations: number;
     input_tokens: number;
     output_tokens: number;
+    /** Input tokens served from Anthropic's prompt cache (renders next to "in"). */
+    cache_read_tokens?: number;
+    /** Input tokens written to prompt cache this turn. */
+    cache_creation_tokens?: number;
     tool_calls: ToolCallSummary[];
   };
 }

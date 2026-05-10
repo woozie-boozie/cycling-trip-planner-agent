@@ -26,6 +26,11 @@ interface MessageBubbleProps {
  *     (maps, itinerary cards) get room to breathe; markdown text inside
  *     self-caps at a comfortable reading measure (~70 chars).
  */
+function formatCached(n: number): string {
+  if (n >= 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return n.toLocaleString();
+}
+
 export function MessageBubble({ message, viewMode = "text", corridor = null }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
@@ -94,8 +99,19 @@ export function MessageBubble({ message, viewMode = "text", corridor = null }: M
               <Badge variant="secondary" className="font-mono text-[10px]">
                 {message.meta.tool_calls.length} tools
               </Badge>
-              <Badge variant="secondary" className="font-mono text-[10px]">
+              <Badge
+                variant="secondary"
+                className="font-mono text-[10px]"
+                title={
+                  message.meta.cache_read_tokens
+                    ? `${message.meta.input_tokens.toLocaleString()} newly billed input + ${(message.meta.cache_read_tokens ?? 0).toLocaleString()} read from prompt cache (~10% rate)`
+                    : undefined
+                }
+              >
                 {message.meta.input_tokens.toLocaleString()} in
+                {message.meta.cache_read_tokens
+                  ? ` · ${formatCached(message.meta.cache_read_tokens)} cached`
+                  : ""}
               </Badge>
               <Badge variant="secondary" className="font-mono text-[10px]">
                 {message.meta.output_tokens.toLocaleString()} out
