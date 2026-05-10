@@ -44,23 +44,38 @@ export function RouteGallery({ profile, onPlan, onCustomPrompt }: RouteGalleryPr
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-2 py-6">
+    <div
+      className="relative mx-auto w-full max-w-6xl px-3 py-10 sm:py-14"
+      style={{
+        backgroundImage:
+          "radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in oklab, var(--primary) 8%, transparent) 0%, transparent 60%)",
+      }}
+    >
       <Hero profile={profile} />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {CORRIDORS.map((c) => (
           <RouteCard key={c.id} corridor={c} onSelect={setSelected} />
         ))}
       </div>
 
-      <div className="mt-6 text-center">
+      <div className="mt-10 flex flex-col items-center gap-3 text-center">
+        <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="h-px w-12 bg-border/70" aria-hidden />
+          or
+          <span className="h-px w-12 bg-border/70" aria-hidden />
+        </div>
         <button
           type="button"
           onClick={onCustomPrompt}
-          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          className="font-heading text-base italic text-foreground/85 transition-colors hover:text-primary"
+          style={{ fontFamily: "var(--font-heading)" }}
         >
-          or describe your own trip
+          describe your own trip ↓
         </button>
+        <p className="text-[11px] text-muted-foreground">
+          The agent handles arbitrary corridors with seed-data fallback.
+        </p>
       </div>
     </div>
   );
@@ -70,31 +85,42 @@ function Hero({ profile }: { profile: UserProfile | null }) {
   const isReturning = Boolean(profile);
 
   return (
-    <div className="mx-auto mb-7 flex max-w-2xl flex-col items-center text-center">
-      <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary">
+    <div className="mx-auto mb-9 flex max-w-3xl flex-col items-center text-center">
+      <div className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
         <Sparkles className="h-3 w-3" aria-hidden />
         Real route data · live weather · curated accommodation
       </div>
       <h1
-        className="font-heading text-3xl font-normal italic leading-[1.1] tracking-tight text-foreground sm:text-4xl"
+        className="font-heading text-4xl font-normal leading-[1.05] tracking-tight text-foreground sm:text-5xl md:text-6xl"
         style={{ fontFamily: "var(--font-heading)" }}
       >
         {isReturning ? (
           <>
-            Welcome back. <span className="text-primary">Pick a route.</span>
+            <span className="italic">Welcome back.</span>{" "}
+            <span className="italic text-primary">Pick a route.</span>
           </>
         ) : (
           <>
-            Tell me where you&apos;d like to{" "}
-            <span className="text-primary">ride.</span>
+            <span className="italic">Tell me where you&apos;d like to</span>{" "}
+            <span className="italic text-primary">ride.</span>
           </>
         )}
       </h1>
-      <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+      <p className="mt-4 max-w-xl text-sm leading-relaxed text-muted-foreground sm:text-base">
         {isReturning
-          ? `${profile!.max_daily_km_comfort} km/day comfort zone · agent honours your saved preferences.`
-          : `Pick a route to start, then tell us when you're riding and how you like to sleep.`}
+          ? `${profile!.max_daily_km_comfort} km/day comfort zone · the agent honours your saved preferences.`
+          : `Pick one of the three signposted corridors below — or describe your own. The agent fans out 15+ tool calls per turn to plan it real.`}
       </p>
+      {/* Provenance bar — shows the system's depth without screaming */}
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground/80">
+        <span>BRouter routes</span>
+        <span aria-hidden>·</span>
+        <span>ECMWF ERA5 climate</span>
+        <span aria-hidden>·</span>
+        <span>Google Places</span>
+        <span aria-hidden>·</span>
+        <span>Anthropic Claude</span>
+      </div>
     </div>
   );
 }
