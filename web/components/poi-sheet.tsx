@@ -18,7 +18,7 @@ interface PoiSheetProps {
 export function PoiSheet({ poi, onClose, onAdd }: PoiSheetProps) {
   const meta = LAYER_META[poi.layer];
   return (
-    <div className="absolute inset-x-3 bottom-3 z-30 overflow-hidden rounded-xl border border-border bg-card shadow-lg backdrop-blur-sm">
+    <div className="absolute inset-x-3 bottom-3 z-[1000] overflow-hidden rounded-xl border border-border bg-card shadow-lg backdrop-blur-sm">
       <div className="flex items-start gap-3 px-4 py-3">
         <div
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white"
