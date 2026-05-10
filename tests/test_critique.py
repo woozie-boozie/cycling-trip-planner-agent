@@ -301,6 +301,66 @@ async def test_critique_two_warnings_yields_minor_revisions() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Absolute single-day blockers (added 2026-05-10 after a real session
+# shipped a 188 km Day 3 with only a "manageable" caveat in prose)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_critique_blocks_day_past_150km_absolute_ceiling() -> None:
+    """A 188 km Day 3 should be a hard blocker — physically unsafe regardless
+    of what daily_km_target the user named, and the assessment should be
+    major_revisions so the agent restructures before presenting."""
+    result = await dispatch(
+        "critique_trip_plan",
+        {
+            "days": [
+                _make_day(1, distance_km=83),
+                _make_day(2, distance_km=55, has_ferry=True),
+                _make_day(3, distance_km=188, elevation_gain_m=330),
+                _make_day(4, distance_km=38),
+            ],
+            "daily_km_target": 100,
+            "accommodation_preference": "camping",
+        },
+    )
+    parsed = CritiqueTripPlanOutput.model_validate(result.content)
+    blockers = [i for i in parsed.issues if i.severity == "blocker"]
+    assert any(3 in i.affects_days and "150" in i.message for i in blockers), (
+        f"Expected a blocker citing the 150 km/day ceiling for Day 3, "
+        f"got issues: {[(i.severity, i.message) for i in parsed.issues]}"
+    )
+    assert parsed.overall_assessment == "major_revisions"
+
+
+@pytest.mark.asyncio
+async def test_critique_blocks_long_day_with_big_climb() -> None:
+    """130 km + 800 m climb is past the joint ceiling even though neither
+    threshold alone fires the absolute blocker."""
+    result = await dispatch(
+        "critique_trip_plan",
+        {
+            "days": [
+                _make_day(1, distance_km=90),
+                _make_day(2, distance_km=130, elevation_gain_m=800),
+                _make_day(3, distance_km=90),
+            ],
+            "daily_km_target": 100,
+            "accommodation_preference": "camping",
+        },
+    )
+    parsed = CritiqueTripPlanOutput.model_validate(result.content)
+    blockers = [i for i in parsed.issues if i.severity == "blocker"]
+    assert any(
+        2 in i.affects_days and "climbing" in i.message for i in blockers
+    ), (
+        f"Expected a blocker citing the joint km+climb ceiling for Day 2, "
+        f"got issues: {[(i.severity, i.message) for i in parsed.issues]}"
+    )
+    assert parsed.overall_assessment == "major_revisions"
+
+
+# ---------------------------------------------------------------------------
 # Registry — critique is registered + visible to Claude
 # ---------------------------------------------------------------------------
 

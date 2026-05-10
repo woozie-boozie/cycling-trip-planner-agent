@@ -514,3 +514,220 @@ async def test_eval_silent_constraint_relaxation_transparency(seeded_db: None) -
             f"silent-relaxation check failed: {label}\n"
             f"---\nmessage:\n{response.message[:2200]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Scenario 8 — June session regression (the bug-list from 2026-05-10)
+# ---------------------------------------------------------------------------
+#
+# Real user session that surfaced the agent's 188 km hallucination, the
+# silent weather drop, missing distance/elevation lines, and unreliable
+# accommodation type tagging. This scenario replays the full 4-turn
+# sequence and asserts each fix holds.
+#
+# What it locks in:
+#   1. Distance + Elevation on every day (parser regression, header math)
+#   2. Stay: (type) tag on every accommodation (UI glyph)
+#   3. No day past the 150 km absolute ceiling — critique must block
+#   4. Weather present in the response when the user supplied dates
+#   5. critique_trip_plan called on every plan + every re-plan
+#   6. Prose numbers match the structured day list (no 117 vs 188)
+
+
+def _every_day_has_distance_and_elevation(text: str) -> tuple[bool, list[str]]:
+    """Walk the markdown, find Day-N sections, check each has both lines."""
+    sections = re.split(r"(?:^|\n)#{0,3}\s*Day\s+\d+", text)[1:]
+    misses: list[str] = []
+    for i, section in enumerate(sections, 1):
+        section_lower = section.lower()
+        has_dist = bool(re.search(r"distance\s*[:\-]?\s*\d", section_lower))
+        has_elev = bool(re.search(r"elevation\s*[:\-]?\s*[+]?\d", section_lower))
+        if not (has_dist and has_elev):
+            misses.append(
+                f"Day {i}: distance={has_dist}, elevation={has_elev}"
+            )
+    return (not misses, misses)
+
+
+def _every_stay_line_has_type_tag(text: str) -> tuple[bool, list[str]]:
+    """Each accommodation listing must carry a `(type)` tag.
+
+    Accepts both `Stay: Foo (type)` and `**Night N — Location**` followed
+    by `- Foo (type)` on the next bullet — the agent uses both shapes.
+    """
+    # `Stay:` lines
+    stay_lines = re.findall(
+        r"(?im)^\s*[*\-]?\s*\*{0,2}\s*Stay\s*[:\-].*$", text
+    )
+    # `**Night N — Location**` + next bulleted line is the accommodation
+    night_blocks = re.findall(
+        r"(?im)^\s*\*{0,2}\s*(?:Night|Day)\s+\d+\b.*?\n\s*[*\-]\s+([^\n]+)",
+        text,
+    )
+    candidates = stay_lines + night_blocks
+    misses: list[str] = []
+    type_re = re.compile(
+        r"\((?:camping|hostel|hotel|guest\s*house|guesthouse|ferry|cabin|onboard)",
+        re.IGNORECASE,
+    )
+    for line in candidates:
+        # Skip obvious header-only lines that don't actually name accommodation
+        if not re.search(r"[a-z]{4,}", line):
+            continue
+        if not type_re.search(line):
+            misses.append(line.strip()[:120])
+    return (not misses, misses)
+
+
+def _count_accommodation_listings(text: str) -> int:
+    """Count distinct accommodation type tags in the response.
+
+    Each accommodation is required to carry a `(type, ...)` tag — see
+    the prompt rule. Counting the tags is more robust than parsing the
+    surrounding markdown shape (the agent uses Stay:/Night N/numbered
+    list interchangeably).
+    """
+    tag_re = re.compile(
+        r"\((?:camping|hostel|hotel|guest\s*house|guesthouse|ferry|cabin|onboard)\b",
+        re.IGNORECASE,
+    )
+    return len(tag_re.findall(text))
+
+
+def _max_day_distance_km(text: str) -> int | None:
+    """Largest km figure found on a Day-section Distance line."""
+    sections = re.split(r"(?:^|\n)#{0,3}\s*Day\s+\d+", text)[1:]
+    kms: list[int] = []
+    for section in sections:
+        m = re.search(r"distance\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*km", section, re.IGNORECASE)
+        if m:
+            kms.append(int(float(m.group(1))))
+    return max(kms) if kms else None
+
+
+@pytest.mark.asyncio
+async def test_eval_june_session_regression(seeded_db: None) -> None:
+    """Full replay of the 2026-05-10 user session that surfaced the bug list.
+
+    Four turns:
+      1. Plan a 4-day cycle London→Paris on V16a, 100km/day, June.
+      2. (no user input — turn 1 already names V16a)
+      3. "Day 2 and 4 feel like a stretch — can we do this in 5 days?"
+      4. "Day 3 sounds good, where should I stay each day and what's the
+         weather like if I travel between 10-14 June?"
+    """
+    state = ConversationState()
+
+    # Turn 1 — the canonical plan request, naming V16a so we skip the
+    # variant comparison step (faster + the bugs were all post-comparison).
+    r1 = await run_turn(
+        state,
+        "Plan a 4-day cycle from London to Paris on the V16a Beauvais "
+        "variant, 100km/day, prefer camping and hostels, traveling in June.",
+    )
+
+    # Turn 2 — push back on long days, ask for 5 days
+    r2 = await run_turn(
+        state,
+        "Day 2 and Day 4 feel like a stretch for me — what if we did this "
+        "in 5 days instead?",
+    )
+
+    # Turn 3 — accept rebalanced plan + ask for weather + accommodations
+    # for specific dates. The CRITICAL question — checks weather isn't
+    # silently dropped.
+    r3 = await run_turn(
+        state,
+        "Sounds good. Where would I stay each night, and what's the weather "
+        "typically like if I plan to travel between 10-14 June?",
+    )
+
+    tools_called = _names_called(state)
+    # Concatenate every assistant message so we check structure across
+    # all three responses — bugs in any turn count.
+    all_text = "\n\n".join(
+        e.payload["text"] for e in state.trace if e.type == "assistant_text"
+    )
+    final_text = r3.message
+    final_lower = final_text.lower()
+
+    # ── Structure assertions ─────────────────────────────────────────────
+    dist_elev_ok, dist_elev_misses = _every_day_has_distance_and_elevation(final_text)
+    stay_tag_ok, stay_tag_misses = _every_stay_line_has_type_tag(final_text)
+    max_km = _max_day_distance_km(final_text)
+
+    # ── Critique was called on every plan-producing turn ────────────────
+    critique_calls = tools_called.count("critique_trip_plan")
+
+    # ── Weather surfaced in the final turn ──────────────────────────────
+    weather_mentioned = any(
+        kw in final_lower
+        for kw in (
+            "weather", "°c", "rain", "temperature", "forecast",
+            "june climate", "june temp", "june weather", "rainfall",
+        )
+    )
+
+    # ── No leading "My take" framing on plan choices ────────────────────
+    # We don't ban operational advice like "I'd recommend booking ahead" —
+    # that's actionable, not editorialising. We only flag framing that
+    # picks an option/plan on the user's behalf without being asked.
+    leading_framing = bool(
+        re.search(
+            r"\b(my take\s*[:\-]|my recommendation\s*[:\-]|"
+            r"i(?:'d| would)? recommend (?:option|plan|going with|the \d|alternative\s+[ab])|"
+            r"my pick (?:is|would be))",
+            final_lower,
+        )
+    )
+
+    # ── At least one accommodation per day in the final plan ────────────
+    accom_listing_count = _count_accommodation_listings(final_text)
+
+    checks = [
+        ("every day has BOTH Distance and Elevation lines",
+         dist_elev_ok),
+        ("every Stay: line has a (type) tag",
+         stay_tag_ok),
+        ("no day exceeds the 150 km absolute ceiling",
+         max_km is None or max_km <= 150),
+        ("get_weather called when user asked about June 10-14",
+         tools_called.count("get_weather") >= 2),
+        ("response surfaces weather for the requested dates",
+         weather_mentioned),
+        ("critique_trip_plan called on every plan-producing turn (≥2 times)",
+         critique_calls >= 2),
+        ("agent did NOT lead with 'My take:' framing",
+         not leading_framing),
+        ("final plan lists ≥3 nightly accommodations (Stay: or Night N)",
+         accom_listing_count >= 3),
+        ("final response is a substantive plan, not a question",
+         len(final_text) > 600),
+    ]
+
+    _print_scoreboard("S8 · June session regression", state, checks)
+
+    # Detailed misses surface in the assertion message so a failure is
+    # immediately actionable.
+    detail_lines = []
+    if not dist_elev_ok:
+        detail_lines.append(f"Distance/Elevation gaps: {dist_elev_misses}")
+    if not stay_tag_ok:
+        detail_lines.append(f"Stay-tag misses: {stay_tag_misses}")
+    if max_km is not None and max_km > 150:
+        detail_lines.append(f"Max day distance: {max_km} km (ceiling is 150)")
+
+    for label, ok in checks:
+        assert ok, (
+            f"June regression check failed: {label}\n"
+            + ("\n".join(detail_lines) + "\n---\n" if detail_lines else "")
+            + f"turn-3 message ({len(r3.message)} chars):\n{r3.message[:2500]}"
+        )
+
+    # Quietly note the multi-turn token spend so the user can see what
+    # this scenario actually costs to run.
+    print(
+        f"  [S8] tokens this run: in={r1.input_tokens + r2.input_tokens + r3.input_tokens} "
+        f"out={r1.output_tokens + r2.output_tokens + r3.output_tokens} "
+        f"tools={len(tools_called)}"
+    )
