@@ -31,8 +31,11 @@ def _disable_real_apis_in_tests() -> Iterator[None]:
     """
     import os
 
-    saved = {k: os.environ.get(k) for k in ("USE_REAL_ROUTES", "USE_REAL_WEATHER")}
-    for k in ("USE_REAL_ROUTES", "USE_REAL_WEATHER"):
+    saved = {
+        k: os.environ.get(k)
+        for k in ("USE_REAL_ROUTES", "USE_REAL_WEATHER", "USE_REAL_PLACES")
+    }
+    for k in ("USE_REAL_ROUTES", "USE_REAL_WEATHER", "USE_REAL_PLACES"):
         os.environ[k] = ""
     yield
     for k, v in saved.items():

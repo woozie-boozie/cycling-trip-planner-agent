@@ -184,3 +184,39 @@ These weren't hallucinations — they were **my** mistakes baked into the mock d
 **Fixing the data fixed the agent's product behaviour without changing one line of orchestrator code.**
 
 **Consequence:** A second tool (`get_route` after `get_weather`) now ships behind an env flag with real public-data backing. The README's coverage table can promote `get_route` from "mock" to "real, opt-in." 90/90 unit tests stay green because the env flag is unset by default in tests.
+
+---
+
+## ADR-015 · Real accommodation + POI via Google Places API New (Phase 1.10d)
+
+**Decision (2026-05-10):** When `USE_REAL_PLACES=true` and `GOOGLE_PLACES_API_KEY` is set, both `find_accommodation` and `get_points_of_interest` route through **Google Places API (New)** — Nearby Search for the listings, Text Search for city geocoding, and the Places Photos endpoint for image URLs. Falls back to the seed catalog (now in Postgres) on any failure or for categories without a Places type. Same architectural pattern as ADR-011 (Open-Meteo) and ADR-014 (BRouter).
+
+**Why now, not before:** ADR-014 made the routing layer real-data-backed; the agent now reasons over real road distances on real signposted variants. The next-biggest "case-study smell" in the response was hand-curated accommodation lists ("Camping Municipal de Beauvais · €18 · bike-friendly") with no ratings, no reviews, no photos. A reviewer skimming the response could tell the data was static. Replacing it lifts every downstream surface — chat response, route map cards, the eventual UI redesign — into the same production-shaped tier as routing and weather.
+
+**Why Google Places (New) and not OSM Overpass:** Both were on the table. Overpass is free, no key, generous coverage of campsites and historic POI tagging, and matches the "OpenStreetMap data foundation" thread already established by BRouter. Google Places (New) added four things Overpass cannot:
+  1. **Aggregate user ratings** (1.0-5.0) and **review counts** — a quality signal beyond hand-curation. "Generator Hostel — 4.5★ (2,847 reviews)" beats "Generator Hostel" full stop.
+  2. **First-party photos** via the Places Photos endpoint, single-URL fetch in a `<img>` tag — directly enables the day-card / accommodation-card UI redesign.
+  3. **Price-tier signals** (`PRICE_LEVEL_INEXPENSIVE` / `MODERATE` / `EXPENSIVE` / `VERY_EXPENSIVE`) — a coarse but real budget input the agent can convert to EUR midpoints.
+  4. **Strong urban coverage globally** — Overpass varies by region; Google's index is consistently dense in the cities the corridor visits.
+
+The case-study reviewer is reading on a screen, not a terminal. Photos and ratings are the unfair advantage. Worth the API key and the modest per-call cost (case-study volume is ~50 requests; well inside Google's $200/mo free credit).
+
+**Why a separate flag (`USE_REAL_PLACES`) and not a single `USE_REAL_DATA` master switch:** Each integration has its own failure mode, its own cost profile, and its own deploy gate (Open-Meteo: free; BRouter: free; Google Places: paid w/ free credit). Independent flags let me deploy one at a time, monitor each on Cloud Run, and roll back per-source if anything misbehaves. Compounds the lesson from ADR-011/014.
+
+**Heuristic mapping the schemas don't carry:**
+  - **AccommodationType inference** — Google's `lodging` is a bucket; we read the per-place `types` array to distinguish `hostel` / `guest_house` / `bed_and_breakfast` from generic `hotel`, and treat `campground` / `rv_park` as `camping`.
+  - **EUR-per-night estimate** — Google returns a tier, not a number. The module ships a 4×4 lookup (`_PRICE_LEVEL_DEFAULTS_EUR`) that maps `(price_level, accom_type)` to a reasonable midpoint. Agent surfaces these as "estimated" rather than live prices.
+  - **Bike-friendliness** — no Places field. Default True for camping/hostels/guesthouses; cautious True for hotels with a note that the agent can challenge in the response.
+
+**Why `water_fountain` and `toilet` stay seed-only:** No clean Places type exists. Fudging via text search ("water fountain near London") is unreliable enough to mislead. The real path returns `None` for those categories so the caller falls back to the seed catalog cleanly — partial real + partial seed in the same response would confuse the agent's quality reasoning.
+
+**Schema change:** `Accommodation` and `POI` gain optional `rating`, `review_count`, `photo_url`, `place_id`, plus `price_level` on `Accommodation`. All `None` on the seed path so existing eval fixtures and downstream consumers stay valid; the UI redesign reads them as "show photo if present, else fall back to text card." Pydantic validates either path identically.
+
+**Smoke verification (live API):**
+  - Beauvais accommodation: 5 results, all with photos + ratings (e.g. *Hôtel Mercure Beauvais Centre Cathédrale · 4.4★ · 627 reviews · 0.4 km*)
+  - London bike shops: 5 results (Condor Cycles 4.8★ · 681, Decathlon 4.6★ · 4,515, Fully Charged 4.8★ · 475)
+  - Seed-only category (water fountain) correctly returns None → caller falls back to the curated seed list
+
+**Failure model:** Mirrors ADR-011/014. Any HTTP error, missing API key, or unrecognised location → return None → caller transparently falls back to Postgres seed. Logged via structlog so observability sees the fallback rate without crashing the agent.
+
+**Consequence:** Three of the eight tools now ship with real public-data backends; two more (`get_elevation_profile`, partially redundant with BRouter; `get_ferry_schedule`, no clean free API) remain seed by deliberate decision rather than oversight. The README's data-coverage table promotes `find_accommodation` and `get_points_of_interest` from "mock" to "real, opt-in." 90/90 unit tests stay green (conftest forces `USE_REAL_PLACES=""` in test runs alongside `USE_REAL_ROUTES` and `USE_REAL_WEATHER`).
