@@ -34,6 +34,7 @@ import re
 from src.tools.base import register_tool
 from src.tools.schemas import (
     CritiqueIssue,
+    CritiqueSeverity,
     CritiqueTripPlanInput,
     CritiqueTripPlanOutput,
     DraftedDay,
@@ -222,6 +223,63 @@ def _check_consistency(
             )
 
 
+def _check_constraint_drift(
+    days: list[DraftedDay], daily_km_target: float, issues: list[CritiqueIssue]
+) -> None:
+    """Catch the silent-relaxation failure mode.
+
+    When the proposed plan's daily km AVERAGE drifts materially from
+    the user's stated target without any acknowledgement, the agent
+    has quietly delivered a different pace than was asked for. This
+    is the soft end of the S2 (infeasibility) spectrum — same honesty
+    principle, different shape.
+
+    Surfaced 2026-05-10 by Gemini fact-check on a real session: agent
+    offered "Option A: 5 days at 73 km/day average" without flagging
+    that 73 is a 27% drop from the user's stated 100 km/day target.
+
+    Tolerances: drift below 12% is normal noise (corridor structure
+    and ferry days create unavoidable per-day variance). Drift between
+    12-25% is a `warning` — the agent should explicitly name it in
+    the plan's headline. Drift over 25% is a `blocker` — the plan
+    should be restructured or the relaxation should be the first
+    sentence of the response.
+    """
+    if not days or daily_km_target <= 0:
+        return
+    avg_km = sum(d.distance_km for d in days) / len(days)
+    drift_pct = abs(avg_km - daily_km_target) / daily_km_target * 100
+    if drift_pct < 12:
+        return
+
+    direction = "below" if avg_km < daily_km_target else "above"
+    severity: CritiqueSeverity = "warning" if drift_pct < 25 else "blocker"
+
+    issues.append(
+        CritiqueIssue(
+            severity=severity,
+            category="constraint_drift",
+            message=(
+                f"Plan averages {avg_km:.0f} km/day across {len(days)} days "
+                f"({drift_pct:.0f}% {direction} the user's stated target of "
+                f"{daily_km_target:.0f} km/day). If this relaxation is "
+                "intentional, the plan must explicitly name it (e.g. "
+                "'I've stretched this to N days at X km/day average, easing "
+                "the brutal Day Y'). Silent drift is a trust break."
+            ),
+            affects_days=list(range(1, len(days) + 1)),
+            suggestion=(
+                f"Either restructure days to land closer to "
+                f"{daily_km_target:.0f} km/day, or surface the relaxation in "
+                "the plan's headline and ask the user to confirm. When "
+                "offering alternative plans, name what each option relaxes "
+                "(km/day target, day count, accommodation pattern) — never "
+                "silently drop a target."
+            ),
+        )
+    )
+
+
 def _assess(issues: list[CritiqueIssue]) -> tuple[str, str]:
     blockers = [i for i in issues if i.severity == "blocker"]
     warnings = [i for i in issues if i.severity == "warning"]
@@ -263,6 +321,7 @@ def critique_trip_plan(input: CritiqueTripPlanInput) -> CritiqueTripPlanOutput:
     _check_elevation_pacing(days, issues)
     _check_accommodation_pattern(days, input.accommodation_preference, issues)
     _check_consistency(days, issues)
+    _check_constraint_drift(days, input.daily_km_target, issues)
 
     assessment, summary = _assess(issues)
 

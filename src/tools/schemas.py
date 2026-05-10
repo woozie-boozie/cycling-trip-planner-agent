@@ -336,6 +336,7 @@ CritiqueCategory = Literal[
     "elevation_pacing",
     "consistency",
     "ferry_missing",
+    "constraint_drift",  # plan's daily km avg drifted from user's stated target
 ]
 
 
