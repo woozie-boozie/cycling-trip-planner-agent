@@ -23,8 +23,10 @@ export interface CorridorWaypoint {
   km_from_start: number;
 }
 
+export type CorridorId = "ams-cph" | "ldn-par" | "ldn-bri";
+
 export interface Corridor {
-  id: "ams-cph" | "ldn-par" | "ldn-bri";
+  id: CorridorId;
   label: string;
   description: string;
   total_km: number;

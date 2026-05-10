@@ -5,13 +5,20 @@ import { Bike, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { InlineTraceStrip } from "@/components/inline-trace-strip";
+import { VisualResponse } from "@/components/visual-response";
+import type { Corridor } from "@/lib/corridors";
 import type { UiMessage } from "@/lib/types";
+import type { ViewMode } from "@/lib/view-mode";
 
 interface MessageBubbleProps {
   message: UiMessage;
+  /** When "visual", assistant messages route through `VisualResponse` */
+  viewMode?: ViewMode;
+  /** Conversation-scoped corridor used by visual mode for card rendering */
+  corridor?: Corridor | null;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, viewMode = "text", corridor = null }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -59,6 +66,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
             ) : null}
           </>
+        ) : viewMode === "visual" ? (
+          <VisualResponse content={message.content} corridor={corridor} />
         ) : (
           <MarkdownRenderer content={message.content} />
         )}

@@ -470,7 +470,12 @@ export default function Home() {
               ) : (
                 <div className="space-y-5">
                   {messages.map((m) => (
-                    <MessageBubble key={m.id} message={m} />
+                    <MessageBubble
+                      key={m.id}
+                      message={m}
+                      viewMode={viewMode}
+                      corridor={corridor}
+                    />
                   ))}
                   {isPending ? <LoadingIndicator /> : null}
                   {error ? (
