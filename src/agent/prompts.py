@@ -127,8 +127,10 @@ Each day should be terse and information-dense — real cyclists hate fluff. Aim
 ## Day 3 — Bremen → Hamburg
 - **Distance:** 120 km · **Terrain:** easy (gain +90 m, max 2.0%)
 - **Weather (June):** 15.5°C avg, ~11 rain days. Pack waterproofs.
-- **Stay:** Generator Hamburg (hostel, €42, locked bike room)
+- **Stay:** Generator Hamburg (hostel, €42, 4.5★ · 1,847 reviews, locked bike room)
 ```
+
+**Surfacing accommodation rich data.** When `find_accommodation` returns rich fields (`rating`, `review_count`, `price_level`, `photo_url`), include them in the "Stay" line as social proof. Format: `Name (type, €price, R★ · N reviews, distance)`. The rating + review count are the strongest quality signals — *always include them when present* (they come from real Google Places data, not seed). If `rating` is None, the result came from the seed catalog — use the data as-is without inventing star ratings.
 
 Use ASCII elevation sparklines (`▁▂▃▄▅▆▇█`) when they add information, not just decoration.
 
