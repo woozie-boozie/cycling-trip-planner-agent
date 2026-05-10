@@ -58,19 +58,23 @@ const ams_cph: Corridor = {
 const ldn_par: Corridor = {
   id: "ldn-par",
   label: "London → Paris",
-  description: "Avenue Verte, ~380 km, Newhaven–Dieppe ferry across the English Channel.",
-  total_km: 380,
+  // Distances reflect BRouter-computed V16a Beauvais variant (the agent's
+  // default pick when no variant is named). Other variants — Oise/Chantilly
+  // (~414 km) and Gisors (~374 km) — have their own totals reported in the
+  // agent's response per turn; this static map shows the default's overview.
+  description: "Avenue Verte V16a Beauvais, ~364 km, Newhaven–Dieppe ferry across the English Channel.",
+  total_km: 364,
   estimated_days: { at_100km: 4 },
   waypoints: [
     { name: "London", country: "UK", lat: 51.5074, lon: -0.1278, is_ferry: false, km_from_start: 0 },
-    { name: "East Grinstead", country: "UK", lat: 51.1267, lon: -0.0067, is_ferry: false, km_from_start: 60 },
-    { name: "Lewes", country: "UK", lat: 50.8736, lon: 0.0097, is_ferry: false, km_from_start: 110 },
-    { name: "Newhaven", country: "UK", lat: 50.7906, lon: 0.0533, is_ferry: false, km_from_start: 122 },
-    { name: "Dieppe", country: "FR", lat: 49.9239, lon: 1.0775, is_ferry: true, km_from_start: 122 },
-    { name: "Forges-les-Eaux", country: "FR", lat: 49.6173, lon: 1.546, is_ferry: false, km_from_start: 180 },
-    { name: "Beauvais", country: "FR", lat: 49.4295, lon: 2.0808, is_ferry: false, km_from_start: 240 },
-    { name: "Cergy-Pontoise", country: "FR", lat: 49.0398, lon: 2.0712, is_ferry: false, km_from_start: 320 },
-    { name: "Paris", country: "FR", lat: 48.8566, lon: 2.3522, is_ferry: false, km_from_start: 380 },
+    { name: "East Grinstead", country: "UK", lat: 51.1267, lon: -0.0067, is_ferry: false, km_from_start: 83 },
+    { name: "Lewes", country: "UK", lat: 50.8736, lon: 0.0097, is_ferry: false, km_from_start: 125 },
+    { name: "Newhaven", country: "UK", lat: 50.7906, lon: 0.0533, is_ferry: false, km_from_start: 138 },
+    { name: "Dieppe", country: "FR", lat: 49.9239, lon: 1.0775, is_ferry: true, km_from_start: 138 },
+    { name: "Forges-les-Eaux", country: "FR", lat: 49.6173, lon: 1.546, is_ferry: false, km_from_start: 192 },
+    { name: "Beauvais", country: "FR", lat: 49.4295, lon: 2.0808, is_ferry: false, km_from_start: 255 },
+    { name: "Cergy-Pontoise", country: "FR", lat: 49.0398, lon: 2.0712, is_ferry: false, km_from_start: 326 },
+    { name: "Paris", country: "FR", lat: 48.8566, lon: 2.3522, is_ferry: false, km_from_start: 364 },
   ],
   aliases: ["london", "paris", "ldn-par", "avenue verte", "newhaven", "dieppe"],
 };
