@@ -1,0 +1,120 @@
+id: ldn-bri
+label: London → Brighton
+start: London
+end: Brighton
+aliases:
+- london
+- brighton
+- ncn 20
+- ncn20
+- ldn bri
+- london to brighton
+description: |-
+  The canonical British day-ride or weekend tour. Two variants — NCN 20 signposted (the BHF charity ride route via the Cuckoo Trail and Ditchling Beacon), and the Avenue Verte UK + Lewes detour (adds South Downs scenery and a Lewes overnight, ~10–20 km longer).
+variants:
+- name: ncn20
+  title: NCN 20 signposted — fastest
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The classic National Cycle Network 20 route, the standard London→Brighton signposted ride. Ridden by ~30,000 cyclists every June for the British Heart Foundation event.
+  distinguishing_features:
+  - Wandle Trail through south London
+  - Cuckoo Trail disused railway in East Sussex
+  - Ditchling Beacon climb (the famous final ascent)
+  - Best signposting of any UK cycle route
+  trade_offs:
+  - Urban south London first 25 km can feel stop-start
+  - Brighton seafront finish but no Lewes/South Downs detour
+  best_for: the canonical day-ride or a fast 2-day weekend; charity riders
+  anchors:
+  - name: London
+    country: United Kingdom
+    lat: 51.5074
+    lon: -0.1278
+  - name: Wandsworth
+    country: United Kingdom
+    lat: 51.453
+    lon: -0.1845
+    is_overnight: false
+  - name: Mitcham
+    country: United Kingdom
+    lat: 51.404
+    lon: -0.1683
+    is_overnight: false
+  - name: Coulsdon
+    country: United Kingdom
+    lat: 51.3208
+    lon: -0.1395
+    is_overnight: false
+  - name: Crawley
+    country: United Kingdom
+    lat: 51.1092
+    lon: -0.1872
+    is_overnight: false
+  - name: Cuckfield
+    country: United Kingdom
+    lat: 51.0007
+    lon: -0.1421
+  - name: Burgess Hill
+    country: United Kingdom
+    lat: 50.9551
+    lon: -0.1316
+    is_overnight: false
+  - name: Brighton
+    country: United Kingdom
+    lat: 50.8225
+    lon: -0.1372
+- name: avenue_verte_lewes
+  title: Avenue Verte UK + Lewes — South Downs detour
+  headline_tag: Scenic
+  description: |-
+    Follows the Avenue Verte UK signposted route via East Grinstead, Forest Row, Lewes — adding the South Downs scenic spur and the historic county town of Lewes (Anne of Cleves' house, castle). Brighton arrival via the South Downs Way.
+  distinguishing_features:
+  - Forest of Ashdown (Winnie-the-Pooh country)
+  - Lewes — Tudor architecture, castle, real-ale pubs
+  - South Downs ridge approach to Brighton
+  - Quieter than NCN 20 — lower traffic on Sussex lanes
+  trade_offs:
+  - 10–20 km longer than NCN 20
+  - More climbing (Ashdown Forest + South Downs ridge)
+  - Less signposting on the Lewes→Brighton spur
+  best_for: |-
+    riders wanting a proper 2-day trip with a Lewes overnight, or those who care more about countryside than the canonical route
+  anchors:
+  - name: London
+    country: United Kingdom
+    lat: 51.5074
+    lon: -0.1278
+  - name: Crystal Palace
+    country: United Kingdom
+    lat: 51.4216
+    lon: -0.0746
+    is_overnight: false
+  - name: Coulsdon
+    country: United Kingdom
+    lat: 51.3208
+    lon: -0.1395
+    is_overnight: false
+  - name: Redhill
+    country: United Kingdom
+    lat: 51.24
+    lon: -0.1714
+    is_overnight: false
+  - name: East Grinstead
+    country: United Kingdom
+    lat: 51.1283
+    lon: -0.0094
+  - name: Forest Row
+    country: United Kingdom
+    lat: 51.1006
+    lon: 0.0312
+    is_overnight: false
+  - name: Lewes
+    country: United Kingdom
+    lat: 50.8736
+    lon: 0.008
+  - name: Brighton
+    country: United Kingdom
+    lat: 50.8225
+    lon: -0.1372

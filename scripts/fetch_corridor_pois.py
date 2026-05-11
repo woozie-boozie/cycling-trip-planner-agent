@@ -68,102 +68,57 @@ USER_AGENT = "cycling-trip-planner-agent/0.1 (build-time POI fetch; github.com/w
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "web" / "lib" / "data"
 
 # ---------------------------------------------------------------------------
-# Corridor anchor data (intentional copy from src/tools/route_real.py)
+# Corridor anchor data (sourced from data/corridors/*.yaml via the registry)
 # ---------------------------------------------------------------------------
-# Duplicated rather than imported because this is a build-time script and we
-# don't want it pulling on the FastAPI dependency tree. Three corridors total;
-# the corridors themselves are stable, so the drift risk is low. If a fourth
-# corridor is added, add it here too.
+# Pre-2026-05-12: this script kept a hand-copied duplicate of the route_real
+# anchors. Now sourced from the YAML registry — adding a 4th, 5th, … 23rd
+# corridor only requires creating data/corridors/<slug>.yaml; this script
+# picks it up on the next `make pois` run.
+#
+# The registry has zero FastAPI deps (just pydantic + pyyaml), so the
+# original "intentional copy to avoid pulling the FastAPI tree" concern
+# doesn't apply anymore.
 
 
 @dataclass(frozen=True)
 class Anchor:
+    """Lightweight Anchor used by the OSM filter math. The corridor
+    registry returns its own Anchor dataclass; we wrap into this minimal
+    one to keep the polyline/bbox helpers below dialect-agnostic."""
+
     name: str
     lat: float
     lon: float
 
 
-# Union-of-all-variants anchor set per corridor — used to compute the bbox
-# and the candidate polylines for distance filtering.
+def _load_corridors_from_registry() -> dict[str, list[list[Anchor]]]:
+    """Read every corridor from data/corridors/*.yaml and produce the
+    {corridor_id: [variant_anchors]} shape this script needs.
 
-_LDN_PAR_ANCHORS: list[list[Anchor]] = [
-    # V16a Beauvais
-    [
-        Anchor("London", 51.5074, -0.1278),
-        Anchor("East Grinstead", 51.1283, -0.0094),
-        Anchor("Lewes", 50.8736, 0.0080),
-        Anchor("Newhaven", 50.7935, 0.0570),
-        Anchor("Dieppe", 49.9229, 1.0784),
-        Anchor("Forges-les-Eaux", 49.6111, 1.5439),
-        Anchor("Beauvais", 49.4314, 2.0807),
-        Anchor("Cergy-Pontoise", 49.0356, 2.0707),
-        Anchor("Paris", 48.8566, 2.3522),
-    ],
-    # Oise/Chantilly detour
-    [
-        Anchor("Beauvais", 49.4314, 2.0807),
-        Anchor("Senlis", 49.2069, 2.5817),
-        Anchor("Chantilly", 49.1939, 2.4598),
-        Anchor("Paris", 48.8566, 2.3522),
-    ],
-    # Gisors western
-    [
-        Anchor("Forges-les-Eaux", 49.6111, 1.5439),
-        Anchor("Gisors", 49.2806, 1.7783),
-        Anchor("Vétheuil", 49.0833, 1.6378),
-        Anchor("Cergy-Pontoise", 49.0356, 2.0707),
-    ],
-]
+    Filters to is_overnight=True anchors only — through-towns (Wandsworth,
+    Crystal Palace, etc.) steer BRouter for cycling routing but are noise
+    for POI bbox + polyline filtering."""
+    # Lazy import so the script still runs when only PyYAML is installed
+    # (no FastAPI / structlog needed for this build-time tool).
+    from src.tools.corridor_registry import all_corridor_defs
 
-_AMS_CPH_ANCHORS: list[list[Anchor]] = [
-    # Inland EV7 hybrid
-    [
-        Anchor("Amsterdam", 52.3676, 4.9041),
-        Anchor("Hoorn", 52.6425, 5.0597),
-        Anchor("Groningen", 53.2194, 6.5665),
-        Anchor("Bremen", 53.0793, 8.8017),
-        Anchor("Hamburg", 53.5511, 9.9937),
-        Anchor("Lübeck", 53.8655, 10.6866),
-        Anchor("Puttgarden", 54.5021, 11.2378),
-        Anchor("Rødby", 54.6907, 11.3469),
-        Anchor("Vordingborg", 55.0085, 11.9105),
-        Anchor("Copenhagen", 55.6761, 12.5683),
-    ],
-    # Coastal EV12
-    [
-        Anchor("Amsterdam", 52.3676, 4.9041),
-        Anchor("Den Helder", 52.9612, 4.7600),
-        Anchor("Harlingen", 53.1740, 5.4220),
-        Anchor("Leeuwarden", 53.2012, 5.7999),
-        Anchor("Bremerhaven", 53.5396, 8.5810),
-        Anchor("Cuxhaven", 53.8665, 8.7010),
-        Anchor("Hamburg", 53.5511, 9.9937),
-    ],
-]
+    out: dict[str, list[list[Anchor]]] = {}
+    for corridor in all_corridor_defs():
+        variant_anchor_lists: list[list[Anchor]] = []
+        for variant in corridor.variants:
+            anchors = [
+                Anchor(name=a.name, lat=a.lat, lon=a.lon)
+                for a in variant.anchors
+                if a.is_overnight
+            ]
+            if anchors:
+                variant_anchor_lists.append(anchors)
+        if variant_anchor_lists:
+            out[corridor.id] = variant_anchor_lists
+    return out
 
-_LDN_BRI_ANCHORS: list[list[Anchor]] = [
-    # NCN 20
-    [
-        Anchor("London", 51.5074, -0.1278),
-        Anchor("Crawley", 51.1092, -0.1872),
-        Anchor("Cuckfield", 51.0007, -0.1421),
-        Anchor("Burgess Hill", 50.9551, -0.1316),
-        Anchor("Brighton", 50.8225, -0.1372),
-    ],
-    # Avenue Verte UK + Lewes
-    [
-        Anchor("London", 51.5074, -0.1278),
-        Anchor("East Grinstead", 51.1283, -0.0094),
-        Anchor("Lewes", 50.8736, 0.0080),
-        Anchor("Brighton", 50.8225, -0.1372),
-    ],
-]
 
-CORRIDORS: dict[str, list[list[Anchor]]] = {
-    "ldn-par": _LDN_PAR_ANCHORS,
-    "ams-cph": _AMS_CPH_ANCHORS,
-    "ldn-bri": _LDN_BRI_ANCHORS,
-}
+CORRIDORS: dict[str, list[list[Anchor]]] = _load_corridors_from_registry()
 
 
 # ---------------------------------------------------------------------------

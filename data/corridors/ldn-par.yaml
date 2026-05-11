@@ -1,0 +1,317 @@
+id: ldn-par
+label: London → Paris
+start: London
+end: Paris
+aliases:
+- london
+- paris
+- avenue verte
+- ldn par
+- london to paris
+description: |-
+  The signposted Avenue Verte from London to Paris via the Newhaven–Dieppe ferry. Three variants — V16a Beauvais (fastest), Oise/Chantilly (scenic châteaux loop), and Gisors (quiet western Epte valley). All share the same UK side from London via East Grinstead and Lewes to Newhaven.
+variants:
+- name: v16a_beauvais
+  title: V16a Beauvais — fastest signposted
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The most direct of the signposted Avenue Verte variants. Crosses the Pays de Bray to Beauvais (UNESCO Gothic cathedral, tallest choir vault in the world), then drops to Cergy via Beaumont-sur-Oise.
+  distinguishing_features:
+  - Beauvais Cathedral (tallest Gothic choir vault, 48 m)
+  - Pays de Bray cheese country (Neufchâtel AOC)
+  - Mostly disused railway path on French side — gentle gradients
+  - Shortest of the three Avenue Verte variants
+  trade_offs:
+  - Misses the Senlis/Chantilly chateaux loop
+  - More A-road sections in the UK approach to East Grinstead
+  best_for: targeting the fastest signposted crossing with one cathedral stop
+  anchors:
+  - name: London
+    country: United Kingdom
+    lat: 51.5074
+    lon: -0.1278
+  - name: Wandsworth
+    country: United Kingdom
+    lat: 51.453
+    lon: -0.1845
+    is_overnight: false
+  - name: Crystal Palace
+    country: United Kingdom
+    lat: 51.4216
+    lon: -0.0746
+    is_overnight: false
+  - name: Coulsdon
+    country: United Kingdom
+    lat: 51.3208
+    lon: -0.1395
+    is_overnight: false
+  - name: Redhill
+    country: United Kingdom
+    lat: 51.24
+    lon: -0.1714
+    is_overnight: false
+  - name: Crawley
+    country: United Kingdom
+    lat: 51.1092
+    lon: -0.1872
+    is_overnight: false
+  - name: East Grinstead
+    country: United Kingdom
+    lat: 51.1283
+    lon: -0.0094
+  - name: Forest Row
+    country: United Kingdom
+    lat: 51.1006
+    lon: 0.0312
+    is_overnight: false
+  - name: Lewes
+    country: United Kingdom
+    lat: 50.8736
+    lon: 0.008
+  - name: Newhaven
+    country: United Kingdom
+    lat: 50.7935
+    lon: 0.057
+  - name: Dieppe
+    country: France
+    lat: 49.9229
+    lon: 1.0784
+    is_ferry_arrival: true
+  - name: Forges-les-Eaux
+    country: France
+    lat: 49.6111
+    lon: 1.5439
+  - name: Gournay-en-Bray
+    country: France
+    lat: 49.4869
+    lon: 1.7269
+    is_overnight: false
+  - name: Saint-Germer-de-Fly
+    country: France
+    lat: 49.4317
+    lon: 1.7747
+    is_overnight: false
+  - name: Beauvais
+    country: France
+    lat: 49.4314
+    lon: 2.0807
+  - name: Beaumont-sur-Oise
+    country: France
+    lat: 49.1432
+    lon: 2.2825
+    is_overnight: false
+  - name: Cergy-Pontoise
+    country: France
+    lat: 49.0356
+    lon: 2.0707
+  - name: Paris
+    country: France
+    lat: 48.8566
+    lon: 2.3522
+- name: oise_chantilly
+  title: Oise/Chantilly — scenic chateaux loop
+  headline_tag: Heritage
+  description: |-
+    Adds the Senlis (medieval town) + Chantilly (chateau, racecourse, lace) detour after Beauvais. ~20–30 km longer than V16a but the most photogenic variant — three world-class historic stops.
+  distinguishing_features:
+  - Chantilly Château + Grand Stables (one of France's finest)
+  - Senlis medieval old town with intact Gallo-Roman walls
+  - Beauvais Cathedral retained
+  - Forest of Chantilly cycle paths
+  trade_offs:
+  - 20–30 km longer than V16a (one extra day for casual riders)
+  - Chantilly + Senlis can be expensive for food and accommodation
+  best_for: |-
+    riders prioritising heritage + photography over distance, or honeymoon/special-occasion trips
+  anchors:
+  - name: London
+    country: United Kingdom
+    lat: 51.5074
+    lon: -0.1278
+  - name: Wandsworth
+    country: United Kingdom
+    lat: 51.453
+    lon: -0.1845
+    is_overnight: false
+  - name: Crystal Palace
+    country: United Kingdom
+    lat: 51.4216
+    lon: -0.0746
+    is_overnight: false
+  - name: Coulsdon
+    country: United Kingdom
+    lat: 51.3208
+    lon: -0.1395
+    is_overnight: false
+  - name: Redhill
+    country: United Kingdom
+    lat: 51.24
+    lon: -0.1714
+    is_overnight: false
+  - name: Crawley
+    country: United Kingdom
+    lat: 51.1092
+    lon: -0.1872
+    is_overnight: false
+  - name: East Grinstead
+    country: United Kingdom
+    lat: 51.1283
+    lon: -0.0094
+  - name: Forest Row
+    country: United Kingdom
+    lat: 51.1006
+    lon: 0.0312
+    is_overnight: false
+  - name: Lewes
+    country: United Kingdom
+    lat: 50.8736
+    lon: 0.008
+  - name: Newhaven
+    country: United Kingdom
+    lat: 50.7935
+    lon: 0.057
+  - name: Dieppe
+    country: France
+    lat: 49.9229
+    lon: 1.0784
+    is_ferry_arrival: true
+  - name: Forges-les-Eaux
+    country: France
+    lat: 49.6111
+    lon: 1.5439
+  - name: Gournay-en-Bray
+    country: France
+    lat: 49.4869
+    lon: 1.7269
+    is_overnight: false
+  - name: Saint-Germer-de-Fly
+    country: France
+    lat: 49.4317
+    lon: 1.7747
+    is_overnight: false
+  - name: Beauvais
+    country: France
+    lat: 49.4314
+    lon: 2.0807
+  - name: Clermont
+    country: France
+    lat: 49.3779
+    lon: 2.414
+    is_overnight: false
+  - name: Senlis
+    country: France
+    lat: 49.2069
+    lon: 2.5817
+  - name: Chantilly
+    country: France
+    lat: 49.1939
+    lon: 2.4598
+  - name: Cergy-Pontoise
+    country: France
+    lat: 49.0356
+    lon: 2.0707
+    is_overnight: false
+  - name: Paris
+    country: France
+    lat: 48.8566
+    lon: 2.3522
+- name: gisors_western
+  title: Gisors — western Epte valley
+  headline_tag: Quiet
+  description: |-
+    Skips Beauvais entirely. From Gournay-en-Bray, drops south via Gisors (12th-century keep, William the Conqueror history) and the Epte valley to the Seine. Quieter, more rural, fewer tourists.
+  distinguishing_features:
+  - Gisors medieval keep (Knights Templar history)
+  - Epte valley — the historic Norman/French frontier
+  - Vexin Français Regional Natural Park
+  - Far fewer tourists than the Beauvais/Chantilly variants
+  trade_offs:
+  - No Beauvais Cathedral
+  - More rural — food + accommodation density lower
+  - Rougher signposting in places (V32 + local cycle network)
+  best_for: |-
+    experienced tourers wanting solitude + rural Normandy/Vexin over headline tourist stops
+  anchors:
+  - name: London
+    country: United Kingdom
+    lat: 51.5074
+    lon: -0.1278
+  - name: Wandsworth
+    country: United Kingdom
+    lat: 51.453
+    lon: -0.1845
+    is_overnight: false
+  - name: Crystal Palace
+    country: United Kingdom
+    lat: 51.4216
+    lon: -0.0746
+    is_overnight: false
+  - name: Coulsdon
+    country: United Kingdom
+    lat: 51.3208
+    lon: -0.1395
+    is_overnight: false
+  - name: Redhill
+    country: United Kingdom
+    lat: 51.24
+    lon: -0.1714
+    is_overnight: false
+  - name: Crawley
+    country: United Kingdom
+    lat: 51.1092
+    lon: -0.1872
+    is_overnight: false
+  - name: East Grinstead
+    country: United Kingdom
+    lat: 51.1283
+    lon: -0.0094
+  - name: Forest Row
+    country: United Kingdom
+    lat: 51.1006
+    lon: 0.0312
+    is_overnight: false
+  - name: Lewes
+    country: United Kingdom
+    lat: 50.8736
+    lon: 0.008
+  - name: Newhaven
+    country: United Kingdom
+    lat: 50.7935
+    lon: 0.057
+  - name: Dieppe
+    country: France
+    lat: 49.9229
+    lon: 1.0784
+    is_ferry_arrival: true
+  - name: Forges-les-Eaux
+    country: France
+    lat: 49.6111
+    lon: 1.5439
+  - name: Gournay-en-Bray
+    country: France
+    lat: 49.4869
+    lon: 1.7269
+    is_overnight: false
+  - name: Gisors
+    country: France
+    lat: 49.2806
+    lon: 1.7783
+  - name: Vétheuil
+    country: France
+    lat: 49.0833
+    lon: 1.6378
+    is_overnight: false
+  - name: Conflans-Sainte-Honorine
+    country: France
+    lat: 48.9988
+    lon: 2.0985
+    is_overnight: false
+  - name: Cergy-Pontoise
+    country: France
+    lat: 49.0356
+    lon: 2.0707
+  - name: Paris
+    country: France
+    lat: 48.8566
+    lon: 2.3522
