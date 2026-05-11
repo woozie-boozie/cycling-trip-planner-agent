@@ -234,13 +234,21 @@ async def test_get_elevation_reverse_direction_works(seeded_db: None) -> None:
 
 @pytest.mark.asyncio
 async def test_get_elevation_unknown_segment_falls_back(seeded_db: None) -> None:
+    """Both endpoints are deliberately fake place names so Open-Meteo's
+    geocoder returns no match and we exercise the last-ditch estimated-
+    values stub (the path the BRouter generic-mode fallback also routes
+    through on geocoding failure)."""
     result = await dispatch(
         "get_elevation_profile",
         {"start": "Mars Base Alpha", "end": "Mars Base Beta"},
     )
     parsed = GetElevationProfileOutput.model_validate(result.content)
     assert parsed.notes is not None
-    assert "Mock data" in parsed.notes
+    # The stub flags itself as an estimate and points to external verification.
+    assert "Estimated values" in parsed.notes or "Komoot" in parsed.notes
+    # Stub keeps the moderate-default shape so the agent loop doesn't break.
+    assert parsed.difficulty == "moderate"
+    assert parsed.distance_km == 80.0
 
 
 # ---------------------------------------------------------------------------

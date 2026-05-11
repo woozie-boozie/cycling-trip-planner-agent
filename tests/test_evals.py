@@ -802,6 +802,16 @@ async def test_eval_out_of_catalog_corridor_london_to_edinburgh(seeded_db: None)
         and re.search(r"day\s*[4-7]", text_lower)
     )
 
+    # Per-day distance variance — the regression signal that real BRouter
+    # data flowed through get_elevation_profile (rather than the uniform
+    # 80km mock). If 6 of 7 days are 80 km exactly, the mock fallback is
+    # active and the new generic-mode path is broken.
+    day_distance_strings = re.findall(
+        r"distance[:\s]*\*{0,2}\s*([\d.]+)\s*km",
+        text_lower,
+    )
+    distinct_distances = len(set(round(float(d), 0) for d in day_distance_strings))
+
     checks = [
         ("get_route called at least once", tools_called.count("get_route") >= 1),
         ("agent fanned out per-segment tools (≥4 each of elev/weather/accom)",
@@ -818,6 +828,13 @@ async def test_eval_out_of_catalog_corridor_london_to_edinburgh(seeded_db: None)
          response.output_tokens > 1500),
         ("max single day under 150 km absolute ceiling (critique blocker)",
          _max_day_distance_km(text) is None or _max_day_distance_km(text) <= 150),
+        # The regression assertion the data-quality complaint generated.
+        # Real BRouter segments produce non-uniform km values (e.g. London →
+        # Cambridge ~95, Cambridge → Peterborough ~65, etc.). The old mock
+        # returned 80 for every segment. If we see ≥3 distinct day distances
+        # the BRouter path is being exercised.
+        ("per-day distances are non-uniform (real BRouter, not 80km mock)",
+         distinct_distances >= 3 or len(day_distance_strings) <= 1),
     ]
 
     _print_scoreboard("S9 · out-of-catalog corridor (LDN → Edinburgh)", state, checks)
@@ -827,6 +844,8 @@ async def test_eval_out_of_catalog_corridor_london_to_edinburgh(seeded_db: None)
             f"---\ntools called: {sorted(set(tools_called))}\n"
             f"cities mentioned: {[c for c in candidate_via_cities if c in text_lower]}\n"
             f"output_tokens: {response.output_tokens}\n"
+            f"day distances seen: {day_distance_strings} "
+            f"(distinct={distinct_distances})\n"
             f"message ({len(text)} chars):\n{text[:3000]}"
         )
 
