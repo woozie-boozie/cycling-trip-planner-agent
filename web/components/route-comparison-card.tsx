@@ -71,8 +71,11 @@ export function RouteComparisonCard({
         </span>
       </div>
 
-      {/* Variant grid */}
-      <div className="grid gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Variant grid — 2-col on tablet+ so each card has room to breathe.
+          For 3-variant corridors (London → Paris) the 3rd card wraps to a
+          second row, which is fine — visually balanced and the card stays
+          readable instead of being squeezed into a 33%-wide column. */}
+      <div className="grid gap-4 p-4 sm:grid-cols-2">
         {variants.map((v) => {
           const isSelected = selectedName === v.name;
           const isRecommended = recommendedName === v.name;

@@ -1,12 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ItineraryCard } from "@/components/itinerary-card";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { RouteCanvas } from "@/components/route-canvas";
 import { RouteComparisonCard } from "@/components/route-comparison-card";
 import { matchCorridor, type Corridor } from "@/lib/corridors";
-import { parseItinerary, type DayRow } from "@/lib/parse-itinerary";
+import { parseItinerary } from "@/lib/parse-itinerary";
 import { getVariants, type RouteVariantSummary } from "@/lib/route-variants";
 
 interface VisualResponseProps {
@@ -63,20 +62,20 @@ export function VisualResponse({ content, corridor, onPickVariant }: VisualRespo
         </div>
       );
     case "itinerary":
+      // The agent's day-by-day markdown is rich and reliably well-formatted —
+      // and the per-day parser was repeatedly mis-shaping it (parenthetical
+      // date suffixes leaking into city names, missing km columns, fake totals).
+      // We keep the map at the top for visual orientation and let the agent's
+      // markdown be the source of truth for the day list itself. Same rendering
+      // path as text mode, framed by the corridor map. ItineraryCard is kept
+      // in the codebase but no longer rendered — easy to revive once the
+      // agent emits structured day data alongside prose.
       return (
         <div className="space-y-3">
           {detection.corridor && <RouteCanvas corridor={detection.corridor} />}
-          <ItineraryCard
-            days={detection.days}
-            title={detection.corridor?.label}
-            subtitle={detection.subtitle}
-            corridor={detection.corridor ?? null}
-          />
-          {detection.afterText && (
-            <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
-              <MarkdownRenderer content={detection.afterText} />
-            </div>
-          )}
+          <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
+            <MarkdownRenderer content={content} />
+          </div>
         </div>
       );
     case "markdown":
@@ -104,6 +103,10 @@ function ComparisonResponse({
   const [selectedName, setSelectedName] = useState<string>(initial);
   const selected = detection.variants.find((v) => v.name === selectedName) ?? detection.variants[0];
 
+  // Cards-only render. The variant cards already convey every fact in the
+  // agent's bullet block (title, tagline, km, days, 3 pros, 2 cons, best-for) —
+  // duplicating it as markdown below is noise. The agent's closing question
+  // / recommendation lives in text mode for users who want the prose.
   return (
     <div className="space-y-3">
       <RouteCanvas
@@ -120,11 +123,6 @@ function ComparisonResponse({
         selectedName={selectedName}
         onSelect={(v) => setSelectedName(v.name)}
       />
-      {detection.afterText && (
-        <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
-          <MarkdownRenderer content={detection.afterText} />
-        </div>
-      )}
     </div>
   );
 }
@@ -140,8 +138,6 @@ type Detection =
       variants: RouteVariantSummary[];
       /** Variant the agent recommended, if we can extract it */
       recommendedName?: string;
-      /** Markdown that follows the variant block (the agent's recommendation prose) */
-      afterText?: string;
     }
   | {
       /** Corridor matched but no multi-variant comparison block */
@@ -149,14 +145,10 @@ type Detection =
       corridor: Corridor;
     }
   | {
-      /** Multi-day plan parsed from markdown */
+      /** Multi-day plan detected — render the map + the agent's markdown body */
       kind: "itinerary";
-      days: DayRow[];
-      /** Corridor inferred from the conversation (if any) — drives the map + title */
+      /** Corridor inferred from the conversation (if any) — drives the map */
       corridor: Corridor | null;
-      subtitle?: string;
-      /** Free-text that came AFTER the day list (e.g. "Heads up" section) */
-      afterText?: string;
     }
   | { kind: "markdown" };
 
@@ -192,38 +184,24 @@ function detectResponseShape(content: string, corridor: Corridor | null): Detect
 
     if (isComparison) {
       const recommendedName = inferRecommended(content, variants);
-      let afterText = "";
-      const cutMatch = content.match(
-        /\bWhich (?:variant|route|option|one)\b[^?]*\?[*_\s]*/i,
-      );
-      if (cutMatch && cutMatch.index !== undefined) {
-        afterText = content.slice(cutMatch.index + cutMatch[0].length).trim();
-      }
       return {
         kind: "comparison",
         corridor,
         variants,
         recommendedName,
-        afterText: afterText || undefined,
       };
     }
   }
 
-  // Multi-day itinerary detection — overrides corridor-only single-route
-  // because day-by-day plans always reference multiple waypoints.
+  // Multi-day itinerary detection — used purely as a signal that the response
+  // IS a day-by-day plan (so the map renders above the markdown body). The
+  // parsed day[] array isn't used downstream; the markdown body is rendered
+  // as-is by MarkdownRenderer, which gives identical output to text mode.
   const days = parseItinerary(content);
   if (days && days.length >= 3) {
-    // Try to extract any "Heads up" / final-section prose to render below
-    // the day list.
-    let afterText: string | undefined;
-    const headsUp = content.match(/(?:^|\n)#{0,3}\s*Heads up\b[\s\S]*$/i);
-    if (headsUp) afterText = headsUp[0].trim();
     return {
       kind: "itinerary",
-      days,
       corridor,
-      subtitle: undefined,
-      afterText,
     };
   }
 
