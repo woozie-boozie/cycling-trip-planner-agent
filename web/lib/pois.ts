@@ -200,14 +200,14 @@ function mergePois(curated: Poi[], osm: Poi[]): Poi[] {
 
 // JSON files arrive as `unknown` types; runtime data is guaranteed by the
 // build-time script to match the Poi shape.
-const OSM_POIS: Record<CorridorId, Poi[]> = {
+const OSM_POIS: Partial<Record<CorridorId, Poi[]>> = {
   "ldn-par": OSM_LDN_PAR as unknown as Poi[],
   "ams-cph": OSM_AMS_CPH as unknown as Poi[],
   "ldn-bri": OSM_LDN_BRI as unknown as Poi[],
 };
 
-export const POIS_BY_CORRIDOR: Record<CorridorId, Poi[]> = {
-  "ldn-par": mergePois(CURATED_LDN_PAR, OSM_POIS["ldn-par"]),
-  "ams-cph": mergePois(CURATED_AMS_CPH, OSM_POIS["ams-cph"]),
-  "ldn-bri": mergePois(CURATED_LDN_BRI, OSM_POIS["ldn-bri"]),
+export const POIS_BY_CORRIDOR: Partial<Record<CorridorId, Poi[]>> = {
+  "ldn-par": mergePois(CURATED_LDN_PAR, OSM_POIS["ldn-par"] ?? []),
+  "ams-cph": mergePois(CURATED_AMS_CPH, OSM_POIS["ams-cph"] ?? []),
+  "ldn-bri": mergePois(CURATED_LDN_BRI, OSM_POIS["ldn-bri"] ?? []),
 };

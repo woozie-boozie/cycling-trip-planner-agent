@@ -6,7 +6,7 @@ import type { Corridor } from "@/lib/corridors";
 import { staticMapUrl } from "@/lib/mapbox";
 import { LAYER_META, POIS_BY_CORRIDOR, type PoiLayer } from "@/lib/pois";
 import { getVariants } from "@/lib/route-variants";
-import { ROUTE_DETAILS } from "@/lib/route-details";
+import { FALLBACK_DETAILS, ROUTE_DETAILS } from "@/lib/route-details";
 import { ElevationSparkline } from "@/components/elevation-sparkline";
 
 interface RouteCardProps {
@@ -39,7 +39,12 @@ export function RouteCard({ corridor, onSelect, featured = false }: RouteCardPro
   const mapUrl = staticMapUrl(corridor, { width: 720, height: MAP_HEIGHT + 40 });
   const days = corridor.estimated_days.at_100km;
   const variants = getVariants(corridor.id);
-  const details = ROUTE_DETAILS[corridor.id];
+  // Fallback to a flat-sparkline placeholder if the corridor doesn't yet
+  // have curated data — keeps the gallery rendering for new YAML corridors
+  // until their entries land in route-details.ts. Should never trigger in
+  // practice (all 23 catalog corridors are curated), but the guard means
+  // adding a 24th corridor without details just gives a graceful default.
+  const details = ROUTE_DETAILS[corridor.id] ?? FALLBACK_DETAILS;
 
   // Pick highlight POIs for the corridor — always 3, so heights align.
   const highlights = useMemo(() => {
@@ -257,5 +262,51 @@ function taglineFor(corridorId: Corridor["id"]): string {
       return "EuroVelo 7 · the Baltic corridor";
     case "ldn-bri":
       return "South Downs classic · 1-day";
+    // Phase 2 corridors — terse two-clause tagline matching the existing style.
+    case "loire-a-velo":
+      return "EuroVelo 6 · flat river path";
+    case "danube-passau-vienna":
+      return "Donauradweg · classic Danube week";
+    case "lf-kustroute":
+      return "LF Kustroute · full Dutch coast";
+    case "velodyssee":
+      return "EuroVelo 1 · Atlantic France";
+    case "danube-vienna-budapest":
+      return "EuroVelo 6 · three-capital ride";
+    case "lejog":
+      return "UK end-to-end · the bucket-list ride";
+    case "c2c-whitehaven-tynemouth":
+      return "NCN 7/14 · Britain's classic C2C";
+    case "hebridean-way":
+      return "Outer Hebrides · single-track island traverse";
+    case "way-of-the-roses":
+      return "NCN 69 · Lancashire to Yorkshire";
+    case "venice-florence":
+      return "Po valley + Apennines · heritage cities";
+    case "sicily-loop":
+      return "Sicily coastal loop · Etna + Greek temples";
+    case "costa-brava":
+      return "Catalan coast · Barcelona to Cap de Creus";
+    case "camino-del-norte":
+      return "Northern Camino · Atlantic pilgrimage";
+    case "algarve-coast":
+      return "Portugal south coast · winter-sun ride";
+    case "berlin-copenhagen":
+      return "EuroVelo 7 north · two cycling capitals";
+    case "prague-vienna":
+      return "Greenways · UNESCO + Moravian wine";
+    case "berlin-usedom":
+      return "Berlin → Baltic · lakeland + sea";
+    case "amsterdam-berlin":
+      return "Capital to capital · Dutch LF + German Radwege";
+    case "paris-lyon":
+      return "Bourgogne canals · vineyards + gastronomy";
+    case "eurovelo-15-rhine":
+      return "EuroVelo 15 · Rhine source to sea";
+    default:
+      // Defensive — keeps the UI rendering if a 24th corridor lands
+      // before its tagline is added. TypeScript exhaustiveness check
+      // would catch missing cases at compile time on the next edit.
+      return corridorId;
   }
 }

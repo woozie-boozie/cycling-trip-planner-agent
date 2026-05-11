@@ -73,7 +73,13 @@ const _UK_AVENUE_VERTE: VariantWaypoint[] = [
   { name: "Newhaven", lat: 50.7935, lon: 0.057 },
 ];
 
-export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
+// Partial — only the 3 hand-curated corridors have RouteVariantSummary
+// entries here (these drive the homepage "compare variants" card UI).
+// The other 20 catalog corridors get their variants from the backend at
+// runtime via the agent's get_route response — consumers null-check
+// (getVariants returns undefined for unknown corridors, which renders
+// a single-variant card instead of a side-by-side comparison).
+export const ROUTE_VARIANTS: Partial<Record<CorridorId, RouteVariantSummary[]>> = {
   "ldn-par": [
     {
       name: "v16a_beauvais",
