@@ -1,6 +1,6 @@
 [project]
 name = "cycling-trip-planner-agent"
-version = "0.1.0"
+version = "1.0.0"
 description = "AI agent that helps a cyclist plan a multi-day bike trip through conversation"
 readme = "README.md"
 requires-python = ">=3.10"
