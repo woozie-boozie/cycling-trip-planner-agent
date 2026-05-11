@@ -210,17 +210,43 @@ class GetRouteOutput(BaseModel):
 class Accommodation(BaseModel):
     """A single place to stay near a location."""
 
-    name: str
-    type: AccommodationType
+    name: str = Field(
+        description=(
+            "Display name of the accommodation (e.g. 'Generator Hamburg', "
+            "'Camping Vliegenbos'). Surfaced verbatim in the agent's final "
+            "Stay line."
+        ),
+    )
+    type: AccommodationType = Field(
+        description=(
+            "Accommodation type. Drives both the icon glyph in the ItineraryCard "
+            "(tent / bed / building / B&B-house) and the agent's matching against "
+            "the cyclist's preferred mix (e.g. 'camping but hostel every 4th night')."
+        ),
+    )
     location: str = Field(description="City or town the accommodation is in")
     distance_from_location_km: float = Field(
         ge=0, description="Distance from the queried location's center"
     )
-    estimated_price_eur_per_night: float = Field(ge=0)
+    estimated_price_eur_per_night: float = Field(
+        ge=0,
+        description=(
+            "Typical nightly rate in EUR for a solo cyclist. Camping pitches "
+            "~€18-30, hostels ~€30-55, hotels ~€80-200 depending on country."
+        ),
+    )
     bike_friendly: bool = Field(
         default=True, description="True if secure bike storage / repair is available"
     )
-    notes: str | None = None
+    notes: str | None = Field(
+        default=None,
+        description=(
+            "Optional human-readable caveats (e.g. 'reception closes 22:00', "
+            "'covered bike shed for free'). Agent should surface these inline "
+            "when present — they're the difference between a working stop and "
+            "an arriving-too-late surprise."
+        ),
+    )
     # Rich fields populated by the Google Places real-data path. None on seed
     # data so the agent can tell the difference (and downstream UI can show
     # photos/ratings only when present).
@@ -341,11 +367,25 @@ class DraftedDay(BaseModel):
         default=None,
         description="Where the cyclist sleeps THIS NIGHT (after riding day_number)",
     )
-    accommodation_name: str | None = None
+    accommodation_name: str | None = Field(
+        default=None,
+        description=(
+            "Specific accommodation chosen for the night after riding day_number "
+            "(e.g. 'Generator Hamburg'). None if no specific pick yet — critique "
+            "will flag this only when the user's preference is an exact type."
+        ),
+    )
     has_ferry: bool = Field(
         default=False, description="True if this day involves a ferry crossing"
     )
-    notes: str | None = None
+    notes: str | None = Field(
+        default=None,
+        description=(
+            "Optional free-text notes about the day (e.g. 'rest day suggested', "
+            "'ferry boards at 14:00'). Critique reads these for flag patterns "
+            "but otherwise doesn't enforce structure."
+        ),
+    )
 
 
 CritiqueSeverity = Literal["info", "warning", "blocker"]
@@ -424,10 +464,27 @@ POICategory = Literal[
 class POI(BaseModel):
     """A single point of interest near a location."""
 
-    name: str
-    category: POICategory
+    name: str = Field(
+        description=(
+            "Display name of the POI (e.g. 'Brixton Cycles', 'Café Smart' or — "
+            "for unnamed public infrastructure — 'Drinking Fountain · Main Square')."
+        ),
+    )
+    category: POICategory = Field(
+        description=(
+            "POI category — drives the cyclist's mental sorting (a bike_shop "
+            "fixes you, a water_fountain refills you, a market feeds you). "
+            "Agent should match the category to the user's intent rather than "
+            "dumping all categories together."
+        ),
+    )
     location: str = Field(description="City/town the POI is in")
-    distance_from_location_km: float = Field(ge=0)
+    distance_from_location_km: float = Field(
+        ge=0,
+        description=(
+            "Walking/cycling distance from the queried location's centre, in km."
+        ),
+    )
     description: str = Field(description="One-line description for the agent")
     opening_hours: str | None = Field(
         default=None,
@@ -437,12 +494,33 @@ class POI(BaseModel):
         default=True,
         description="True if known to welcome cyclists (bike racks, repair stand, etc.)",
     )
-    notes: str | None = None
+    notes: str | None = Field(
+        default=None,
+        description=(
+            "Optional caveats (e.g. 'closed Mondays', 'cash only', 'no espresso'). "
+            "Surface to the cyclist when material to their decision."
+        ),
+    )
     # Rich fields populated by the Google Places real-data path.
-    rating: float | None = Field(default=None, ge=0, le=5)
-    review_count: int | None = Field(default=None, ge=0)
-    photo_url: str | None = None
-    place_id: str | None = None
+    rating: float | None = Field(
+        default=None,
+        ge=0,
+        le=5,
+        description="Aggregate Google rating (1.0-5.0). None on seed data.",
+    )
+    review_count: int | None = Field(
+        default=None,
+        ge=0,
+        description="Number of Google reviews. None on seed data.",
+    )
+    photo_url: str | None = Field(
+        default=None,
+        description="Single Google Places photo URL. None when not available.",
+    )
+    place_id: str | None = Field(
+        default=None,
+        description="Google place_id for deeplinks (https://maps.google.com/?cid=…).",
+    )
 
 
 class GetPointsOfInterestInput(BaseModel):
@@ -474,16 +552,42 @@ class GetPointsOfInterestOutput(BaseModel):
 class FerryDeparture(BaseModel):
     """A single departure on a ferry route."""
 
-    departure_time: str = Field(description="24h local time, e.g. '08:00'")
-    arrival_time: str
-    duration_hours: float = Field(gt=0)
+    departure_time: str = Field(description="24h local time at the origin port, e.g. '08:00'")
+    arrival_time: str = Field(
+        description="24h local time at the destination port (may be a different timezone)",
+    )
+    duration_hours: float = Field(
+        gt=0,
+        description=(
+            "Crossing time excluding boarding. Short hops (Rødby–Puttgarden) "
+            "are ~0.75h; channel crossings (Newhaven–Dieppe) are ~4h."
+        ),
+    )
     operator: str = Field(description="Ferry operator (DFDS, Scandlines, etc.)")
-    price_per_cyclist_eur: float = Field(ge=0)
+    price_per_cyclist_eur: float = Field(
+        ge=0,
+        description=(
+            "Foot-passenger fare in EUR (cyclists travel as foot passengers — "
+            "no separate cyclist tier). Excludes bike."
+        ),
+    )
     price_per_bike_eur: float = Field(
         default=0, ge=0, description="0 if bikes carried free of charge"
     )
-    bike_policy: str = Field(description="Free-text bike-handling policy")
-    advance_booking_required: bool = Field(default=False)
+    bike_policy: str = Field(
+        description=(
+            "Free-text bike-handling rules (e.g. 'walk on, no booking needed', "
+            "'wheeled aboard at car deck door, secured to railing')."
+        ),
+    )
+    advance_booking_required: bool = Field(
+        default=False,
+        description=(
+            "True if the operator generally requires booking ahead. Most "
+            "North Sea / Channel routes accept walk-on cyclists; some peak-"
+            "summer crossings require it."
+        ),
+    )
 
 
 class GetFerryScheduleInput(BaseModel):
@@ -502,8 +606,20 @@ class GetFerryScheduleOutput(BaseModel):
 
     from_port: str
     to_port: str
-    operator: str
-    departures: list[FerryDeparture]
+    operator: str = Field(
+        description=(
+            "Primary operator on this route (e.g. 'DFDS Seaways', "
+            "'Scandlines', 'P&O Ferries'). Some routes have multiple operators "
+            "but we surface the dominant one."
+        ),
+    )
+    departures: list[FerryDeparture] = Field(
+        description=(
+            "Ordered list of typical daily sailings. Surface 2-3 in the agent's "
+            "response so the cyclist sees real timing options, not the entire "
+            "schedule dump."
+        ),
+    )
     notes: str = Field(
         description=(
             "Practical notes for cyclists — e.g. 'arrive 30min early', 'book online "

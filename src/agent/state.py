@@ -58,6 +58,15 @@ class ConversationState(BaseModel):
     total_input_tokens: int = 0
     total_output_tokens: int = 0
     total_turns: int = Field(default=0, description="Number of full user-message → final-answer cycles")
+    version: int = Field(
+        default=0,
+        description=(
+            "Optimistic-locking version. Incremented by every successful "
+            "SessionStore.put(). Callers (the agent loop, /chat endpoint) "
+            "should not mutate this directly — the store owns it. A "
+            "concurrent writer with a stale version raises SessionConflict."
+        ),
+    )
 
     def touch(self) -> None:
         self.updated_at = datetime.now(timezone.utc)

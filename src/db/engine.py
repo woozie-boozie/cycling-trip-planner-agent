@@ -10,11 +10,14 @@ Connection URL conventions:
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from dotenv import load_dotenv
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -23,6 +26,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
+
+log = logging.getLogger(__name__)
 
 # Load .env on first import so DATABASE_URL is available everywhere — the
 # seed script, the FastAPI app, the smoke test, etc. pydantic-settings
@@ -116,11 +121,25 @@ async def get_async_session() -> AsyncIterator[AsyncSession]:
 
 
 async def init_db() -> None:
-    """Create all tables. Idempotent — safe to call on every startup.
+    """Create all tables, then apply idempotent column-level migrations.
 
-    For SQLite tests this is the only way to materialize the schema.
-    For Postgres it's how we bootstrap a fresh Neon project (no Alembic
-    yet — case study scope).
+    Two-phase startup:
+
+      1. ``SQLModel.metadata.create_all`` creates any tables that don't yet
+         exist. It does NOT alter existing tables — so on an existing
+         Postgres deploy, a column added to an SQLModel won't be added to
+         the live DB by this call alone.
+
+      2. ``_apply_idempotent_migrations`` runs column-level ``ALTER TABLE
+         … ADD COLUMN IF NOT EXISTS`` statements for fields that landed in
+         later phases (e.g. ``sessions.version`` from Phase 1.13's
+         optimistic-locking work). Each migration is fully idempotent —
+         safe to run on a fresh DB, an upgraded DB, and concurrent
+         instances racing to apply them.
+
+    For SQLite tests this is the only way to materialize the schema. For
+    Postgres it's how we bootstrap a fresh Neon project AND how we patch
+    an existing one on deploy. (No Alembic — case-study scope.)
     """
     # Importing models registers their metadata with SQLModel.
     from src.db import models  # noqa: F401
@@ -128,3 +147,47 @@ async def init_db() -> None:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(SQLModel.metadata.create_all)
+
+    await _apply_idempotent_migrations(engine)
+
+
+async def _column_exists(conn: Any, table: str, column: str) -> bool:
+    """Introspect schema for ``column`` on ``table``. Works on both SQLite
+    and PostgreSQL — used by the idempotent migration runner so we can
+    issue plain ``ADD COLUMN`` (no ``IF NOT EXISTS``, which SQLite <3.35
+    rejects as a syntax error)."""
+    dialect_name = conn.dialect.name
+    if dialect_name == "sqlite":
+        result = await conn.execute(text(f"PRAGMA table_info({table})"))
+        return any(row[1] == column for row in result.fetchall())
+    # PostgreSQL (and most other server engines) expose information_schema.
+    result = await conn.execute(
+        text(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_name = :t AND column_name = :c LIMIT 1"
+        ),
+        {"t": table, "c": column},
+    )
+    return result.scalar() is not None
+
+
+async def _apply_idempotent_migrations(engine: AsyncEngine) -> None:
+    """Add columns that landed after the initial schema.
+
+    We introspect each column's existence (via ``_column_exists``) and
+    only issue ``ALTER TABLE … ADD COLUMN`` when missing — no reliance on
+    ``IF NOT EXISTS``, which SQLite versions older than 3.35 don't support.
+
+    Migrations registered here:
+      - ``sessions.version`` — Phase 1.13 optimistic-locking column.
+        NOT NULL DEFAULT 0 so existing rows from pre-locking deploys
+        appear at version 0 and the next put() rolls them forward.
+    """
+    async with engine.begin() as conn:
+        if not await _column_exists(conn, "sessions", "version"):
+            await conn.execute(
+                text(
+                    "ALTER TABLE sessions ADD COLUMN "
+                    "version INTEGER NOT NULL DEFAULT 0"
+                )
+            )

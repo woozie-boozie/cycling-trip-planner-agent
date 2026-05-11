@@ -46,10 +46,11 @@ import json
 import time
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, cast
 
 import structlog
 from anthropic import AsyncAnthropic
+from anthropic.types import MessageParam, TextBlockParam, ToolParam
 
 from src.agent.caching import (
     cached_messages,
@@ -167,12 +168,14 @@ async def run_turn_stream(
         # Re-mark the message history's last block on every iteration so
         # the cache breakpoint moves forward as the conversation grows.
         # state.messages is NOT mutated — cached_messages returns a copy.
+        # See orchestrator.py for the cast() rationale — same boundary, same
+        # shape; the cast is purely a type-system narrowing.
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=cached_system_blocks,
-            tools=cached_tool_defs,
-            messages=cached_messages(state.messages),
+            system=cast(list[TextBlockParam], cached_system_blocks),
+            tools=cast(list[ToolParam], cached_tool_defs),
+            messages=cast(list[MessageParam], cached_messages(state.messages)),
         ) as stream:
             async for event in stream:
                 event_type = getattr(event, "type", None)

@@ -55,3 +55,7 @@ out/
 .dart_tool/
 .flutter-plugins-dependencies
 build/
+
+# Affinity Labs assignment artefacts (kept local, not for the public repo)
+AL/
+

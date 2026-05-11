@@ -6,6 +6,7 @@ shapes:
   - ProfileStore — cyclist profile per user (Phase 2D)
 """
 
+from src.sessions.postgres_store import PostgresSessionStore
 from src.sessions.profile_store import (
     DietaryRestriction,
     ExperienceLevel,
@@ -17,13 +18,13 @@ from src.sessions.profile_store import (
     UserProfile,
     UserProfileCreate,
 )
-from src.sessions.postgres_store import PostgresSessionStore
-from src.sessions.store import InMemorySessionStore, SessionStore
+from src.sessions.store import InMemorySessionStore, SessionConflict, SessionStore
 
 __all__ = [
     # Sessions
     "InMemorySessionStore",
     "PostgresSessionStore",
+    "SessionConflict",
     "SessionStore",
     # Profiles
     "DietaryRestriction",

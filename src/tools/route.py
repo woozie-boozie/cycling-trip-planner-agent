@@ -199,11 +199,18 @@ def _normalize(city: str) -> str:
 @register_tool(
     name="get_route",
     description=(
-        "Get a cycling route between two cities. Returns total distance, an ordered "
-        "list of waypoints (cities/towns along the way), the cumulative distance to "
-        "each waypoint from the start, whether each leg requires a ferry, and an "
-        "estimated number of days based on the cyclist's daily target. Use this FIRST "
-        "to understand the overall trip shape before calling per-segment tools."
+        "Get cycling route(s) between two cities. Returns a `variants` list — one "
+        "entry per signposted way to cycle the corridor (e.g. Avenue Verte has "
+        "V16a Beauvais / Oise-Chantilly / Gisors). Each variant carries: "
+        "`waypoints` (ordered city list with per-leg + cumulative km, ferry flags), "
+        "`total_distance_km`, `estimated_days` at the user's daily_km_target, a "
+        "pre-computed `suggested_day_plan` (day-by-day split — do NOT recompute "
+        "per-day distances yourself, that's where LLM math errors creep in), and "
+        "`distinguishing_features` + `trade_offs` + `best_for` for surfacing the "
+        "choice. When `len(variants) > 1`, present them side-by-side and let the "
+        "user pick before planning per-day. Call ONCE per turn for a corridor — "
+        "no need to re-call if the user changes daily_km mid-conversation; the "
+        "variants list is identical."
     ),
     input_model=GetRouteInput,
     output_model=GetRouteOutput,
