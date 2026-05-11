@@ -18,6 +18,7 @@ files. (See docs/decisions.md ADR-001.)
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -212,36 +213,47 @@ async def run_turn(
                 tool_calls=tool_call_summary,
             )
 
-        # Otherwise, dispatch every tool_use block from this assistant response
-        # and bundle the results into a single user message (per Anthropic's
-        # tool_use protocol).
+        # Dispatch every tool_use block from this assistant response IN
+        # PARALLEL (asyncio.gather), then bundle the results into a single
+        # user message in Claude's original order per the Anthropic tool_use
+        # protocol. Each tool's inputs are independent — get_elevation_profile
+        # for segment A doesn't read get_weather for segment B — so the
+        # serial loop here was leaving 30–80% of latency on the table on
+        # fan-out heavy turns. Real LDN→Edinburgh request before this change:
+        # 5 BRouter timeouts × 30s = 150s serial. After: max(timeouts) ≈ 10s.
+        # Tracing still records each tool's individual latency_ms.
+        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
         tool_result_blocks: list[dict[str, Any]] = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            t0 = time.perf_counter()
-            result = await dispatch(block.name, dict(block.input))
-            latency_ms = int((time.perf_counter() - t0) * 1000)
+        if tool_use_blocks:
+            async def _dispatch_one(b: Any) -> tuple[Any, int]:
+                t0 = time.perf_counter()
+                r = await dispatch(b.name, dict(b.input))
+                return r, int((time.perf_counter() - t0) * 1000)
 
-            tool_result_blocks.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps(result.content),
-                    "is_error": result.is_error,
-                }
+            results = await asyncio.gather(
+                *(_dispatch_one(b) for b in tool_use_blocks),
             )
-            _trace(
-                state,
-                iteration,
-                "tool_result",
-                {
-                    "tool_use_id": block.id,
-                    "name": block.name,
-                    "is_error": result.is_error,
-                    "latency_ms": latency_ms,
-                },
-            )
+
+            for block, (result, latency_ms) in zip(tool_use_blocks, results):
+                tool_result_blocks.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result.content),
+                        "is_error": result.is_error,
+                    }
+                )
+                _trace(
+                    state,
+                    iteration,
+                    "tool_result",
+                    {
+                        "tool_use_id": block.id,
+                        "name": block.name,
+                        "is_error": result.is_error,
+                        "latency_ms": latency_ms,
+                    },
+                )
 
         state.messages.append({"role": "user", "content": tool_result_blocks})
 

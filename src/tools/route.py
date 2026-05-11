@@ -61,18 +61,34 @@ def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
-async def _geocode_location(name: str) -> tuple[float, float] | None:
+async def _geocode_location(
+    name: str,
+    prefer_near: tuple[float, float] | None = None,
+) -> tuple[float, float] | None:
     """Resolve a place name to (lat, lon) via Open-Meteo's free geocoding API.
+
+    `prefer_near` is an optional (lat, lon) bias. When set, the function
+    fetches up to 10 candidates and returns the one closest to the bias
+    point by haversine — solves the "Dunbar matches Dunbar, West Virginia
+    instead of Dunbar, Scotland" class of bug. Pass the prior waypoint's
+    coords here when geocoding a route's end city; for an isolated lookup
+    leave it None and the top result wins (preserves the pre-2026-05-11
+    behaviour for catalog code paths that already work).
 
     Returns None on network error, no matches, or any other failure — the
     caller falls back to the "truly unknown" stub. We intentionally don't
     raise so a single bad input doesn't break the agent loop.
     """
+    # Fetch more candidates when we have a bias signal — Open-Meteo's count=1
+    # always returns the top match by population/relevance, which is wrong
+    # for ambiguous names whose top global match is across an ocean from
+    # what the trip actually means.
+    count = 10 if prefer_near is not None else 1
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(
                 _OPEN_METEO_GEOCODE_URL,
-                params={"name": name, "count": 1, "language": "en", "format": "json"},
+                params={"name": name, "count": count, "language": "en", "format": "json"},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -85,12 +101,50 @@ async def _geocode_location(name: str) -> tuple[float, float] | None:
         log.info("geocode.no_match", name=name)
         return None
 
-    top = results[0]
-    lat = top.get("latitude")
-    lon = top.get("longitude")
-    if lat is None or lon is None:
+    # No bias → keep the historical top-result-wins behaviour. Used by the
+    # first endpoint geocode in any pair (we have nothing to bias toward yet).
+    if prefer_near is None:
+        top = results[0]
+        lat = top.get("latitude")
+        lon = top.get("longitude")
+        if lat is None or lon is None:
+            return None
+        return (float(lat), float(lon))
+
+    # Bias provided → pick the candidate closest to the reference point.
+    best: tuple[float, tuple[float, float]] | None = None  # (distance_km, coords)
+    for r in results:
+        lat = r.get("latitude")
+        lon = r.get("longitude")
+        if lat is None or lon is None:
+            continue
+        coords = (float(lat), float(lon))
+        d = _haversine_km(prefer_near, coords)
+        if best is None or d < best[0]:
+            best = (d, coords)
+
+    if best is None:
         return None
-    return (float(lat), float(lon))
+
+    # Sanity log — when the bias dramatically reshuffled the choice (top
+    # result was thousands of km from the bias), surface it so we can spot
+    # if Open-Meteo's data shifts. Distance > 5,000 km from the bias is
+    # almost certainly a wrong-continent miss.
+    top_coords = (
+        float(results[0]["latitude"]),
+        float(results[0]["longitude"]),
+    ) if results[0].get("latitude") is not None else None
+    if top_coords is not None and top_coords != best[1]:
+        top_dist = _haversine_km(prefer_near, top_coords)
+        if top_dist > 5000:
+            log.info(
+                "geocode.bias_rejected_top",
+                name=name,
+                top_dist_km=round(top_dist, 0),
+                picked_dist_km=round(best[0], 0),
+            )
+
+    return best[1]
 
 # (name, country, cumulative_km_from_start, ferry_required)
 _WAYPOINTS_AMS_TO_CPH: list[tuple[str, str, float, bool]] = [
@@ -186,8 +240,15 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
             # well-known legs" was a punt. The agent has everything it needs
             # to plan ANY corridor — see src/agent/prompts.py "Generic-mode
             # corridors" section.
+            # Geocode the start with no bias (we have nothing to bias
+            # toward yet), then bias the end toward the start's coords.
+            # This is the headline fix for the Berwick → Dunbar-WV class
+            # of error: "Dunbar" alone geocodes to West Virginia by default,
+            # but with a UK bias the Scottish Dunbar wins comfortably.
             start_coords = await _geocode_location(input.start)
-            end_coords = await _geocode_location(input.end)
+            end_coords = await _geocode_location(
+                input.end, prefer_near=start_coords,
+            )
 
             if start_coords is None or end_coords is None:
                 # Couldn't geocode at all — fall back to the truly-unknown stub
