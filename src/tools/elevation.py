@@ -119,19 +119,20 @@ async def _fetch_real_elevation(
     """
     # Local imports — these modules pull database + httpx clients at import
     # time, so deferring keeps `from src.tools.elevation import …` light.
-    from src.tools.route import _geocode_location, _haversine_km
+    from src.tools.route import _geocode_pair, _haversine_km
     from src.tools.route_real import Anchor, _brouter_segment
 
-    # Geocode start with no bias, then bias end toward start's coords —
-    # disambiguates same-name places across continents (Boston Lincs vs MA,
-    # Newcastle Tyne vs upon Lyme, Dunbar Scotland vs WV). The route.py
-    # generic-mode branch uses the same pattern; we keep them consistent
-    # because both tools see the same ambiguity-prone inputs.
-    start_coords = await _geocode_location(start)
-    end_coords = await _geocode_location(end, prefer_near=start_coords)
-    if start_coords is None or end_coords is None:
+    # Joint geocoding — resolves both endpoints simultaneously, picking the
+    # candidate pair with the smallest haversine distance. Handles the
+    # "Cambridge → Newmarket" class of error where each endpoint has a
+    # more-populous US namesake and the asymmetric "geocode start, bias end"
+    # pattern silently picks the wrong continent. See route._geocode_pair
+    # docstring for the failure-mode trace.
+    coords = await _geocode_pair(start, end)
+    if coords is None:
         log.info("elevation.geocode_miss", start=start, end=end)
         return None
+    start_coords, end_coords = coords
 
     start_anchor = Anchor(
         name=start, country="?", lat=start_coords[0], lon=start_coords[1],
@@ -146,12 +147,55 @@ async def _fetch_real_elevation(
     # (15s) but tighter so multi-segment fan-outs aren't dominated by dead
     # waits. A 30s value here cost ~150s of compounded latency on a real
     # 5-timeout LDN→Edinburgh request before this was tightened.
+    brouter_failed = False
+    brouter_exc: Exception | None = None
+    distance_km = 0.0
+    ascend_m = 0.0
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             distance_km, ascend_m, _time_s = await _brouter_segment(
                 client, start_anchor, end_anchor,
             )
     except (httpx.HTTPError, ValueError, KeyError) as e:
+        brouter_failed = True
+        brouter_exc = e
+
+    # Sanity check — even when BRouter "succeeds" it occasionally returns
+    # nonsense distances (5–13× the real value) when its internal routing
+    # hits a problem. Cycling routes typically run 1.1–1.5× the great-
+    # circle distance; > 2.5× is almost certainly a routing error. We also
+    # cap at an absolute 300 km per segment — even ultra-endurance riders
+    # rarely cover that in a single day, so a >300 km segment-distance
+    # signals a geocoding or routing collapse.
+    #
+    # Real example from production (London → Norfolk Broads chat,
+    # 2026-05-11): BRouter returned 542 km for a Newmarket → Thetford
+    # segment whose real distance is ~40 km, after geocoding resolved
+    # one endpoint to the wrong continent. Without this check the agent
+    # had to dance around the nonsense value mid-conversation.
+    if not brouter_failed:
+        gc_km_sanity = _haversine_km(start_coords, end_coords)
+        # Guard against degenerate same-point pairs (gc_km == 0) where
+        # any ratio test would explode; if both coords are identical,
+        # zero distance is fine.
+        ratio_blown = gc_km_sanity > 0.5 and distance_km > gc_km_sanity * 2.5
+        if ratio_blown or distance_km > 300.0:
+            log.warning(
+                "elevation.brouter_sanity_check_failed",
+                start=start,
+                end=end,
+                brouter_km=round(distance_km, 1),
+                haversine_km=round(gc_km_sanity, 1),
+                reason="ratio" if ratio_blown else "absolute_cap",
+            )
+            brouter_failed = True
+            brouter_exc = ValueError(
+                f"brouter returned {distance_km:.1f} km vs haversine "
+                f"{gc_km_sanity:.1f} km — routing engine produced a "
+                f"value outside the sanity envelope"
+            )
+
+    if brouter_failed:
         # BRouter unavailable BUT we already have valid geocodes. Compute a
         # great-circle × 1.25 distance estimate (same multiplier the get_route
         # generic-mode fallback uses) instead of returning None and dropping to
@@ -165,8 +209,10 @@ async def _fetch_real_elevation(
         # York real is ~130 km, the 80 km mock was sometimes 3× off in either
         # direction. Worse, the under-stated 80 km for Lincoln → York hid a
         # day that would otherwise trip the joint blocker.
-        log.warning("elevation.brouter_failed_haversine_fallback",
-                    error=str(e), start=start, end=end)
+        log.warning(
+            "elevation.brouter_failed_haversine_fallback",
+            error=str(brouter_exc), start=start, end=end,
+        )
         gc_km = _haversine_km(start_coords, end_coords)
         realistic_km = round(gc_km * 1.25, 1)
         return GetElevationProfileOutput(

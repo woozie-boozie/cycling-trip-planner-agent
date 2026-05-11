@@ -146,6 +146,112 @@ async def _geocode_location(
 
     return best[1]
 
+
+async def _geocode_candidates(
+    name: str, count: int = 10
+) -> list[tuple[float, float]]:
+    """Fetch up to ``count`` geocoded candidate coordinates for ``name``.
+
+    Lower-level than ``_geocode_location`` / ``_geocode_pair``: returns the
+    full candidate list (ranked by Open-Meteo's population/relevance score)
+    rather than picking one. Used by :func:`_geocode_pair` which needs to
+    consider all combinations across both endpoints jointly.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                _OPEN_METEO_GEOCODE_URL,
+                params={
+                    "name": name,
+                    "count": count,
+                    "language": "en",
+                    "format": "json",
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except (httpx.HTTPError, ValueError) as e:
+        log.warning("geocode.http_error", error=str(e), name=name)
+        return []
+
+    out: list[tuple[float, float]] = []
+    for r in data.get("results") or []:
+        lat = r.get("latitude")
+        lon = r.get("longitude")
+        if lat is not None and lon is not None:
+            out.append((float(lat), float(lon)))
+    return out
+
+
+async def _geocode_pair(
+    start: str, end: str
+) -> tuple[tuple[float, float], tuple[float, float]] | None:
+    """Resolve both endpoints jointly, picking the candidate pair that
+    minimises the haversine distance between them.
+
+    Why joint disambiguation instead of "geocode start, then bias end":
+    the asymmetric pattern leaves the *first* endpoint resolving by global
+    population, which silently picks Cambridge MA over Cambridge UK (US
+    population dominates). Subsequent bias on the second endpoint then
+    locks in the wrong continent. Joint disambiguation considers all
+    candidate pairs (10×10 max) and picks the one whose endpoints are
+    closest together — the constraint that "these two places are part
+    of the same trip" implies "they're geographically coherent."
+
+    Real failure mode this fixes (London → Norfolk Broads chat,
+    2026-05-11): ``get_elevation_profile("Cambridge", "Newmarket")``
+    resolved to Cambridge MA + Newmarket NH (USA), and BRouter dutifully
+    returned the trans-state distance (~120 km) for a route that's
+    actually ~25 km in the UK. The downstream sanity check in
+    ``elevation.py`` catches the symptom; this is the root-cause fix.
+
+    Returns ``None`` only when either endpoint has zero candidates
+    (typo, unknown place). Network failures bubble up to ``None`` from
+    the underlying candidate fetch.
+    """
+    start_candidates = await _geocode_candidates(start, count=10)
+    end_candidates = await _geocode_candidates(end, count=10)
+    if not start_candidates or not end_candidates:
+        log.info(
+            "geocode.pair_no_match",
+            start=start,
+            end=end,
+            start_count=len(start_candidates),
+            end_count=len(end_candidates),
+        )
+        return None
+
+    best_pair: tuple[tuple[float, float], tuple[float, float]] = (
+        start_candidates[0],
+        end_candidates[0],
+    )
+    best_distance = _haversine_km(*best_pair)
+    for s in start_candidates:
+        for e in end_candidates:
+            d = _haversine_km(s, e)
+            if d < best_distance:
+                best_distance = d
+                best_pair = (s, e)
+
+    # Sanity log — when joint disambiguation rejected the top-by-population
+    # pair in favor of a substantially-closer pair, surface it. A 2× gap
+    # between the top-pair distance and the picked-pair distance means
+    # joint disambiguation actually mattered for this query (vs being a
+    # noop that happened to agree with population ranking).
+    top_pair_distance = _haversine_km(start_candidates[0], end_candidates[0])
+    if best_pair != (start_candidates[0], end_candidates[0]) and (
+        top_pair_distance > best_distance * 2
+    ):
+        log.info(
+            "geocode.pair_disambiguated",
+            start=start,
+            end=end,
+            top_pair_distance_km=round(top_pair_distance, 0),
+            picked_pair_distance_km=round(best_distance, 0),
+        )
+
+    return best_pair
+
 # (name, country, cumulative_km_from_start, ferry_required)
 _WAYPOINTS_AMS_TO_CPH: list[tuple[str, str, float, bool]] = [
     ("Amsterdam", "Netherlands", 0.0, False),
@@ -247,24 +353,20 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
             # well-known legs" was a punt. The agent has everything it needs
             # to plan ANY corridor — see src/agent/prompts.py "Generic-mode
             # corridors" section.
-            # Geocode the start with no bias (we have nothing to bias
-            # toward yet), then bias the end toward the start's coords.
-            # This is the headline fix for the Berwick → Dunbar-WV class
-            # of error: "Dunbar" alone geocodes to West Virginia by default,
-            # but with a UK bias the Scottish Dunbar wins comfortably.
-            start_coords = await _geocode_location(input.start)
-            end_coords = await _geocode_location(
-                input.end, prefer_near=start_coords,
-            )
+            # Joint disambiguation — geocode BOTH endpoints with their full
+            # candidate list, then pick the pair minimising haversine
+            # distance. This handles the "Cambridge → Newmarket" class of
+            # error where each endpoint has a more-populous US namesake
+            # (Cambridge MA + Newmarket NH); the joint constraint that
+            # "these are the same trip" implies "they're in the same
+            # region" picks the UK pair correctly. See _geocode_pair
+            # docstring for the full failure mode this addresses.
+            coords = await _geocode_pair(input.start, input.end)
 
-            if start_coords is None or end_coords is None:
+            if coords is None:
                 # Couldn't geocode at all — fall back to the truly-unknown stub
                 # so the agent can ask the user to rephrase the place name.
-                missing = []
-                if start_coords is None:
-                    missing.append(input.start)
-                if end_coords is None:
-                    missing.append(input.end)
+                missing = [input.start, input.end]
                 stub_waypoints = [
                     Waypoint(
                         name=input.start, country="Unknown",
@@ -305,6 +407,7 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
             # GENERIC MODE — real geocoded endpoints + great-circle estimate.
             # The agent reads the GENERIC MODE prefix on `notes` and switches
             # into "propose waypoints yourself + fan out per-segment tools" flow.
+            start_coords, end_coords = coords
             great_circle_km = _haversine_km(start_coords, end_coords)
             realistic_km = round(great_circle_km * _ROAD_DISTANCE_MULTIPLIER, 1)
             estimated_days = max(1, math.ceil(realistic_km / input.daily_km_target))
