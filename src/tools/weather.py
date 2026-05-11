@@ -44,6 +44,12 @@ _OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 # every call: lookups are O(1), no extra HTTP round-trip, no second API
 # dependency. Unknown cities fall through to the DB mock — which itself has
 # a "mock data" note that the agent surfaces honestly to the user.
+#
+# As of 2026-05-12, `_get_city_coords()` ALSO checks the corridor YAML
+# registry first, so new corridors added via `data/corridors/*.yaml`
+# automatically populate the weather lookup — no manual dict edit needed.
+# This dict is the explicit fallback for cities not in any corridor (e.g.
+# Crystal Palace as a through-town historically; future non-corridor seeds).
 _CITY_COORDS: dict[str, tuple[float, float]] = {
     # Amsterdam → Copenhagen corridor
     "amsterdam": (52.3676, 4.9041),
@@ -70,6 +76,40 @@ _CITY_COORDS: dict[str, tuple[float, float]] = {
     "crystal palace": (51.4189, -0.0735),
     "brighton": (50.8225, -0.1372),
 }
+
+def _get_city_coords(location_lower: str) -> tuple[float, float] | None:
+    """Resolve a lowercased city name to (lat, lon) for Open-Meteo lookups.
+
+    Lookup order:
+      1. The corridor YAML registry — any waypoint defined in
+         ``data/corridors/*.yaml`` is automatically available. Adding a
+         new corridor auto-populates its cities for weather without
+         touching this file.
+      2. The manual ``_CITY_COORDS`` fallback for cities that don't
+         appear in any corridor.
+
+    Returns ``None`` if neither source knows the city — caller falls back
+    to the DB mock or the live geocoder as before.
+    """
+    # Registry lookup is cheap (in-memory dict from lru_cached load).
+    # Walk every variant's anchors looking for a name match. ~30 corridors
+    # × ~10 anchors × 1-3 variants ≈ 1,000 string comparisons worst case,
+    # well below noise on a single weather call.
+    from src.tools.corridor_registry import load_all_corridors
+
+    catalog = load_all_corridors()
+    seen: set[tuple[str, str]] = set()
+    for key, variants in catalog.items():
+        if key in seen:
+            continue
+        seen.add(key)
+        for variant in variants:
+            for anchor in variant.anchors:
+                if anchor.name.lower() == location_lower:
+                    return (anchor.lat, anchor.lon)
+
+    return _CITY_COORDS.get(location_lower)
+
 
 _MONTH_TO_NUMBER: dict[Month, int] = {
     "January": 1, "February": 2, "March": 3, "April": 4,
@@ -98,7 +138,7 @@ async def _fetch_open_meteo_norm(
     Strategy: pull 5 years of daily data from the ECMWF ERA5 archive,
     filter client-side to the target month, aggregate to a monthly norm.
     """
-    coords = _CITY_COORDS.get(location_lower)
+    coords = _get_city_coords(location_lower)
     if coords is None:
         log.info("open_meteo.skip_unknown_city", location=location)
         return None
