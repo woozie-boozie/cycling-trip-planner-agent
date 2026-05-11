@@ -11,7 +11,7 @@ A request flows top-to-bottom through four layers. Each layer has one job. None 
                                  ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Layer 4 · API (src/api/)                                            │
-│    routes.py        — /chat, /sessions, /trace, /healthz             │
+│    routes.py        — /chat, /sessions, /trace, /health              │
 │    dependencies.py  — FastAPI Depends (store, anthropic client)      │
 │    main.py          — app factory + structlog + CORS                 │
 │  Validates request via Pydantic. Hands ConversationState to agent.   │

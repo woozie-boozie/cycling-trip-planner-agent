@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             # Don't crash the boot — log and let a bad schema fail loudly
             # on the first real request. Cold-starting fast matters more
-            # on Cloud Run than blocking /healthz on the migration.
+            # on Cloud Run than blocking /health on the migration.
             log.warning("db.init.failed", error=str(e))
     yield
 

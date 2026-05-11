@@ -120,8 +120,8 @@ def set_fake_client(responses: list[FakeResponse]) -> MagicMock:
 # ---------------------------------------------------------------------------
 
 
-def test_healthz(client: TestClient) -> None:
-    resp = client.get("/healthz")
+def test_health(client: TestClient) -> None:
+    resp = client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"

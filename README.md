@@ -54,7 +54,7 @@ make seed                 # populates DB with route/accommodation/weather/elevat
 make dev                  # runs FastAPI on http://localhost:8000
 
 # in another terminal
-curl http://localhost:8000/healthz
+curl http://localhost:8000/health
 # → {"status":"ok",...}
 
 # Interactive Swagger UI:
@@ -221,7 +221,7 @@ src/
     seed.py               idempotent seed script
   api/                    FastAPI routes
     main.py               app factory + structlog + lifespan handler (init_db on startup)
-    routes.py             /chat, /chat/stream, /profile, /sessions, /trace, /healthz
+    routes.py             /chat, /chat/stream, /profile, /sessions, /trace, /health
     dependencies.py       FastAPI Depends — env-driven store selection
     schemas.py            request/response models
 web/                      Next.js 16 frontend (Phase 2 + 2D + 2E)

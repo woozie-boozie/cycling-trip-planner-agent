@@ -1,8 +1,10 @@
 """HTTP routes for the cycling trip planner agent.
 
 Endpoints:
-  GET  /healthz                  — liveness probe
-  GET  /                         — root, same shape as healthz
+  GET  /health                   — liveness probe (was /healthz pre-2026-05-11;
+                                   Google Cloud Run reserves /healthz at the GFE
+                                   edge, so the path renamed for prod parity)
+  GET  /                         — root, same shape as /health
   POST /chat                     — single conversational turn (the brief's required endpoint)
   POST /profile                  — upsert a cyclist profile (Phase 2D)
   GET  /profile/{profile_id}     — fetch a cyclist profile (Phase 2D)
@@ -95,9 +97,17 @@ class HealthResponse(BaseModel):
     version: str
 
 
-@router.get("/healthz", response_model=HealthResponse, tags=["meta"])
-async def healthz() -> HealthResponse:
-    """Liveness probe for Cloud Run + local dev."""
+@router.get("/health", response_model=HealthResponse, tags=["meta"])
+async def health() -> HealthResponse:
+    """Liveness probe for Cloud Run + local dev.
+
+    Path is ``/health`` (not ``/healthz``) because Google's Cloud Run
+    Frontend Service reserves ``/healthz`` at the edge for its own
+    infrastructure probing — requests to ``/healthz`` never reach the
+    container. Verified empirically against ``cycling-trip-planner-backend``
+    in europe-west1 on 2026-05-11: ``/randomx`` and ``/`` show up in the
+    container access logs but ``/healthz`` doesn't.
+    """
     return HealthResponse(status="ok", service="cycling-trip-planner-agent", version="0.1.0")
 
 
