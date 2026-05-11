@@ -10,6 +10,7 @@ import { RouteGallery } from "@/components/route-gallery";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
+import type { RouteVariantSummary } from "@/lib/route-variants";
 import {
   clearProfileId,
   clearWizardDismissed,
@@ -405,6 +406,20 @@ export default function Home() {
     }
   }, [input, isPending, sessionId, attachedImage, refreshTrace, profileId]);
 
+  // Variant pick from the visual comparison card. Bottom-of-card "Plan this
+  // route →" CTA fires this with the user's chosen variant; we dispatch a
+  // curated chat prompt (using handleSubmit's textOverride path that the
+  // route gallery already uses) so the agent advances to day-by-day planning
+  // without the user typing.
+  const handlePickVariant = useCallback(
+    (variant: RouteVariantSummary) => {
+      handleSubmit(
+        `Let's go with the ${variant.title} route — please build the day-by-day plan.`,
+      );
+    },
+    [handleSubmit],
+  );
+
   const handleWizardComplete = useCallback(async (id: string) => {
     saveProfileId(id);
     setProfileId(id);
@@ -501,6 +516,7 @@ export default function Home() {
                   message={m}
                   viewMode={viewMode}
                   corridor={corridor}
+                  onPickVariant={handlePickVariant}
                 />
               ))}
               {isPending ? <LoadingIndicator trace={trace} /> : null}

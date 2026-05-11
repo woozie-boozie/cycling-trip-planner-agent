@@ -200,7 +200,7 @@ export function RouteComparisonCard({
             }}
             className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Plan {variants.find((v) => v.name === selectedName)?.title}
+            Plan this route
             <ArrowRight className="h-3.5 w-3.5" aria-hidden />
           </button>
         </div>

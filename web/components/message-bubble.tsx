@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { VisualResponse } from "@/components/visual-response";
 import type { Corridor } from "@/lib/corridors";
+import type { RouteVariantSummary } from "@/lib/route-variants";
 import type { UiMessage } from "@/lib/types";
 import type { ViewMode } from "@/lib/view-mode";
 
@@ -15,6 +16,13 @@ interface MessageBubbleProps {
   viewMode?: ViewMode;
   /** Conversation-scoped corridor used by visual mode for card rendering */
   corridor?: Corridor | null;
+  /**
+   * Fired when the user commits to a variant via the comparison card's
+   * "Plan this route →" CTA. Routed up to the page-level handler that
+   * dispatches a curated chat message ("Let's go with the X route…") so
+   * the agent can proceed to day-by-day planning without the user typing.
+   */
+  onPickVariant?: (variant: RouteVariantSummary) => void;
 }
 
 /**
@@ -31,7 +39,12 @@ function formatCached(n: number): string {
   return n.toLocaleString();
 }
 
-export function MessageBubble({ message, viewMode = "text", corridor = null }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  viewMode = "text",
+  corridor = null,
+  onPickVariant,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -81,7 +94,11 @@ export function MessageBubble({ message, viewMode = "text", corridor = null }: M
               ) : null}
             </>
           ) : viewMode === "visual" ? (
-            <VisualResponse content={message.content} corridor={corridor} />
+            <VisualResponse
+              content={message.content}
+              corridor={corridor}
+              onPickVariant={onPickVariant}
+            />
           ) : (
             // Cap markdown text at a comfortable reading measure within
             // the wide bubble. Visual responses ignore this and fill width.
