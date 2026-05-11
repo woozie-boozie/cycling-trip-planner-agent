@@ -36,14 +36,14 @@ import logging
 from datetime import datetime, timezone
 
 import structlog
-from sqlalchemy import delete, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy import delete, insert, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.agent.state import ConversationState
 from src.db import get_async_session
 from src.db.models import SessionRow
+from src.sessions.store import SessionConflict
 
 log = structlog.get_logger(__name__)
 logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
@@ -57,14 +57,36 @@ def _to_naive_utc(dt: datetime) -> datetime:
 
 
 def _row_to_state(row: SessionRow) -> ConversationState:
-    """Deserialise the JSON blob, then re-attach tz-aware UTC datetimes
-    in the parsed ConversationState (Pydantic re-parses datetimes on
-    `model_validate_json`)."""
-    return ConversationState.model_validate_json(row.state_json)
+    """Deserialise the JSON blob into ConversationState.
+
+    The row's ``version`` column is the authoritative version; the JSON blob
+    carries the same value (kept in sync by ``put``). We trust the JSON
+    here — Pydantic defaults ``version=0`` for pre-1.13 rows whose
+    serialised blob predates the field, then the next ``put`` brings it
+    into sync with ``row.version``.
+    """
+    state = ConversationState.model_validate_json(row.state_json)
+    # Postgres column is authoritative — overrides JSON for pre-1.13 rows
+    # whose blob was written without a version field.
+    state.version = row.version
+    return state
 
 
 class PostgresSessionStore:
-    """Postgres-backed session store. Same Protocol as InMemorySessionStore."""
+    """Postgres-backed session store with optimistic-locking semantics.
+
+    Concurrent writers to the same ``session_id`` are detected via a
+    conditional UPDATE keyed on ``version``. The loser sees rowcount=0 and
+    is raised as :class:`SessionConflict`; callers convert this to HTTP
+    409 so the client can refetch + retry.
+
+    Why not pessimistic ``SELECT … FOR UPDATE``: the read-modify-write
+    window spans an entire agent turn (often 10–30 s of Anthropic calls).
+    Holding a row lock that long blocks unrelated reads (e.g. the trace
+    panel) and risks deadlocks under fan-out. Optimistic locking pushes
+    the conflict to write time, which is microseconds — the right scope
+    for this access pattern.
+    """
 
     async def get(self, session_id: str) -> ConversationState | None:
         try:
@@ -81,44 +103,109 @@ class PostgresSessionStore:
             raise
 
     async def put(self, state: ConversationState) -> None:
-        """Upsert by session_id. INSERT … ON CONFLICT (session_id) DO UPDATE
-        keeps it atomic on both Postgres and SQLite (the test fixture)."""
+        """Persist ``state`` with optimistic-locking version check.
+
+        Two-statement pattern (SELECT current version → conditional
+        INSERT/UPDATE) for dialect-agnostic correctness:
+
+          1. SELECT the current version for this session_id.
+          2a. No row → INSERT. If a concurrent writer beat us to it,
+              the UNIQUE constraint raises IntegrityError → SessionConflict.
+          2b. Row exists AND version matches state.version → UPDATE with
+              a redundant ``WHERE version = :expected_version``. If
+              rowcount=0, another writer slipped in between our SELECT
+              and UPDATE → SessionConflict.
+          2c. Row exists BUT version drifted → SessionConflict immediately.
+
+        Why not a single ``INSERT ... ON CONFLICT DO UPDATE WHERE``:
+        the rowcount semantics of ON CONFLICT differ across Postgres
+        and SQLite (Postgres reports 0 when the WHERE filters the
+        UPDATE; SQLite reports 1). The two-statement pattern is more
+        verbose but rock-solid on both engines, and session writes are
+        one-per-chat-turn — not a hot path. The extra roundtrip is
+        negligible.
+
+        On success, ``state.version`` is incremented in-place so the
+        caller can chain another ``put`` without re-fetching.
+        """
         state.touch()
-        payload = state.model_dump_json()
+        expected_version = state.version
+        new_version = expected_version + 1
         now_naive = _to_naive_utc(datetime.now(timezone.utc))
+
+        # Serialise with the new version baked in so the JSON blob and
+        # the version column stay in sync from the very first write.
+        state.version = new_version
+        payload = state.model_dump_json()
+        state.version = expected_version
 
         try:
             async with get_async_session() as session:
-                bind = session.get_bind()
-                dialect = bind.dialect.name if bind is not None else "postgresql"
-                values = {
-                    "session_id": state.session_id,
-                    "state_json": payload,
-                    "created_at": now_naive,
-                    "updated_at": now_naive,
-                }
+                # Step 1 — read current on-disk version.
+                read = await session.execute(
+                    select(SessionRow.version).where(
+                        SessionRow.session_id == state.session_id
+                    )
+                )
+                on_disk_version = read.scalar_one_or_none()
 
-                if dialect == "sqlite":
-                    stmt = sqlite_insert(SessionRow).values(**values)
-                    stmt = stmt.on_conflict_do_update(
-                        index_elements=["session_id"],
-                        set_={
-                            "state_json": payload,
-                            "updated_at": now_naive,
-                        },
+                if on_disk_version is None:
+                    # Step 2a — no row exists, INSERT. A concurrent INSERT
+                    # races us to the unique constraint, surfaces as
+                    # IntegrityError, which we translate to SessionConflict.
+                    try:
+                        await session.execute(
+                            insert(SessionRow).values(
+                                session_id=state.session_id,
+                                state_json=payload,
+                                version=new_version,
+                                created_at=now_naive,
+                                updated_at=now_naive,
+                            )
+                        )
+                    except IntegrityError as e:
+                        raise SessionConflict(
+                            f"session {state.session_id!r} was created "
+                            f"concurrently between get() and put()"
+                        ) from e
+                elif on_disk_version != expected_version:
+                    # Step 2c — version drift detected at read time. No
+                    # need to even attempt the UPDATE.
+                    raise SessionConflict(
+                        f"session {state.session_id!r} was modified "
+                        f"concurrently (expected version {expected_version}, "
+                        f"on-disk version {on_disk_version})"
                     )
                 else:
-                    stmt = pg_insert(SessionRow).values(**values)
-                    stmt = stmt.on_conflict_do_update(
-                        index_elements=["session_id"],
-                        set_={
-                            "state_json": payload,
-                            "updated_at": now_naive,
-                        },
+                    # Step 2b — version matches, UPDATE with belt-and-braces
+                    # WHERE that catches a concurrent UPDATE between our
+                    # SELECT and our UPDATE.
+                    result = await session.execute(
+                        update(SessionRow)
+                        .where(
+                            SessionRow.session_id == state.session_id,
+                            SessionRow.version == expected_version,
+                        )
+                        .values(
+                            state_json=payload,
+                            version=new_version,
+                            updated_at=now_naive,
+                        )
                     )
+                    if (result.rowcount or 0) == 0:
+                        raise SessionConflict(
+                            f"session {state.session_id!r} was modified "
+                            f"concurrently (expected version "
+                            f"{expected_version}, UPDATE matched no rows)"
+                        )
 
-                await session.execute(stmt)
                 await session.commit()
+                state.version = new_version
+        except SessionConflict:
+            # Don't log at WARNING — conflict is an expected outcome of
+            # concurrent writes, not a system failure. Let the caller
+            # decide whether to surface it.
+            raise
         except Exception as e:
             log.warning(
                 "session.put.failed",

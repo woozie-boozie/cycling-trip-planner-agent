@@ -328,3 +328,208 @@ async def test_loop_safety_net_raises_after_max_iterations(monkeypatch: pytest.M
 
     with pytest.raises(AgentLoopExceeded):
         await run_turn(state, "loop", client=client)
+
+
+# ---------------------------------------------------------------------------
+# Prompt-following guardrail — Phase 1.13 (post-hoc critique_trip_plan check)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_guardrail_fires_when_plan_shipped_without_critique() -> None:
+    """If Claude ships a plan-shaped response with no critique_trip_plan
+    call this turn, the orchestrator MUST nudge it to comply rather than
+    let the contract violation slip through. The guardrail injects a
+    synthetic user message and loops once more."""
+    import src.tools  # noqa: F401
+
+    plan_text = (
+        "Here is your plan:\n\n"
+        "## Day 1 — Amsterdam → Hoorn\n"
+        "- Distance: 40 km · Elevation: +20 m\n\n"
+        "## Day 2 — Hoorn → Enkhuizen\n"
+        "- Distance: 28 km · Elevation: +15 m\n"
+    )
+    revised_text = (
+        "Got it — I'll run the critique first.\n\n"
+        "## Day 1 — Amsterdam → Hoorn\n"
+        "- Distance: 40 km · Elevation: +20 m\n\n"
+        "## Day 2 — Hoorn → Enkhuizen\n"
+        "- Distance: 28 km · Elevation: +15 m\n"
+    )
+
+    client = make_fake_client(
+        [
+            # Iter 1 — Claude ships a plan with NO critique call. Guardrail fires.
+            FakeResponse(
+                content=[FakeTextBlock(text=plan_text)],
+                stop_reason="end_turn",
+                usage=FakeUsage(input_tokens=100, output_tokens=80),
+            ),
+            # Iter 2 — Claude complies and calls critique_trip_plan.
+            FakeResponse(
+                content=[
+                    FakeToolUseBlock(
+                        id="tu_critique",
+                        name="critique_trip_plan",
+                        input={
+                            "days": [
+                                {"day_number": 1, "distance_km": 40.0},
+                                {"day_number": 2, "distance_km": 28.0},
+                            ],
+                            "daily_km_target": 40.0,
+                        },
+                    )
+                ],
+                stop_reason="tool_use",
+                usage=FakeUsage(input_tokens=50, output_tokens=40),
+            ),
+            # Iter 3 — final plan after critique.
+            FakeResponse(
+                content=[FakeTextBlock(text=revised_text)],
+                stop_reason="end_turn",
+                usage=FakeUsage(input_tokens=80, output_tokens=80),
+            ),
+        ]
+    )
+    state = ConversationState()
+    response = await run_turn(state, "Plan it", client=client)
+
+    # 3 iterations: original draft + nudge-driven critique call + final ship.
+    assert response.iterations == 3
+    # Final text is from the third response, after critique ran.
+    assert "## Day 1" in response.message
+    # The trace contains the guardrail marker so observability shows the nudge.
+    guardrail_events = [
+        e for e in state.trace
+        if e.type == "tool_use" and e.payload.get("name") == "_guardrail_critique_missing"
+    ]
+    assert len(guardrail_events) == 1, "guardrail should fire exactly once"
+    # And critique_trip_plan ran on iteration 2 (post-nudge).
+    critique_events = [
+        e for e in state.trace
+        if e.type == "tool_use" and e.payload.get("name") == "critique_trip_plan"
+    ]
+    assert len(critique_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_guardrail_silent_when_critique_already_called(seeded_db: None) -> None:
+    """If Claude calls critique_trip_plan before presenting the plan, the
+    guardrail must NOT fire — the contract was honoured."""
+    import src.tools  # noqa: F401
+
+    plan_text = (
+        "Plan complete:\n\n"
+        "## Day 1 — Amsterdam → Hoorn\n"
+        "- Distance: 40 km\n\n"
+        "## Day 2 — Hoorn → Enkhuizen\n"
+        "- Distance: 28 km\n"
+    )
+
+    client = make_fake_client(
+        [
+            # Iter 1 — Claude calls critique_trip_plan FIRST.
+            FakeResponse(
+                content=[
+                    FakeToolUseBlock(
+                        id="tu_critique",
+                        name="critique_trip_plan",
+                        input={
+                            "days": [
+                                {"day_number": 1, "distance_km": 40.0},
+                                {"day_number": 2, "distance_km": 28.0},
+                            ],
+                            "daily_km_target": 40.0,
+                        },
+                    )
+                ],
+                stop_reason="tool_use",
+                usage=FakeUsage(input_tokens=50, output_tokens=40),
+            ),
+            # Iter 2 — Claude ships the plan (guardrail must stay silent).
+            FakeResponse(
+                content=[FakeTextBlock(text=plan_text)],
+                stop_reason="end_turn",
+                usage=FakeUsage(input_tokens=80, output_tokens=80),
+            ),
+        ]
+    )
+    state = ConversationState()
+    response = await run_turn(state, "Plan it", client=client)
+
+    # 2 iterations only — no guardrail-induced extra loop.
+    assert response.iterations == 2
+    guardrail_events = [
+        e for e in state.trace
+        if e.type == "tool_use" and e.payload.get("name") == "_guardrail_critique_missing"
+    ]
+    assert guardrail_events == [], "guardrail should NOT fire when critique was called"
+
+
+@pytest.mark.asyncio
+async def test_guardrail_silent_for_non_plan_responses() -> None:
+    """A clarifying question or short answer is not a plan presentation —
+    no Day-N markers, so the guardrail must stay silent even with no critique."""
+    client = make_fake_client(
+        [
+            FakeResponse(
+                content=[
+                    FakeTextBlock(text="What month are you planning to travel?")
+                ],
+                stop_reason="end_turn",
+                usage=FakeUsage(input_tokens=10, output_tokens=15),
+            )
+        ]
+    )
+    state = ConversationState()
+    response = await run_turn(state, "Plan a trip", client=client)
+
+    assert response.iterations == 1
+    assert "month" in response.message.lower()
+    guardrail_events = [
+        e for e in state.trace
+        if e.type == "tool_use" and e.payload.get("name") == "_guardrail_critique_missing"
+    ]
+    assert guardrail_events == []
+
+
+@pytest.mark.asyncio
+async def test_guardrail_fires_at_most_once_per_turn() -> None:
+    """If Claude ignores the nudge and ships another plan-shaped response
+    without calling critique, we DO NOT loop forever — the guardrail's
+    one-shot flag prevents amplification. The plan ships with a warning
+    in the log; the outer eval suite catches systemic violations."""
+    plan_text = (
+        "Plan:\n\n## Day 1 — A → B\n- 50 km\n\n## Day 2 — B → C\n- 50 km\n"
+    )
+
+    client = make_fake_client(
+        [
+            # Iter 1 — plan with no critique. Guardrail fires.
+            FakeResponse(
+                content=[FakeTextBlock(text=plan_text)],
+                stop_reason="end_turn",
+                usage=FakeUsage(input_tokens=80, output_tokens=80),
+            ),
+            # Iter 2 — Claude ignores the nudge and ships the plan again.
+            # Guardrail must NOT fire again, so this is the final iteration.
+            FakeResponse(
+                content=[FakeTextBlock(text=plan_text + "\n(unchanged)")],
+                stop_reason="end_turn",
+                usage=FakeUsage(input_tokens=70, output_tokens=80),
+            ),
+        ]
+    )
+    state = ConversationState()
+    response = await run_turn(state, "Plan it", client=client)
+
+    assert response.iterations == 2
+    assert "unchanged" in response.message
+    # Only ONE guardrail event in the trace — second violation logged but
+    # not nudged.
+    guardrail_events = [
+        e for e in state.trace
+        if e.type == "tool_use" and e.payload.get("name") == "_guardrail_critique_missing"
+    ]
+    assert len(guardrail_events) == 1

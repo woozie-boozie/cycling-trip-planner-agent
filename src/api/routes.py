@@ -15,15 +15,16 @@ Endpoints:
 
 from __future__ import annotations
 
-from typing import Any, Literal
-
+import base64
+import binascii
 import json
+from typing import Any, Literal
 
 import structlog
 from anthropic import APIConnectionError, APITimeoutError, AsyncAnthropic, RateLimitError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.agent import (
     AgentLoopExceeded,
@@ -38,7 +39,13 @@ from src.api.dependencies import (
     get_profile_store,
     get_session_store,
 )
-from src.sessions import ProfileStore, SessionStore, UserProfile, UserProfileCreate
+from src.sessions import (
+    ProfileStore,
+    SessionConflict,
+    SessionStore,
+    UserProfile,
+    UserProfileCreate,
+)
 
 log = structlog.get_logger(__name__)
 
@@ -54,6 +61,13 @@ def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
     a specific recovery hint (e.g. "Start a new trip" for context-overflow
     cases) without parsing prose.
     """
+    if isinstance(exc, SessionConflict):
+        return (
+            "session_conflict",
+            "This session was modified by another request in flight. "
+            "Refetch the session and retry — your message was processed "
+            "but not persisted.",
+        )
     if isinstance(exc, RateLimitError):
         return (
             "rate_limit",
@@ -103,6 +117,10 @@ class ChatImage(BaseModel):
     Mirrors Anthropic's content-block image format. The agent receives the
     image as the first content block of the user message and reasons about
     it directly — no separate "extract intent" pass.
+
+    Validation is strict at this boundary: a malformed base64 payload
+    surfaces as HTTP 422 here, not as an opaque HTTP 500 from inside the
+    agent loop after we've already spent tokens on the round-trip.
     """
 
     media_type: Literal["image/jpeg", "image/png", "image/webp", "image/gif"] = Field(
@@ -113,6 +131,25 @@ class ChatImage(BaseModel):
         max_length=10_000_000,
         description="Base64-encoded image data. Cap at ~7MB encoded (~5MB decoded).",
     )
+
+    @field_validator("base64_data")
+    @classmethod
+    def _validate_base64(cls, v: str) -> str:
+        """Ensure ``base64_data`` is well-formed base64.
+
+        Pydantic's default ``str`` type accepts any string, so a junk
+        payload like "not actually base64!!!" would pass validation,
+        reach the Anthropic SDK, and fail with a confusing 500. Catching
+        it here turns the failure into a deterministic 422 with a clear
+        ``"invalid base64 payload"`` detail.
+        """
+        try:
+            # validate=True rejects non-base64 chars; b64decode handles
+            # both URL-safe and standard encoding internally.
+            base64.b64decode(v, validate=True)
+        except (binascii.Error, ValueError) as e:
+            raise ValueError(f"invalid base64 payload: {e}") from e
+        return v
 
 
 class ChatRequest(BaseModel):
@@ -258,13 +295,45 @@ async def chat(
     except AgentLoopExceeded as e:
         log.warning("chat.loop_exceeded", session_id=state.session_id, error=str(e))
         # Persist the partial state so /trace can still show what happened.
-        await store.put(state)
+        # Tolerate a SessionConflict here — if another writer beat us to
+        # the partial save, /trace will read their version (also partial)
+        # which is fine for observability.
+        try:
+            await store.put(state)
+        except SessionConflict:
+            log.info(
+                "chat.loop_exceeded.partial_save_conflict",
+                session_id=state.session_id,
+            )
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="agent did not converge — see /trace for what it tried",
         ) from e
 
-    await store.put(state)
+    try:
+        await store.put(state)
+    except SessionConflict as e:
+        # Another /chat call to the same session_id wrote between our get
+        # and put. The user's message was processed by Claude but isn't
+        # persisted. Return 409 so the client can refetch the session and
+        # retry — frontend's session-conflict UI surfaces this.
+        log.info(
+            "chat.session_conflict",
+            session_id=state.session_id,
+            error=str(e),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "kind": "session_conflict",
+                "message": (
+                    "This session was modified by another request in flight. "
+                    "Refetch the session and retry — your message was processed "
+                    "but not persisted."
+                ),
+                "session_id": state.session_id,
+            },
+        ) from e
 
     log.info(
         "chat.turn.done",
@@ -397,9 +466,27 @@ async def chat_stream(
                 f"data: {json.dumps({'type': 'error', 'kind': kind, 'message': message})}\n\n"
             )
         finally:
-            # Backstop persist for error paths and partial streams (when the
-            # agent loop hits an exception before yielding `done`).
-            await store.put(state)
+            # Backstop persist for error paths and partial streams (when
+            # the agent loop hits an exception before yielding `done`).
+            # If the `done` branch above already wrote, the second put
+            # here will SessionConflict — that's expected, not an error.
+            # We MUST swallow it: an uncaught exception in a StreamingResponse
+            # generator's finally crashes the ASGI handler AFTER the
+            # response body has been sent, which surfaces as a network
+            # error on the frontend even though the user got their reply.
+            try:
+                await store.put(state)
+            except SessionConflict:
+                # The done-path put already persisted. Nothing to do.
+                pass
+            except Exception as exc:  # noqa: BLE001
+                # Any other persistence error in the backstop path: log
+                # and move on. The user already got their stream.
+                log.warning(
+                    "chat.stream.backstop_put.failed",
+                    session_id=state.session_id,
+                    error=str(exc),
+                )
             log.info(
                 "chat.stream.turn.done",
                 session_id=state.session_id,

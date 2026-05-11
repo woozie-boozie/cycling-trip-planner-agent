@@ -129,14 +129,10 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Subtler ambient lighting on pure white — single warm radial at
-       the top, fading to transparent. */
-    background-image: radial-gradient(
-      ellipse 100% 60% at 50% 0%,
-      color-mix(in oklab, var(--primary) 4%, transparent) 0%,
-      transparent 60%
-    );
-    background-attachment: fixed;
+    /* Pure white background — no ambient tint. The previous radial
+       gradient mixed 4% of --primary (orange) over white, which read
+       peachy/cream and felt like a warm wash. Stripping it restores
+       the clean white the design started from. */
     font-feature-settings: "cv11", "ss01", "ss03";
   }
   html {

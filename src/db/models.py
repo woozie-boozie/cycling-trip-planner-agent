@@ -217,5 +217,16 @@ class SessionRow(SQLModel, table=True):
     state_json: str = Field(
         description="ConversationState serialised via .model_dump_json()"
     )
+    version: int = Field(
+        default=0,
+        description=(
+            "Optimistic-locking version — mirrors ConversationState.version "
+            "for SQL-level enforcement. PostgresSessionStore.put() does a "
+            "conditional UPDATE keyed on this column; mismatch raises "
+            "SessionConflict. NOT NULL DEFAULT 0 so existing rows from "
+            "pre-1.13 deploys parse cleanly after the idempotent ALTER in "
+            "init_db()."
+        ),
+    )
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
