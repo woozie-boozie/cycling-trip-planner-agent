@@ -29,6 +29,7 @@ export function RouteGallery({ profile, onPlan }: RouteGalleryProps) {
       <div className="px-2 py-6">
         <RouteConfigForm
           corridor={selected}
+          anchorKm={profile?.max_daily_km_comfort ?? 80}
           onBack={() => setSelected(null)}
           onPlan={(prompt) => {
             setSelected(null);

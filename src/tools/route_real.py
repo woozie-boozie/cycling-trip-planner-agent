@@ -79,6 +79,10 @@ class CorridorVariant:
     trade_offs: list[str]
     best_for: str
     is_default: bool = False
+    # One-word at-a-glance tag (e.g. "Direct", "Scenic", "Quiet"). Picked from
+    # axes that actually differ between variants in this corridor — None when
+    # variants are too homogeneous to label honestly.
+    headline_tag: str | None = None
 
 
 # ---- Avenue Verte — 3 variants ─────────────────────────────────────────────
@@ -161,6 +165,7 @@ _AVENUE_VERTE_VARIANTS: list[CorridorVariant] = [
             "targeting the fastest signposted crossing with one cathedral stop"
         ),
         is_default=True,
+        headline_tag="Direct",
     ),
     CorridorVariant(
         name="oise_chantilly",
@@ -185,6 +190,7 @@ _AVENUE_VERTE_VARIANTS: list[CorridorVariant] = [
             "riders prioritising heritage + photography over distance, "
             "or honeymoon/special-occasion trips"
         ),
+        headline_tag="Heritage",
     ),
     CorridorVariant(
         name="gisors_western",
@@ -210,6 +216,7 @@ _AVENUE_VERTE_VARIANTS: list[CorridorVariant] = [
             "experienced tourers wanting solitude + rural Normandy/Vexin "
             "over headline tourist stops"
         ),
+        headline_tag="Quiet",
     ),
 ]
 
@@ -273,6 +280,7 @@ _AMS_TO_CPH_VARIANTS: list[CorridorVariant] = [
             "infrastructure"
         ),
         is_default=True,
+        headline_tag="Direct",
     ),
     CorridorVariant(
         name="coastal_ev12",
@@ -298,6 +306,7 @@ _AMS_TO_CPH_VARIANTS: list[CorridorVariant] = [
             "riders who want the EuroVelo 12 'proper' experience with time "
             "to enjoy the coast — not for tight schedules"
         ),
+        headline_tag="Coastal",
     ),
 ]
 
@@ -354,6 +363,7 @@ _LDN_TO_BRI_VARIANTS: list[CorridorVariant] = [
             "the canonical day-ride or a fast 2-day weekend; charity riders"
         ),
         is_default=True,
+        headline_tag="Direct",
     ),
     CorridorVariant(
         name="avenue_verte_lewes",
@@ -380,6 +390,7 @@ _LDN_TO_BRI_VARIANTS: list[CorridorVariant] = [
             "riders wanting a proper 2-day trip with a Lewes overnight, or "
             "those who care more about countryside than the canonical route"
         ),
+        headline_tag="Scenic",
     ),
 ]
 
@@ -398,6 +409,7 @@ _CORRIDORS: dict[tuple[str, str], list[CorridorVariant]] = {
             trade_offs=v.trade_offs,
             best_for=v.best_for,
             is_default=v.is_default,
+            headline_tag=v.headline_tag,
         )
         for v in _AVENUE_VERTE_VARIANTS
     ],
@@ -412,6 +424,7 @@ _CORRIDORS: dict[tuple[str, str], list[CorridorVariant]] = {
             trade_offs=v.trade_offs,
             best_for=v.best_for,
             is_default=v.is_default,
+            headline_tag=v.headline_tag,
         )
         for v in _AMS_TO_CPH_VARIANTS
     ],
@@ -426,6 +439,7 @@ _CORRIDORS: dict[tuple[str, str], list[CorridorVariant]] = {
             trade_offs=v.trade_offs,
             best_for=v.best_for,
             is_default=v.is_default,
+            headline_tag=v.headline_tag,
         )
         for v in _LDN_TO_BRI_VARIANTS
     ],
@@ -441,7 +455,11 @@ _BROUTER_PROFILE = "trekking"
 _BROUTER_TIMEOUT = 15.0
 _CACHE_TTL_SECONDS = 60 * 60 * 24  # 24h
 
-_segment_cache: dict[tuple[float, float, float, float], tuple[float, float, float]] = {}
+# Per-segment cache. Stores everything BRouter returns for an a→b call so
+# the variant-build path and the GPX-export path share one round-trip.
+# Coordinates are kept as raw [lon, lat, ele?] floats (lists from JSON).
+_SegmentCache = tuple[float, float, float, list[list[float]]]
+_segment_cache: dict[tuple[float, float, float, float], _SegmentCache] = {}
 _cache_timestamps: dict[tuple[float, float, float, float], float] = {}
 
 _client: httpx.AsyncClient | None = None
@@ -468,7 +486,7 @@ def _cache_key(a: Anchor, b: Anchor) -> tuple[float, float, float, float]:
     return (round(a.lat, 4), round(a.lon, 4), round(b.lat, 4), round(b.lon, 4))
 
 
-def _cached_segment(a: Anchor, b: Anchor) -> tuple[float, float, float] | None:
+def _cached_segment(a: Anchor, b: Anchor) -> _SegmentCache | None:
     key = _cache_key(a, b)
     ts = _cache_timestamps.get(key)
     if ts is None or (time.time() - ts) > _CACHE_TTL_SECONDS:
@@ -477,18 +495,26 @@ def _cached_segment(a: Anchor, b: Anchor) -> tuple[float, float, float] | None:
 
 
 def _cache_segment(
-    a: Anchor, b: Anchor, distance_km: float, ascend_m: float, time_s: float
+    a: Anchor,
+    b: Anchor,
+    distance_km: float,
+    ascend_m: float,
+    time_s: float,
+    coordinates: list[list[float]],
 ) -> None:
     key = _cache_key(a, b)
-    _segment_cache[key] = (distance_km, ascend_m, time_s)
+    _segment_cache[key] = (distance_km, ascend_m, time_s, coordinates)
     _cache_timestamps[key] = time.time()
 
 
-async def _brouter_segment(
+async def _brouter_fetch(
     client: httpx.AsyncClient, a: Anchor, b: Anchor
-) -> tuple[float, float, float]:
-    """Real road distance for one cycling segment a→b. Returns
-    (distance_km, ascend_m, time_seconds). Raises on any failure."""
+) -> _SegmentCache:
+    """Fetch one BRouter segment a→b. Returns
+    (distance_km, ascend_m, time_seconds, coordinates) where coordinates is
+    the raw GeoJSON LineString — each entry is [lon, lat] or [lon, lat, ele].
+    Cached for ``_CACHE_TTL_SECONDS`` so the variant-build path and the
+    GPX-export path share a single round-trip."""
     cached = _cached_segment(a, b)
     if cached is not None:
         return cached
@@ -510,7 +536,25 @@ async def _brouter_segment(
     ascend_m = float(props.get("filtered ascend", 0))
     time_s = float(props.get("total-time", 0))
     distance_km = track_length_m / 1000.0
-    _cache_segment(a, b, distance_km, ascend_m, time_s)
+    geometry = features[0].get("geometry", {})
+    raw_coords = geometry.get("coordinates", []) or []
+    # Normalise to plain float lists — robust to numpy/tuple variants if any
+    # transport upstream changes how the JSON gets parsed.
+    coordinates: list[list[float]] = [[float(x) for x in pt] for pt in raw_coords]
+    _cache_segment(a, b, distance_km, ascend_m, time_s, coordinates)
+    return distance_km, ascend_m, time_s, coordinates
+
+
+async def _brouter_segment(
+    client: httpx.AsyncClient, a: Anchor, b: Anchor
+) -> tuple[float, float, float]:
+    """Back-compat shim: (distance_km, ascend_m, time_seconds) only.
+
+    Variant building doesn't need geometry — keeping the 3-tuple return
+    avoids touching the variant-build call sites. GPX export uses
+    ``_brouter_fetch`` directly to also grab the polyline.
+    """
+    distance_km, ascend_m, time_s, _coords = await _brouter_fetch(client, a, b)
     return distance_km, ascend_m, time_s
 
 
@@ -722,6 +766,7 @@ async def _build_variant(
         distinguishing_features=list(cv.distinguishing_features),
         trade_offs=list(cv.trade_offs),
         best_for=cv.best_for,
+        headline_tag=cv.headline_tag,
         notes=notes,
         is_default=cv.is_default,
     )

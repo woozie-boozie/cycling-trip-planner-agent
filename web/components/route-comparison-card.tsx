@@ -94,6 +94,21 @@ export function RouteComparisonCard({
                 .filter(Boolean)
                 .join(" ")}
             >
+              {/* Headline tag — single-word at-a-glance differentiator.
+                  Sits above the title so the eye lands on the category
+                  before reading the variant name. */}
+              {v.headline_tag && (
+                <span
+                  className="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+                  style={{
+                    background: `${v.color}1A`,
+                    color: v.color,
+                  }}
+                >
+                  {v.headline_tag}
+                </span>
+              )}
+
               {/* Color swatch + name */}
               <div className="flex items-center gap-2">
                 <span

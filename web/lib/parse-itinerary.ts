@@ -148,3 +148,92 @@ export function parseItinerary(content: string): DayRow[] | null {
 
   return days;
 }
+
+// ---------------------------------------------------------------------------
+// Route header parsing — extracts corridor + variant identifiers from the
+// agent's prose so the GPX download buttons know what to request.
+// ---------------------------------------------------------------------------
+
+export interface ParsedRouteHeader {
+  /** Origin city (e.g. "London") */
+  start: string;
+  /** Destination city (e.g. "Paris") */
+  end: string;
+  /**
+   * Variant identifier the agent picked — matches backend
+   * `CorridorVariant.name` (e.g. "v16a_beauvais"). Resolved by matching
+   * the prose against `ROUTE_VARIANTS` titles. ``null`` when the title
+   * doesn't reference any catalogued variant (corridor with only one
+   * variant, or unknown corridor).
+   */
+  variantName: string | null;
+  /** Full matched heading line (for debugging / fallback display). */
+  rawHeading: string;
+}
+
+const HEADER_LINE_RE =
+  /(?:^|\n)#{1,3}\s+([^\n→⇒]+?)\s*(?:→|⇒|->)\s*([^\n]+)/;
+
+/**
+ * Pull out the corridor + variant from the agent's response prose.
+ *
+ * Matches headings like:
+ *   ``# London → Paris via Avenue Verte V16a Beauvais``
+ *   ``## Amsterdam → Copenhagen · EuroVelo 7 inland``
+ *
+ * Strategy:
+ *   1. Find the first H1/H2/H3 line containing an arrow.
+ *   2. Slice ``start`` and ``end`` from either side of the arrow.
+ *   3. Search the heading for any variant title (case-insensitive,
+ *      against the supplied `variantTitles` map) — pick the longest
+ *      title that matches to prefer "V16a Beauvais" over "V16a".
+ *
+ * Returns ``null`` when no header is found in the content.
+ */
+export function parseRouteHeader(
+  content: string,
+  variantTitles: { name: string; title: string }[] = [],
+): ParsedRouteHeader | null {
+  const m = content.match(HEADER_LINE_RE);
+  if (!m) return null;
+
+  const start = cleanCity(m[1]);
+  // The "end" capture may include the "via ..." suffix — split it back out
+  // so we get the bare destination city and a separate variant string.
+  const endRaw = m[2].trim();
+  const viaSplit = endRaw.split(/\s+via\s+/i);
+  const end = cleanCity(viaSplit[0]);
+  const variantHint = viaSplit.slice(1).join(" via ").trim();
+
+  // Look for the longest variant title that appears in either the
+  // post-"via" hint or the full heading text. Longest match wins so
+  // "V16a Beauvais" beats "V16a" when both could match.
+  const haystack = (variantHint || endRaw + " " + start + " " + end).toLowerCase();
+  let bestName: string | null = null;
+  let bestLen = 0;
+  for (const v of variantTitles) {
+    // Compare against the title's leading segment (before "—" / "·"), since
+    // the agent's prose typically drops the marketing suffix.
+    const titleHead = v.title.split(/[—·–\-:]/)[0].trim().toLowerCase();
+    if (!titleHead) continue;
+    if (haystack.includes(titleHead) && titleHead.length > bestLen) {
+      bestName = v.name;
+      bestLen = titleHead.length;
+    }
+  }
+
+  return {
+    start,
+    end,
+    variantName: bestName,
+    rawHeading: m[0].trim(),
+  };
+}
+
+function cleanCity(raw: string): string {
+  // Strip leading hashes/markdown chars and trailing punctuation.
+  return raw
+    .replace(/^[#\s*_]+/, "")
+    .replace(/[\s*_,.:]+$/, "")
+    .trim();
+}
