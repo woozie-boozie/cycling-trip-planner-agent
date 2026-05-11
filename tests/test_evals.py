@@ -731,3 +731,106 @@ async def test_eval_june_session_regression(seeded_db: None) -> None:
         f"out={r1.output_tokens + r2.output_tokens + r3.output_tokens} "
         f"tools={len(tools_called)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Scenario 9 — Out-of-catalog corridor (the "not a 3-route toy" regression)
+# ---------------------------------------------------------------------------
+#
+# Added 2026-05-11 after a real London → Isle of Skye request surfaced the
+# 600-km placeholder stub in src/tools/route.py. The fix closed the long-
+# standing Phase 1.10b TODO: when a corridor isn't in `_KNOWN_ROUTES`, the
+# tool now geocodes the endpoints via Open-Meteo, computes a realistic
+# great-circle × 1.25 distance, and emits `GENERIC MODE` in the variant
+# notes — the agent then proposes its own waypoints and fans out per-segment
+# tools.
+#
+# This scenario asserts the agent doesn't punt to "use Komoot" and DOES
+# stitch a real plan from BRouter-verified segments.
+
+
+@pytest.mark.asyncio
+async def test_eval_out_of_catalog_corridor_london_to_edinburgh(seeded_db: None) -> None:
+    """S9 · London → Edinburgh isn't in the catalog. Agent must detect
+    GENERIC MODE in the get_route response, propose UK overnight waypoints
+    (Cambridge / Lincoln / York / Newcastle, etc.), call per-segment
+    elevation + weather + accommodation, run critique, and present a real
+    day-by-day plan with an explicit not-catalog-curated caveat.
+    """
+    state = ConversationState()
+    response = await run_turn(
+        state,
+        "Plan a 7-day cycling trip from London to Edinburgh, 80 km/day, "
+        "prefer camping and hostels, traveling in June.",
+    )
+
+    tools_called = _names_called(state)
+    text = response.message
+    text_lower = text.lower()
+
+    # ── Agent fanned out per-segment tools, not just punted on get_route ─
+    fanned_out_per_segment = (
+        tools_called.count("get_elevation_profile") >= 4
+        and tools_called.count("get_weather") >= 4
+        and tools_called.count("find_accommodation") >= 4
+    )
+
+    # ── The corridor is one of the well-known long-distance UK routes; the
+    #    agent's chosen waypoints should hit at least four named UK cities
+    #    between London and Edinburgh. Allow several plausible alternatives.
+    candidate_via_cities = [
+        "cambridge", "lincoln", "peterborough", "york", "durham",
+        "newcastle", "berwick", "alnwick", "doncaster", "leeds",
+        "hull", "darlington", "harrogate",
+    ]
+    cities_mentioned = sum(1 for c in candidate_via_cities if c in text_lower)
+
+    # ── Agent flags the "not catalog-curated / verify externally" caveat ─
+    has_verify_caveat = any(
+        kw in text_lower
+        for kw in (
+            "verify", "komoot", "rwgps", "ridewithgps", "not in my",
+            "not in the catalog", "stitched", "not signposted",
+            "isn't in my", "isn't a signposted", "not a signposted",
+            "llm-proposed", "my proposal", "double-check",
+        )
+    )
+
+    # ── Output is a real day-by-day plan, not a clarifying-question stall ─
+    has_day_by_day = bool(
+        re.search(r"day\s*1", text_lower)
+        and re.search(r"day\s*[4-7]", text_lower)
+    )
+
+    checks = [
+        ("get_route called at least once", tools_called.count("get_route") >= 1),
+        ("agent fanned out per-segment tools (≥4 each of elev/weather/accom)",
+         fanned_out_per_segment),
+        ("agent mentioned ≥4 plausible UK via-cities (not just endpoints)",
+         cities_mentioned >= 4),
+        ("critique_trip_plan called before presenting",
+         tools_called.count("critique_trip_plan") >= 1),
+        ("response is a substantive day-by-day plan (Day 1 + Day 4+)",
+         has_day_by_day),
+        ("response flags the not-catalog-curated caveat",
+         has_verify_caveat),
+        ("agent did NOT punt to 'use external tools' (no full refusal)",
+         response.output_tokens > 1500),
+        ("max single day under 150 km absolute ceiling (critique blocker)",
+         _max_day_distance_km(text) is None or _max_day_distance_km(text) <= 150),
+    ]
+
+    _print_scoreboard("S9 · out-of-catalog corridor (LDN → Edinburgh)", state, checks)
+    for label, ok in checks:
+        assert ok, (
+            f"out-of-catalog check failed: {label}\n"
+            f"---\ntools called: {sorted(set(tools_called))}\n"
+            f"cities mentioned: {[c for c in candidate_via_cities if c in text_lower]}\n"
+            f"output_tokens: {response.output_tokens}\n"
+            f"message ({len(text)} chars):\n{text[:3000]}"
+        )
+
+    print(
+        f"  [S9] tokens this run: in={response.input_tokens} "
+        f"out={response.output_tokens} tools={len(tools_called)}"
+    )
