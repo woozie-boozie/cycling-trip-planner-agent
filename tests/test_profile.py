@@ -81,13 +81,14 @@ def test_user_profile_validates_uuid() -> None:
         )
 
 
-def test_user_profile_caps_priorities_at_3() -> None:
-    """The brief calls for *focus* — max 3 priorities forces real ranking."""
-    with pytest.raises(ValueError):
-        UserProfileCreate(
-            experience="casual",
-            priorities=["scenery", "distance", "food_drink", "wild_camping"],  # 4
-        )
+def test_user_profile_accepts_unlimited_priorities() -> None:
+    """No cap on priorities — trust the user to pick what matters."""
+    create = UserProfileCreate(
+        experience="casual",
+        priorities=["scenery", "distance", "food_drink", "wild_camping", "quiet_roads"],
+    )
+    profile = create.to_profile()
+    assert len(profile.priorities) == 5
 
 
 # ---------------------------------------------------------------------------

@@ -216,14 +216,13 @@ export function OnboardingWizard({ onComplete, onDismiss, existing }: WizardProp
 
           {step === 2 && (
             <ChipPickerStep
-              title="What matters most? (max 3)"
-              hint="Forces a real ranking. I&apos;ll bias route + accommodation toward these."
+              title="What matters most?"
+              hint="I&apos;ll bias route + accommodation toward these."
               options={PRIORITY_OPTIONS}
               selected={priorities}
               onToggle={(v) =>
-                setPriorities((prev) => toggleInArray(prev, v, 3))
+                setPriorities((prev) => toggleInArray(prev, v))
               }
-              maxNote={priorities.length >= 3 ? "Three's the cap — deselect to swap." : undefined}
             />
           )}
 
