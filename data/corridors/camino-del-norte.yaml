@@ -1,0 +1,68 @@
+id: camino-del-norte
+label: Irún → Santiago de Compostela
+start: Irún
+end: Santiago de Compostela
+aliases:
+- camino del norte
+- northern way
+- north camino
+- irun to santiago
+- basque coast
+- asturias coast
+description: |-
+  Camino del Norte — the northern Camino de Santiago, rideable as a cycle pilgrimage. ~825 km along Spain's Atlantic coast through Basque country, Cantabria, Asturias and Galicia. The greener, hillier alternative to the Camino Francés.
+variants:
+- name: camino_norte_cycle
+  title: Camino del Norte — Atlantic-coast pilgrimage by bike
+  headline_tag: Scenic
+  is_default: true
+  description: |-
+    The cycleable variant of the Northern Camino from Irún at the French border to Santiago de Compostela. Follows the Bay of Biscay coast, then turns inland through Galicia.
+  distinguishing_features:
+  - Atlantic-coast scenery vs the dry meseta of the Camino Francés
+  - Pilgrim infrastructure — albergues every 25-40 km, cyclist-priced
+  - Basque + Asturian + Galician food regions in one trip
+  - Compostela certificate at journey's end (200 km minimum by bike)
+  trade_offs:
+  - Hillier than the Francés — Asturias has real climbing days
+  - Rainier than the Francés — Atlantic coast weather
+  - Less waymarking than the Francés in places
+  best_for: |-
+    pilgrim-cyclists wanting the scenic alternative; Atlantic + green Spain enthusiasts; experienced tourers
+  anchors:
+  - name: Irún
+    country: Spain
+    lat: 43.34
+    lon: -1.79
+  - name: San Sebastián
+    country: Spain
+    lat: 43.32
+    lon: -1.98
+  - name: Bilbao
+    country: Spain
+    lat: 43.26
+    lon: -2.92
+  - name: Santander
+    country: Spain
+    lat: 43.46
+    lon: -3.81
+  - name: Llanes
+    country: Spain
+    lat: 43.42
+    lon: -4.75
+  - name: Gijón
+    country: Spain
+    lat: 43.54
+    lon: -5.66
+  - name: Mondoñedo
+    country: Spain
+    lat: 43.43
+    lon: -7.36
+  - name: Sobrado
+    country: Spain
+    lat: 43.04
+    lon: -8.03
+  - name: Santiago de Compostela
+    country: Spain
+    lat: 42.88
+    lon: -8.55

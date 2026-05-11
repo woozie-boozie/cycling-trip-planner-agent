@@ -1,0 +1,58 @@
+id: berlin-usedom
+label: Berlin → Usedom
+start: Berlin
+end: Heringsdorf
+aliases:
+- berlin to usedom
+- berlin baltic
+- usedom
+- heringsdorf
+- berlin-usedom-radweg
+description: |-
+  Berlin-Usedom-Radweg — the signposted Berlin-to-Baltic ride. ~290 km via Prenzlau and Anklam to the island of Usedom and the seaside town of Heringsdorf. Mostly flat, lake-and-canal scenery on the inland section.
+variants:
+- name: berlin_usedom_radweg
+  title: Berlin-Usedom-Radweg — capital to Baltic beach
+  headline_tag: Coastal
+  is_default: true
+  description: |-
+    The signposted Berlin-Usedom-Radweg from central Berlin via Brandenburg lakelands and Mecklenburg-Vorpommern to Usedom island and the Heringsdorf seafront. 4-5 days at casual pace.
+  distinguishing_features:
+  - Capital city → Baltic beach in one tour
+  - Brandenburg lakelands — many swimming spots in summer
+  - Usedom Pier (Seebrücke Heringsdorf) — Germany's longest
+  - Connects to the Polish Baltic-coast routes
+  trade_offs:
+  - Limited shade — German Plain summer days can be hot + exposed
+  - Anklam → Wolgast section has some traffic-shared B-roads
+  best_for: |-
+    Berliners wanting a week-long ride to the sea, German summer tour, family + intermediate level
+  anchors:
+  - name: Berlin
+    country: Germany
+    lat: 52.52
+    lon: 13.4
+  - name: Eberswalde
+    country: Germany
+    lat: 52.83
+    lon: 13.83
+  - name: Prenzlau
+    country: Germany
+    lat: 53.32
+    lon: 13.86
+  - name: Pasewalk
+    country: Germany
+    lat: 53.51
+    lon: 13.99
+  - name: Anklam
+    country: Germany
+    lat: 53.85
+    lon: 13.69
+  - name: Wolgast
+    country: Germany
+    lat: 54.05
+    lon: 13.77
+  - name: Heringsdorf
+    country: Germany
+    lat: 53.95
+    lon: 14.16

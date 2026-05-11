@@ -1,0 +1,71 @@
+id: sicily-loop
+label: Palermo → Catania → Palermo
+start: Palermo
+end: Palermo
+aliases:
+- sicily
+- sicilia
+- palermo loop
+- sicilian coast
+- palermo catania
+description: |-
+  Sicily coastal loop — the full island circumnavigation by bike. ~750 km via Cefalù, Messina, Taormina, Catania, Syracuse, Ragusa, Agrigento and Trapani back to Palermo. Mt Etna views, Greek temples, Norman cathedrals — packed.
+variants:
+- name: sicily_coast_loop
+  title: Sicily coastal loop — full island circumnavigation
+  headline_tag: Scenic
+  is_default: true
+  description: |-
+    Anti-clockwise from Palermo around Sicily's coast back to Palermo. Mix of coastal flatlands and short inland climbs (no proper mountain sections away from Etna).
+  distinguishing_features:
+  - Mt Etna views from Catania and Taormina sides
+  - Greek temples at Agrigento (UNESCO Valley of the Temples)
+  - Norman cathedrals (Monreale, Cefalù) bookend the trip
+  - Coastal seafood + Sicilian wine every overnight
+  trade_offs:
+  - Summer heat brutal — best ridden April/May or September/October
+  - Coastal traffic on the SS113 stretches
+  - Limited segregated cycle infrastructure
+  best_for: |-
+    experienced riders wanting a self-contained loop, food + heritage tourists, shoulder-season Mediterranean lovers
+  anchors:
+  - name: Palermo
+    country: Italy
+    lat: 38.12
+    lon: 13.36
+  - name: Cefalù
+    country: Italy
+    lat: 38.04
+    lon: 14.02
+  - name: Messina
+    country: Italy
+    lat: 38.19
+    lon: 15.55
+  - name: Taormina
+    country: Italy
+    lat: 37.85
+    lon: 15.29
+  - name: Catania
+    country: Italy
+    lat: 37.51
+    lon: 15.09
+  - name: Syracuse
+    country: Italy
+    lat: 37.07
+    lon: 15.29
+  - name: Ragusa
+    country: Italy
+    lat: 36.93
+    lon: 14.73
+  - name: Agrigento
+    country: Italy
+    lat: 37.31
+    lon: 13.59
+  - name: Trapani
+    country: Italy
+    lat: 38.02
+    lon: 12.51
+  - name: Palermo
+    country: Italy
+    lat: 38.12
+    lon: 13.36

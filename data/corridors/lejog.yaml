@@ -1,0 +1,67 @@
+id: lejog
+label: Land's End → John o' Groats
+start: Land's End
+end: John o' Groats
+aliases:
+- lejog
+- lands end to john o groats
+- lands end john o'groats
+- end to end
+- uk end-to-end
+description: |-
+  LEJOG — the iconic UK end-to-end. ~1,600 km from Cornwall's south-westernmost point to the north-eastern Scottish tip. The most famous long-distance cycling challenge in Britain; every cyclist's bucket-list traverse.
+variants:
+- name: lejog_ncn
+  title: LEJOG — the classic NCN-signposted route
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The most-ridden LEJOG path — NCN 3 from Land's End north via Exeter, Bristol, Birmingham, Manchester and Carlisle to Scotland, then NCN 7/1 via Glasgow and Inverness to John o' Groats. 14-21 days at 80-120 km/day.
+  distinguishing_features:
+  - The bucket-list British end-to-end traverse
+  - Crosses every climate band the UK has — Cornwall to Caithness
+  - NCN signposting on most segments
+  - Major-city overnight options if you need bike shops mid-trip
+  trade_offs:
+  - 1,600 km is a serious commitment — average ~14 days at 110 km/day
+  - Some A-road sections are unavoidable in remoter Scottish stretches
+  - Headwind risk on the Scottish leg from west-coast prevailing winds
+  best_for: |-
+    experienced multi-day tourers; once-in-a-lifetime UK trips; charity-fundraising rides
+  anchors:
+  - name: Land's End
+    country: United Kingdom
+    lat: 50.07
+    lon: -5.71
+  - name: Exeter
+    country: United Kingdom
+    lat: 50.72
+    lon: -3.53
+  - name: Bristol
+    country: United Kingdom
+    lat: 51.45
+    lon: -2.58
+  - name: Birmingham
+    country: United Kingdom
+    lat: 52.49
+    lon: -1.89
+  - name: Manchester
+    country: United Kingdom
+    lat: 53.48
+    lon: -2.24
+  - name: Carlisle
+    country: United Kingdom
+    lat: 54.89
+    lon: -2.94
+  - name: Glasgow
+    country: United Kingdom
+    lat: 55.86
+    lon: -4.25
+  - name: Inverness
+    country: United Kingdom
+    lat: 57.48
+    lon: -4.22
+  - name: John o' Groats
+    country: United Kingdom
+    lat: 58.64
+    lon: -3.07

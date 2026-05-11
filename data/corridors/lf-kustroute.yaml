@@ -1,0 +1,64 @@
+id: lf-kustroute
+label: Den Helder → Cadzand
+start: Den Helder
+end: Cadzand
+aliases:
+- lf kustroute
+- nl coast
+- dutch coast
+- north sea cycle
+- den helder
+- cadzand
+description: |-
+  LF Kustroute — the entire Dutch North Sea coast in one signposted route. ~570 km of dunes, beaches, and seaside towns from Den Helder in the north to the Belgian border at Cadzand. Pure flat, occasional dune climbs, headwinds the constant companion.
+variants:
+- name: lf_kustroute
+  title: LF Kustroute — the full Dutch coast
+  headline_tag: Coastal
+  is_default: true
+  description: |-
+    The fully signposted LF Kustroute (LF1 + LF12) along the Dutch North Sea coast from the Wadden Sea to the Western Scheldt — dune paths, beach towns, ferry crossings at the river deltas.
+  distinguishing_features:
+  - Dune cycle paths most of the way — traffic-free and scenic
+  - Multiple short ferry crossings at river-mouth deltas
+  - Beach swimming at every overnight stop
+  - Hoek van Holland ferry connects to UK if extending the trip
+  trade_offs:
+  - Constant westerly headwinds — plan north-to-south for tailwind
+  - Limited inland alternatives if the coast gets stormy
+  - Tourist crowds in Scheveningen / Zandvoort in July/August
+  best_for: |-
+    riders who want pure coast + tailwind plans, beach swimmers, Wadden Sea ecology enthusiasts
+  anchors:
+  - name: Den Helder
+    country: Netherlands
+    lat: 52.96
+    lon: 4.76
+  - name: Egmond aan Zee
+    country: Netherlands
+    lat: 52.62
+    lon: 4.63
+  - name: IJmuiden
+    country: Netherlands
+    lat: 52.46
+    lon: 4.61
+  - name: Zandvoort
+    country: Netherlands
+    lat: 52.37
+    lon: 4.53
+  - name: The Hague
+    country: Netherlands
+    lat: 52.07
+    lon: 4.3
+  - name: Hoek van Holland
+    country: Netherlands
+    lat: 51.98
+    lon: 4.13
+  - name: Vlissingen
+    country: Netherlands
+    lat: 51.45
+    lon: 3.57
+  - name: Cadzand
+    country: Netherlands
+    lat: 51.37
+    lon: 3.4
