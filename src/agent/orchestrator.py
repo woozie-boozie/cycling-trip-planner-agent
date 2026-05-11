@@ -18,6 +18,7 @@ files. (See docs/decisions.md ADR-001.)
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from datetime import datetime, timezone
@@ -26,6 +27,12 @@ from typing import Any
 import structlog
 from anthropic import AsyncAnthropic
 
+from src.agent.caching import (
+    cached_messages,
+    cached_system,
+    cached_tools,
+    extract_cache_usage,
+)
 from src.agent.config import get_settings
 from src.agent.prompts import SYSTEM_PROMPT, user_profile_context
 from src.agent.state import AgentResponse, ConversationState, TraceEvent
@@ -94,6 +101,11 @@ async def run_turn(
     if profile is not None:
         system_prompt = SYSTEM_PROMPT + "\n\n" + user_profile_context(profile)
 
+    # Pre-build cache-marked versions of the prefix (system + tools).
+    # Both are stable for the entire turn so we only build them once.
+    cached_system_blocks = cached_system(system_prompt)
+    cached_tool_defs = cached_tools(tools)
+
     # Append the user's message to the conversation.
     state.messages.append({"role": "user", "content": user_message})
 
@@ -112,6 +124,8 @@ async def run_turn(
 
     turn_input_tokens = 0
     turn_output_tokens = 0
+    turn_cache_creation = 0
+    turn_cache_read = 0
     tool_call_summary: list[dict[str, Any]] = []
 
     for iteration in range(1, settings.max_loop_iterations + 1):
@@ -122,19 +136,35 @@ async def run_turn(
             messages=len(state.messages),
         )
 
+        # Re-mark the message history's last block on every iteration so
+        # the cache breakpoint moves forward as the conversation grows.
+        # state.messages is NOT mutated — cached_messages returns a copy.
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tools,
-            messages=state.messages,
+            system=cached_system_blocks,
+            tools=cached_tool_defs,
+            messages=cached_messages(state.messages),
         )
 
         # Token accounting
         turn_input_tokens += response.usage.input_tokens
         turn_output_tokens += response.usage.output_tokens
+        cache_creation, cache_read = extract_cache_usage(response.usage)
+        turn_cache_creation += cache_creation
+        turn_cache_read += cache_read
         state.total_input_tokens += response.usage.input_tokens
         state.total_output_tokens += response.usage.output_tokens
+
+        log.info(
+            "agent.turn.iteration.usage",
+            session_id=state.session_id,
+            iteration=iteration,
+            input_tokens=response.usage.input_tokens,
+            output_tokens=response.usage.output_tokens,
+            cache_creation=cache_creation,
+            cache_read=cache_read,
+        )
 
         # Append the assistant message verbatim — the next iteration needs it
         # in the messages history so Claude can see its own prior turn.
@@ -162,6 +192,15 @@ async def run_turn(
             final_text = "".join(b.text for b in response.content if b.type == "text")
             state.total_turns += 1
             state.touch()
+            log.info(
+                "agent.turn.done",
+                session_id=state.session_id,
+                iterations=iteration,
+                input_tokens=turn_input_tokens,
+                output_tokens=turn_output_tokens,
+                cache_creation=turn_cache_creation,
+                cache_read=turn_cache_read,
+            )
             return AgentResponse(
                 session_id=state.session_id,
                 message=final_text,
@@ -169,39 +208,52 @@ async def run_turn(
                 iterations=iteration,
                 input_tokens=turn_input_tokens,
                 output_tokens=turn_output_tokens,
+                cache_read_tokens=turn_cache_read,
+                cache_creation_tokens=turn_cache_creation,
                 tool_calls=tool_call_summary,
             )
 
-        # Otherwise, dispatch every tool_use block from this assistant response
-        # and bundle the results into a single user message (per Anthropic's
-        # tool_use protocol).
+        # Dispatch every tool_use block from this assistant response IN
+        # PARALLEL (asyncio.gather), then bundle the results into a single
+        # user message in Claude's original order per the Anthropic tool_use
+        # protocol. Each tool's inputs are independent — get_elevation_profile
+        # for segment A doesn't read get_weather for segment B — so the
+        # serial loop here was leaving 30–80% of latency on the table on
+        # fan-out heavy turns. Real LDN→Edinburgh request before this change:
+        # 5 BRouter timeouts × 30s = 150s serial. After: max(timeouts) ≈ 10s.
+        # Tracing still records each tool's individual latency_ms.
+        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
         tool_result_blocks: list[dict[str, Any]] = []
-        for block in response.content:
-            if block.type != "tool_use":
-                continue
-            t0 = time.perf_counter()
-            result = await dispatch(block.name, dict(block.input))
-            latency_ms = int((time.perf_counter() - t0) * 1000)
+        if tool_use_blocks:
+            async def _dispatch_one(b: Any) -> tuple[Any, int]:
+                t0 = time.perf_counter()
+                r = await dispatch(b.name, dict(b.input))
+                return r, int((time.perf_counter() - t0) * 1000)
 
-            tool_result_blocks.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps(result.content),
-                    "is_error": result.is_error,
-                }
+            results = await asyncio.gather(
+                *(_dispatch_one(b) for b in tool_use_blocks),
             )
-            _trace(
-                state,
-                iteration,
-                "tool_result",
-                {
-                    "tool_use_id": block.id,
-                    "name": block.name,
-                    "is_error": result.is_error,
-                    "latency_ms": latency_ms,
-                },
-            )
+
+            for block, (result, latency_ms) in zip(tool_use_blocks, results):
+                tool_result_blocks.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": json.dumps(result.content),
+                        "is_error": result.is_error,
+                    }
+                )
+                _trace(
+                    state,
+                    iteration,
+                    "tool_result",
+                    {
+                        "tool_use_id": block.id,
+                        "name": block.name,
+                        "is_error": result.is_error,
+                        "latency_ms": latency_ms,
+                    },
+                )
 
         state.messages.append({"role": "user", "content": tool_result_blocks})
 

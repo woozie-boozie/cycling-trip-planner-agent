@@ -5,12 +5,12 @@ import { Header } from "@/components/header";
 import { MessageBubble } from "@/components/message-bubble";
 import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
-import { TracePanel } from "@/components/trace-panel";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { RouteGallery } from "@/components/route-gallery";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
+import type { RouteVariantSummary } from "@/lib/route-variants";
 import {
   clearProfileId,
   clearWizardDismissed,
@@ -21,6 +21,7 @@ import {
 } from "@/lib/profile";
 import { clearSessionId, loadSessionId, saveSessionId } from "@/lib/session";
 import type { TraceResponse, UiMessage, UserProfile } from "@/lib/types";
+import { useViewMode } from "@/lib/view-mode";
 
 function makeId(): string {
   // Quick-and-light unique id for React keys; not the backend session_id.
@@ -34,11 +35,13 @@ export default function Home() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [trace, setTrace] = useState<TraceResponse | null>(null);
-  const [isTraceLoading, setIsTraceLoading] = useState(false);
   const [attachedImage, setAttachedImage] = useState<PreparedImage | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Visual ⇄ text view-mode toggle (Phase A · v2 redesign).
+  const { mode: viewMode, toggle: toggleViewMode } = useViewMode();
 
   const scrollAnchorRef = useRef<HTMLDivElement>(null);
 
@@ -122,7 +125,6 @@ export default function Home() {
   // the next turn into a fresh session and look like amnesia. Only /chat
   // 404 is a real "session lost" signal; that's handled in handleSubmit.
   const refreshTrace = useCallback(async (id: string) => {
-    setIsTraceLoading(true);
     try {
       const data = await getTrace(id);
       setTrace(data);
@@ -132,8 +134,6 @@ export default function Home() {
       if (err instanceof ApiError && err.status === 404) {
         // benign — leave sessionId + trace alone
       }
-    } finally {
-      setIsTraceLoading(false);
     }
   }, []);
 
@@ -228,6 +228,8 @@ export default function Home() {
           iterations: res.iterations,
           input_tokens: res.input_tokens,
           output_tokens: res.output_tokens,
+          cache_read_tokens: res.cache_read_tokens,
+          cache_creation_tokens: res.cache_creation_tokens,
           tool_calls: res.tool_calls,
         },
       };
@@ -246,6 +248,8 @@ export default function Home() {
       let iterations = 0;
       let inputTokens = 0;
       let outputTokens = 0;
+      let cacheReadTokens = 0;
+      let cacheCreationTokens = 0;
 
       setMessages((prev) => [
         ...prev,
@@ -290,6 +294,46 @@ export default function Home() {
                 name: event.name,
                 args: Object.keys(event.input ?? {}),
               });
+              // Push a "running" pill for the inline trace strip — flips
+              // to "done" or "error" when the matching tool_result arrives.
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        liveTrace: [
+                          ...(m.liveTrace ?? []),
+                          {
+                            toolUseId: event.id,
+                            name: event.name,
+                            status: "running",
+                            argKeys: Object.keys(event.input ?? {}),
+                          },
+                        ],
+                      }
+                    : m,
+                ),
+              );
+              break;
+            case "tool_result":
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId
+                    ? {
+                        ...m,
+                        liveTrace: (m.liveTrace ?? []).map((t) =>
+                          t.toolUseId === event.id
+                            ? {
+                                ...t,
+                                status: event.is_error ? "error" : "done",
+                                latencyMs: event.latency_ms,
+                              }
+                            : t,
+                        ),
+                      }
+                    : m,
+                ),
+              );
               break;
             case "iteration_end":
               iterations = event.iteration;
@@ -297,6 +341,8 @@ export default function Home() {
             case "done":
               inputTokens = event.input_tokens;
               outputTokens = event.output_tokens;
+              cacheReadTokens = event.cache_read_tokens ?? 0;
+              cacheCreationTokens = event.cache_creation_tokens ?? 0;
               setMessages((prev) =>
                 prev.map((m) =>
                   m.id === assistantId
@@ -306,6 +352,8 @@ export default function Home() {
                           iterations: iterations || event.iterations,
                           input_tokens: inputTokens,
                           output_tokens: outputTokens,
+                          cache_read_tokens: cacheReadTokens,
+                          cache_creation_tokens: cacheCreationTokens,
                           tool_calls: event.tool_calls.length
                             ? event.tool_calls
                             : liveToolCalls,
@@ -316,6 +364,21 @@ export default function Home() {
               );
               void refreshTrace(event.session_id);
               break;
+            case "error": {
+              // Mid-stream error from backend (rate-limit, timeout, etc.).
+              // Surface a user-friendly message with a kind-specific hint
+              // and drop the empty assistant bubble so the thread doesn't
+              // show a hanging "" reply.
+              const hint =
+                event.kind === "rate_limit"
+                  ? " Tip: click \"+ New trip\" to start fresh and shrink the context."
+                  : "";
+              setError(`${event.message}${hint}`);
+              setMessages((prev) =>
+                prev.filter((m) => !(m.id === assistantId && !m.content)),
+              );
+              break;
+            }
         }
       }
 
@@ -343,12 +406,35 @@ export default function Home() {
     }
   }, [input, isPending, sessionId, attachedImage, refreshTrace, profileId]);
 
-  const handleWizardComplete = useCallback((id: string) => {
+  // Variant pick from the visual comparison card. Bottom-of-card "Plan this
+  // route →" CTA fires this with the user's chosen variant; we dispatch a
+  // curated chat prompt (using handleSubmit's textOverride path that the
+  // route gallery already uses) so the agent advances to day-by-day planning
+  // without the user typing.
+  const handlePickVariant = useCallback(
+    (variant: RouteVariantSummary) => {
+      handleSubmit(
+        `Let's go with the ${variant.title} route — please build the day-by-day plan.`,
+      );
+    },
+    [handleSubmit],
+  );
+
+  const handleWizardComplete = useCallback(async (id: string) => {
     saveProfileId(id);
     setProfileId(id);
     setWizardOpen(false);
     // If they explicitly onboarded, clear the dismissed flag — they came back.
     clearWizardDismissed();
+    // Refetch — when editing, the id is unchanged so the [profileId] effect
+    // won't fire on its own. Pull the canonical updated profile so the
+    // header reflects the change immediately.
+    try {
+      const p = await getProfile(id);
+      setProfile(p);
+    } catch {
+      // benign — the [profileId] effect will retry on next render cycle
+    }
   }, []);
 
   const handleWizardDismiss = useCallback(() => {
@@ -396,58 +482,53 @@ export default function Home() {
       <Header
         sessionId={sessionId}
         onReset={handleReset}
-        hasProfile={Boolean(profile)}
+        profile={profile}
         onEditProfile={handleEditProfile}
+        viewMode={viewMode}
+        onToggleViewMode={toggleViewMode}
       />
       {wizardOpen && (
         <OnboardingWizard
           onComplete={handleWizardComplete}
           onDismiss={handleWizardDismiss}
+          existing={profile}
         />
       )}
 
-      <main className="flex-1 overflow-hidden">
-        <div className="mx-auto flex h-full max-w-7xl">
-          {/* Chat column — full width on mobile, ~7/10ths on desktop */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-y-auto px-4 py-6">
-              {isEmpty ? (
-                <RouteGallery
-                  profile={profile}
-                  onPlan={(prompt) => handleSubmit(prompt)}
-                  onCustomPrompt={() => {
-                    // Focus the chat input — let the existing auto-focus
-                    // effect grab it; nothing to do here besides give the
-                    // user a visual nudge that the textarea is ready.
-                  }}
+      <main className="flex-1 overflow-y-auto">
+        {isEmpty ? (
+          // Empty state — full-width hero + 3-up gallery, no sidebar
+          <div className="mx-auto max-w-[1200px] px-4 py-12 sm:py-16 lg:px-10">
+            <RouteGallery
+              profile={profile}
+              onPlan={(prompt) => handleSubmit(prompt)}
+            />
+          </div>
+        ) : (
+          // Conversation — same wide container as the landing for visual
+          // responses (maps, itineraries) to breathe. Individual bubbles
+          // self-cap text width inside; visual content fills the column.
+          <div className="mx-auto max-w-[1200px] px-4 py-10 sm:py-14 lg:px-10">
+            <div className="space-y-5">
+              {messages.map((m) => (
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  viewMode={viewMode}
+                  corridor={corridor}
+                  onPickVariant={handlePickVariant}
                 />
-              ) : (
-                <div className="space-y-5">
-                  {messages.map((m) => (
-                    <MessageBubble key={m.id} message={m} />
-                  ))}
-                  {isPending ? <LoadingIndicator /> : null}
-                  {error ? (
-                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                      {error}
-                    </div>
-                  ) : null}
-                  <div ref={scrollAnchorRef} />
+              ))}
+              {isPending ? <LoadingIndicator trace={trace} /> : null}
+              {error ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {error}
                 </div>
-              )}
+              ) : null}
+              <div ref={scrollAnchorRef} />
             </div>
           </div>
-
-          {/* Trace panel — hidden on mobile, ~3/10ths on lg+ */}
-          <aside className="hidden w-[360px] shrink-0 overflow-y-auto border-l border-border/40 bg-card/30 p-4 lg:block">
-            <TracePanel
-              trace={trace}
-              isLoading={isTraceLoading || isPending}
-              hasSession={Boolean(sessionId)}
-              corridor={corridor}
-            />
-          </aside>
-        </div>
+        )}
       </main>
 
       <ChatInput

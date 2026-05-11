@@ -47,6 +47,13 @@ _LONG_DAY_KM = 110  # threshold for "yesterday was long"
 _HARD_AFTER_LONG_WARNING = True
 _BIG_GAIN_M = 600  # threshold for "big elevation day"
 _SUSPICIOUS_DISTANCE_FOR_HARD_NO_GAIN = 50
+# Elevation-aware blockers (added 2026-05-10 after a real session shipped
+# a 188 km Day 3 silently). Any day past these thresholds is a HARD blocker
+# regardless of the user's target — physically unsafe for the rider profile
+# the agent targets.
+_ABSOLUTE_DAY_BLOCKER_KM = 150
+_LONG_DAY_WITH_CLIMB_KM = 120
+_LONG_DAY_WITH_CLIMB_GAIN_M = 600
 
 _HOSTEL_EVERY_N_RE = re.compile(
     r"hostel\s*(?:on|every)?\s*every\s*(\d+)(?:st|nd|rd|th)?\s*night",
@@ -201,6 +208,62 @@ def _check_accommodation_pattern(
             )
 
 
+def _check_absolute_day_blockers(
+    days: list[DraftedDay], issues: list[CritiqueIssue]
+) -> None:
+    """Per-day hard blockers, target-independent.
+
+    A 188 km flat day is physically brutal regardless of what the user
+    *said* their daily target was — `_check_pacing` will catch the
+    target-drift, but only as a warning. This pass adds a hard blocker
+    so the agent must restructure before presenting.
+
+    Added 2026-05-10 after a real session shipped a 188 km Day 3 with
+    only a "manageable, terrain is gentle" caveat in the prose.
+    """
+    for d in days:
+        if d.distance_km > _ABSOLUTE_DAY_BLOCKER_KM:
+            issues.append(
+                CritiqueIssue(
+                    severity="blocker",
+                    category="pacing",
+                    message=(
+                        f"Day {d.day_number} is {d.distance_km:.0f} km — past the "
+                        f"{_ABSOLUTE_DAY_BLOCKER_KM} km/day single-day ceiling. "
+                        f"Restructure the plan (add a day, shift distance to neighbours, "
+                        f"or pick a different overnight stop) before presenting."
+                    ),
+                    affects_days=[d.day_number],
+                    suggestion=(
+                        "Split this day. Look at the next overnight stop's segment_km "
+                        "to find a midway accommodation."
+                    ),
+                )
+            )
+        elif (
+            d.distance_km > _LONG_DAY_WITH_CLIMB_KM
+            and d.elevation_gain_m > _LONG_DAY_WITH_CLIMB_GAIN_M
+        ):
+            issues.append(
+                CritiqueIssue(
+                    severity="blocker",
+                    category="pacing",
+                    message=(
+                        f"Day {d.day_number} combines {d.distance_km:.0f} km with "
+                        f"{d.elevation_gain_m} m of climbing — past the "
+                        f"{_LONG_DAY_WITH_CLIMB_KM} km / {_LONG_DAY_WITH_CLIMB_GAIN_M} m "
+                        "joint ceiling. Distance alone may be tolerable, but combined "
+                        "with this much climb it's unsafe for the rider profile."
+                    ),
+                    affects_days=[d.day_number],
+                    suggestion=(
+                        "Either split the day or pick a different routing that avoids the "
+                        "biggest climbs on the longest day."
+                    ),
+                )
+            )
+
+
 def _check_consistency(
     days: list[DraftedDay], issues: list[CritiqueIssue]
 ) -> None:
@@ -318,6 +381,7 @@ def critique_trip_plan(input: CritiqueTripPlanInput) -> CritiqueTripPlanOutput:
     issues: list[CritiqueIssue] = []
 
     _check_pacing(days, input.daily_km_target, issues)
+    _check_absolute_day_blockers(days, issues)
     _check_elevation_pacing(days, issues)
     _check_accommodation_pattern(days, input.accommodation_preference, issues)
     _check_consistency(days, issues)

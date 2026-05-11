@@ -5,16 +5,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Cycling outdoor palette — peppy, energetic, motivating (revised 2026-05-09):
- *   - Light cream background (warm, inviting — feels outdoorsy not corporate)
- *   - White cards (clean, readable)
- *   - Deep forest text (on-brand, high contrast)
- *   - Bright amber/orange primary (Strava-energy — CTAs jump out)
- *   - Sage muted (soft secondary information)
- *   - Rust destructive (warm warning, not aggressive red)
+ * Modernized palette (revised 2026-05-10 evening, Phase B polish):
+ *   - White background — pure, clean, modern (was warm cream)
+ *   - Off-white surfaces (#FAFAF9, #F4F4F2) for layering
+ *   - Sharp orange-red primary (#FF3D14, more saturated)
+ *   - Near-black ink for text + dark CTAs (#0A0A09)
+ *   - Inter for UI + Instrument Serif italic for accent flourishes
  *
- * Reference inspirations: REI catalog, Komoot, Strava — outdoor brands
- * that pair cream/white with one BOLD warm accent for energy.
+ * Reference: Linear-style minimalism + Strava-energy accent. Less
+ * "outdoor catalog", more "shipped 2026 product".
  *
  * App is light-only by default — tokens live in :root.
  */
@@ -24,14 +23,14 @@
   --color-foreground: var(--foreground);
 
   /*
-   * Geist fonts: literal names, NOT var(--font-geist-*).
-   * @theme inline resolves CSS vars at parse time, so runtime-injected
-   * vars from Next.js next/font/google never resolve here. We rely on
-   * the @font-face rules Next.js loads for "Geist" / "Geist Mono".
+   * Fonts use LITERAL names, NOT var(--font-*). @theme inline resolves
+   * at parse time; runtime-injected vars from Next.js next/font/google
+   * never resolve here. We rely on the @font-face rules Next.js loads
+   * for "Geist", "Geist Mono", and "Instrument Serif".
    */
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
-  --font-heading: var(--font-sans);
+  --font-heading: "Instrument Serif", "Instrument Serif Fallback", Georgia, "Times New Roman", serif;
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -72,53 +71,56 @@
 }
 
 :root {
-  /* Surfaces — light, warm, clean */
-  --background: oklch(0.98 0.012 85);           /* warm cream */
-  --foreground: oklch(0.26 0.04 145);           /* deep forest text */
+  /* Surfaces — pure white + warm-tinted off-white layers */
+  --background: oklch(1 0 0);                   /* pure white #FFFFFF */
+  --bg-soft: oklch(0.98 0.001 90);              /* #FAFAF9 — page sections */
+  --bg-2: oklch(0.96 0.002 90);                 /* #F4F4F2 — chips / muted bg */
+  --foreground: oklch(0.06 0.001 90);           /* near-black #0A0A09 */
 
-  --card: oklch(1 0 0);                         /* clean white */
-  --card-foreground: oklch(0.26 0.04 145);
+  --card: oklch(1 0 0);                         /* white */
+  --card-foreground: oklch(0.06 0.001 90);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.26 0.04 145);
+  --popover-foreground: oklch(0.06 0.001 90);
 
-  /* PRIMARY — bright amber-orange (Strava-energy CTAs) */
-  --primary: oklch(0.69 0.19 50);
-  --primary-foreground: oklch(1 0 0);           /* white on orange */
+  /* PRIMARY — sharp red-orange (#FF3D14, mockup spec) */
+  --primary: oklch(0.65 0.245 30);
+  --primary-foreground: oklch(1 0 0);
 
-  /* Secondary — light sage (subtle UI elements) */
-  --secondary: oklch(0.94 0.02 130);
-  --secondary-foreground: oklch(0.32 0.05 145);
+  /* Secondary — neutral light grey (was sage) */
+  --secondary: oklch(0.96 0.002 90);
+  --secondary-foreground: oklch(0.18 0.005 65);
 
-  --muted: oklch(0.95 0.012 85);                /* slightly warmer cream */
-  --muted-foreground: oklch(0.50 0.06 145);     /* mid sage */
+  --muted: oklch(0.98 0.001 90);
+  --muted-foreground: oklch(0.46 0.005 65);     /* #6B675F neutral grey */
 
-  --accent: oklch(0.92 0.04 130);               /* light forest tint */
-  --accent-foreground: oklch(0.26 0.04 145);
+  --accent: oklch(0.96 0.002 90);
+  --accent-foreground: oklch(0.18 0.005 65);
 
-  --destructive: oklch(0.58 0.20 28);           /* rust — warm but clear */
+  --destructive: oklch(0.58 0.20 28);
 
-  --border: oklch(0.26 0.04 145 / 14%);
-  --input: oklch(0.26 0.04 145 / 10%);
-  --ring: oklch(0.69 0.19 50);                  /* amber focus ring */
+  /* Borders — narrow, warm-tinted */
+  --border: oklch(0.93 0.005 80);               /* #ECEAE5 */
+  --input: oklch(0.88 0.005 80);                /* slightly stronger */
+  --ring: oklch(0.65 0.245 30);                 /* orange focus ring */
 
-  /* Categorical chart colors */
-  --chart-1: oklch(0.69 0.19 50);               /* amber */
-  --chart-2: oklch(0.55 0.13 140);              /* forest */
-  --chart-3: oklch(0.65 0.16 130);              /* lime */
-  --chart-4: oklch(0.58 0.13 230);              /* sky */
+  /* Categorical chart colours */
+  --chart-1: oklch(0.65 0.245 30);              /* primary orange */
+  --chart-2: oklch(0.62 0.10 230);              /* sky blue */
+  --chart-3: oklch(0.62 0.15 140);              /* fresh green */
+  --chart-4: oklch(0.65 0.18 60);               /* amber */
   --chart-5: oklch(0.58 0.20 28);               /* rust */
 
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.96 0.015 85);
-  --sidebar-foreground: oklch(0.26 0.04 145);
-  --sidebar-primary: oklch(0.69 0.19 50);
+  --sidebar: oklch(0.98 0.001 90);
+  --sidebar-foreground: oklch(0.06 0.001 90);
+  --sidebar-primary: oklch(0.65 0.245 30);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.92 0.04 130);
-  --sidebar-accent-foreground: oklch(0.26 0.04 145);
-  --sidebar-border: oklch(0.26 0.04 145 / 14%);
-  --sidebar-ring: oklch(0.69 0.19 50);
+  --sidebar-accent: oklch(0.96 0.002 90);
+  --sidebar-accent-foreground: oklch(0.18 0.005 65);
+  --sidebar-border: oklch(0.93 0.005 80);
+  --sidebar-ring: oklch(0.65 0.245 30);
 }
 
 @layer base {
@@ -127,8 +129,39 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Subtler ambient lighting on pure white — single warm radial at
+       the top, fading to transparent. */
+    background-image: radial-gradient(
+      ellipse 100% 60% at 50% 0%,
+      color-mix(in oklab, var(--primary) 4%, transparent) 0%,
+      transparent 60%
+    );
+    background-attachment: fixed;
+    font-feature-settings: "cv11", "ss01", "ss03";
   }
   html {
     @apply font-sans;
+  }
+
+  /* Modern multi-layer shadow utility — layered close + far shadows
+     give surfaces credible elevation without the 2010s drop-shadow look. */
+  .shadow-paper {
+    box-shadow:
+      0 1px 2px -1px rgb(20 19 15 / 0.06),
+      0 4px 12px -4px rgb(20 19 15 / 0.05),
+      0 16px 40px -8px rgb(20 19 15 / 0.04);
+  }
+  .shadow-lift {
+    box-shadow:
+      0 1px 3px -1px rgb(20 19 15 / 0.08),
+      0 8px 24px -6px rgb(20 19 15 / 0.10),
+      0 24px 60px -12px rgb(20 19 15 / 0.08);
+  }
+
+  /* Frosted-glass surface for sticky panels (header, chat input). */
+  .surface-glass {
+    background: color-mix(in oklab, var(--background) 75%, transparent);
+    backdrop-filter: saturate(180%) blur(12px);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
   }
 }

@@ -119,3 +119,23 @@ export function staticMapUrl(
 export function hasMapboxToken(): boolean {
   return TOKEN.length > 0;
 }
+
+/**
+ * Mapbox raster-tile URL for use as a Leaflet `<TileLayer url>`. The
+ * `{z}/{x}/{y}` are left as Leaflet placeholders — Leaflet substitutes
+ * them per-tile.
+ *
+ * Use with `tileSize={512}` and `zoomOffset={-1}` on the TileLayer so
+ * Leaflet (which defaults to 256px tiles) lines up correctly with
+ * Mapbox's 512px tiles.
+ *
+ * Returns null when the token is missing so callers can fall back to
+ * plain OSM.
+ */
+export function mapboxTileUrl(style: string = STYLE): string | null {
+  if (!TOKEN) return null;
+  return (
+    `https://api.mapbox.com/styles/v1/mapbox/${style}/tiles/512/` +
+    `{z}/{x}/{y}@2x?access_token=${TOKEN}`
+  );
+}

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cycling Trip Planner",
+  title: "Cyclepath",
   description:
     "An AI agent that helps a cyclist plan a multi-day bike trip through conversation.",
 };

@@ -1,12 +1,14 @@
 """get_elevation_profile — terrain difficulty for a single segment.
 
-Segments live in the `elevation_segments` table in Postgres (seeded from
-`_SEGMENTS` below via `src/db/seed.py`). Both directions are seeded with
+Catalog segments live in the `elevation_segments` table in Postgres (seeded
+from `_SEGMENTS` below via `src/db/seed.py`). Both directions are seeded with
 gain/loss mirrored, so reverse lookups don't need runtime computation.
 
-Mock data reflects honest terrain (the Amsterdam → Copenhagen corridor is
-flat; London → Brighton crosses the South Downs) so the agent gives credible
-recommendations rather than fabricating mountains.
+Out-of-catalog segments (generic-mode corridors like London → Edinburgh):
+geocode both endpoints via Open-Meteo, call BRouter for real cycling
+distance + ascent, derive max grade + difficulty. Mirrors the get_route
+generic-mode pattern — the catalog is the fast path for curated corridors,
+BRouter is the general-purpose fallback for everywhere else.
 
 Real elevation data lives in DEMs (digital elevation models like SRTM); the
 abstraction here is the same shape a real provider would use.
@@ -14,6 +16,8 @@ abstraction here is the same shape a real provider would use.
 
 from __future__ import annotations
 
+import httpx
+import structlog
 from sqlmodel import select
 
 from src.db import get_async_session
@@ -24,6 +28,8 @@ from src.tools.schemas import (
     GetElevationProfileInput,
     GetElevationProfileOutput,
 )
+
+log = structlog.get_logger(__name__)
 
 # Per-segment terrain. Ordered as they appear on the Ams→Cph corridor;
 # reverse direction (Cph→Ams) is symmetrical.
@@ -66,6 +72,160 @@ def _normalize(s: str) -> str:
     return s.strip().lower()
 
 
+def _difficulty_from(distance_km: float, gain_m: float, max_grade_pct: float) -> Difficulty:
+    """Map BRouter outputs to the same easy/moderate/hard/extreme buckets the
+    catalog rows use. Combines km + climb the way critique.py scores days,
+    plus a max-grade gate so a short-but-steep climb (e.g. Ditchling Beacon
+    on a 25 km day) still reads as hard."""
+    if max_grade_pct >= 8.0:
+        return "extreme"
+    score = distance_km + (gain_m * 0.05)
+    if score < 50:
+        return "easy"
+    if score < 90 and max_grade_pct < 4.5:
+        return "easy"
+    if score < 115 and max_grade_pct < 6.0:
+        return "moderate"
+    if score < 140 and max_grade_pct < 7.0:
+        return "hard"
+    return "extreme"
+
+
+def _difficulty_from_distance(distance_km: float) -> Difficulty:
+    """Distance-only difficulty for the haversine fallback path where we
+    don't have real elevation data. Conservative — long flat days still
+    flag as 'hard' so the agent doesn't underestimate fatigue."""
+    if distance_km < 50:
+        return "easy"
+    if distance_km < 90:
+        return "easy"
+    if distance_km < 115:
+        return "moderate"
+    if distance_km < 145:
+        return "hard"
+    return "extreme"
+
+
+async def _fetch_real_elevation(
+    start: str, end: str
+) -> GetElevationProfileOutput | None:
+    """Out-of-catalog fallback: geocode + BRouter for any (start, end) pair.
+
+    Returns None on any failure (geocode miss, BRouter unavailable, etc.) so
+    the caller can drop to the moderate-default stub. We import the helpers
+    from route.py + route_real.py rather than duplicating; they're build-time
+    shared utilities now that two tools rely on the same geocode + BRouter
+    pattern.
+    """
+    # Local imports — these modules pull database + httpx clients at import
+    # time, so deferring keeps `from src.tools.elevation import …` light.
+    from src.tools.route import _geocode_location, _haversine_km
+    from src.tools.route_real import Anchor, _brouter_segment
+
+    # Geocode start with no bias, then bias end toward start's coords —
+    # disambiguates same-name places across continents (Boston Lincs vs MA,
+    # Newcastle Tyne vs upon Lyme, Dunbar Scotland vs WV). The route.py
+    # generic-mode branch uses the same pattern; we keep them consistent
+    # because both tools see the same ambiguity-prone inputs.
+    start_coords = await _geocode_location(start)
+    end_coords = await _geocode_location(end, prefer_near=start_coords)
+    if start_coords is None or end_coords is None:
+        log.info("elevation.geocode_miss", start=start, end=end)
+        return None
+
+    start_anchor = Anchor(
+        name=start, country="?", lat=start_coords[0], lon=start_coords[1],
+    )
+    end_anchor = Anchor(
+        name=end, country="?", lat=end_coords[0], lon=end_coords[1],
+    )
+
+    # 10s ceiling — healthy BRouter responses are 2–5s; 10s gives comfortable
+    # headroom while keeping the haversine fallback prompt when the public
+    # instance is overloaded. Matches the spirit of route_real._BROUTER_TIMEOUT
+    # (15s) but tighter so multi-segment fan-outs aren't dominated by dead
+    # waits. A 30s value here cost ~150s of compounded latency on a real
+    # 5-timeout LDN→Edinburgh request before this was tightened.
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            distance_km, ascend_m, _time_s = await _brouter_segment(
+                client, start_anchor, end_anchor,
+            )
+    except (httpx.HTTPError, ValueError, KeyError) as e:
+        # BRouter unavailable BUT we already have valid geocodes. Compute a
+        # great-circle × 1.25 distance estimate (same multiplier the get_route
+        # generic-mode fallback uses) instead of returning None and dropping to
+        # the universal 80 km stub. This is the difference between *all 7
+        # timeouts becoming uniform 80 km* and *each timeout becoming roughly
+        # right per its geography* (Durham → Newcastle ~23 km, Lincoln → York
+        # ~111 km, etc.).
+        #
+        # Added 2026-05-11 after a web-Claude fact-check pinpointed the uniform
+        # 80 km values as broken: Newcastle → Durham real is ~26 km, Lincoln →
+        # York real is ~130 km, the 80 km mock was sometimes 3× off in either
+        # direction. Worse, the under-stated 80 km for Lincoln → York hid a
+        # day that would otherwise trip the joint blocker.
+        log.warning("elevation.brouter_failed_haversine_fallback",
+                    error=str(e), start=start, end=end)
+        gc_km = _haversine_km(start_coords, end_coords)
+        realistic_km = round(gc_km * 1.25, 1)
+        return GetElevationProfileOutput(
+            start=start,
+            end=end,
+            distance_km=realistic_km,
+            # Elevation is genuinely unknown without BRouter or DEM data — set
+            # to 0 with a clear caveat in `notes` rather than fabricating a
+            # number that masquerades as data.
+            elevation_gain_m=0,
+            elevation_loss_m=0,
+            max_grade_percent=0.0,
+            difficulty=_difficulty_from_distance(realistic_km),
+            notes=(
+                f"Distance is geocode + great-circle × 1.25 (~{realistic_km} km, "
+                f"within ~15% of real cycling distance — PLAN WITH IT). "
+                f"Elevation is unknown for this specific segment (BRouter "
+                f"unavailable) — surface 'verify gradient via Komoot' in your "
+                f"Heads up section but DO NOT refuse to plan; the distance "
+                f"is sufficient to compute pacing + accommodation."
+            ),
+        )
+
+    # Touring routes are typically near-symmetric in gain/loss; ~0.95× ascent
+    # is a reasonable estimate without a second BRouter call. For genuinely
+    # net-climbing routes (sea-level → mountain town), this under-counts loss
+    # in one direction and over-counts in the other — fine for the agent's
+    # "roughly how hard is this segment" purpose.
+    loss_m = int(round(ascend_m * 0.95))
+
+    # BRouter doesn't return peak gradient. Approximate as ~1.8× the average
+    # gradient, which empirically matches the peaks in catalog routes
+    # (Ditchling Beacon: avg ~3.5%, peak ~6%; Avenue Verte: avg ~1%, peak ~4%).
+    if distance_km > 0:
+        avg_grade_pct = (ascend_m / 1000.0) / distance_km * 100
+    else:
+        avg_grade_pct = 0.0
+    max_grade_pct = round(avg_grade_pct * 1.8, 1)
+
+    difficulty = _difficulty_from(distance_km, ascend_m, max_grade_pct)
+
+    return GetElevationProfileOutput(
+        start=start,
+        end=end,
+        distance_km=round(distance_km, 1),
+        elevation_gain_m=int(round(ascend_m)),
+        elevation_loss_m=loss_m,
+        max_grade_percent=max_grade_pct,
+        difficulty=difficulty,
+        notes=(
+            f"Real BRouter cycling segment (out-of-catalog). Distance and "
+            f"ascent are BRouter-verified; descent is approximated as 0.95× "
+            f"ascent and max grade as 1.8× the average gradient (BRouter "
+            f"doesn't return peak grade). For exact terrain confirm via "
+            f"Komoot or RWGPS before riding."
+        ),
+    )
+
+
 @register_tool(
     name="get_elevation_profile",
     description=(
@@ -92,8 +252,19 @@ async def get_elevation_profile(input: GetElevationProfileInput) -> GetElevation
         row = result.scalar_one_or_none()
 
     if row is None:
-        # Fall back to a flat-ish default with a note rather than 500-error
-        # the agent. Keeps the loop moving on unknown segments.
+        # Out-of-catalog segment — try real BRouter data before falling back.
+        # Added 2026-05-11 (closes the same Phase 1.10b TODO as get_route's
+        # generic-mode fix): the prior implementation returned a uniform
+        # 80 km / 150 m / "moderate" stub which made every generic-mode
+        # corridor's day plan look identical regardless of actual terrain.
+        # Now the catalog is the fast path; BRouter handles everywhere else.
+        real = await _fetch_real_elevation(input.start, input.end)
+        if real is not None:
+            return real
+
+        # BRouter unavailable AND geocoding worked elsewhere — last-ditch
+        # fallback. Surfaces clearly that the values are estimates so the
+        # agent doesn't quote them with false confidence.
         return GetElevationProfileOutput(
             start=input.start,
             end=input.end,
@@ -103,8 +274,9 @@ async def get_elevation_profile(input: GetElevationProfileInput) -> GetElevation
             max_grade_percent=3.0,
             difficulty="moderate",
             notes=(
-                "Mock data — segment not in the catalog. Treated as a 'moderate "
-                "rolling terrain' default."
+                "Estimated values — segment not in the catalog and BRouter "
+                "unavailable for this pair. Treat as 'moderate rolling terrain' "
+                "default and verify via Komoot/RWGPS before riding."
             ),
         )
 

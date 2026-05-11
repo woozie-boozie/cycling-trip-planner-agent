@@ -55,7 +55,7 @@ const components: Components = {
     <li className="pl-1 text-foreground/90 [&>strong]:text-foreground">{children}</li>
   ),
   strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-  em: ({ children }) => <em className="italic text-foreground/90">{children}</em>,
+  em: ({ children }) => <em className="not-italic font-semibold text-foreground/90">{children}</em>,
   hr: () => <hr className="my-4 border-border/50" />,
   code: ({ children }) => (
     <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[0.85em] text-primary">
@@ -68,7 +68,7 @@ const components: Components = {
     </pre>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-3 border-l-2 border-primary/40 bg-primary/5 px-3 py-2 text-sm italic text-foreground/85">
+    <blockquote className="my-3 border-l-2 border-primary/40 bg-primary/5 px-3 py-2 text-sm text-foreground/85">
       {children}
     </blockquote>
   ),

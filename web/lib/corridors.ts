@@ -23,8 +23,10 @@ export interface CorridorWaypoint {
   km_from_start: number;
 }
 
+export type CorridorId = "ams-cph" | "ldn-par" | "ldn-bri";
+
 export interface Corridor {
-  id: "ams-cph" | "ldn-par" | "ldn-bri";
+  id: CorridorId;
   label: string;
   description: string;
   total_km: number;
@@ -96,22 +98,39 @@ const ldn_bri: Corridor = {
 export const CORRIDORS: Corridor[] = [ams_cph, ldn_par, ldn_bri];
 
 /**
- * Pick the corridor that best matches a user message, by simple keyword
- * heuristic. Returns `null` if no clear match.
+ * Pick the corridor that best matches a user message — but only when
+ * the message references BOTH endpoints (start AND end city).
  *
- * If the user mentions multiple corridor names (e.g. "compare London to
- * Paris vs London to Brighton"), we prefer the one whose total alias hits
- * is highest. Ties break in favour of the longer / more specific corridor.
+ * Previous behaviour matched on ANY single alias hit, which caused a
+ * "London → Edinburgh" request to fuzzy-match `ldn-par` (because "London"
+ * alone hit one alias) and render the wrong map. The fix: require both
+ * endpoint city names to appear before claiming this is a catalog corridor.
+ *
+ * For out-of-catalog corridors (e.g. London → Edinburgh, Bordeaux → Geneva),
+ * `matchCorridor` correctly returns `null` and the visual layer falls
+ * through to markdown rendering without a misleading corridor map.
+ *
+ * Multi-corridor mentions (e.g. "compare London → Paris vs London → Brighton")
+ * tie-break in favour of the corridor with the most alias hits *beyond*
+ * the endpoint check — gives heritage / route-name signals like
+ * "avenue verte" or "south downs" a chance to disambiguate.
  */
 export function matchCorridor(text: string): Corridor | null {
   const lower = text.toLowerCase();
   let best: { corridor: Corridor; score: number } | null = null;
   for (const c of CORRIDORS) {
-    let score = 0;
+    const start = c.waypoints[0].name.toLowerCase();
+    const end = c.waypoints[c.waypoints.length - 1].name.toLowerCase();
+    // Gate: BOTH endpoints must appear. This is the headline fix —
+    // single-endpoint matches were the bug.
+    if (!lower.includes(start) || !lower.includes(end)) continue;
+    // Tie-break score = count of additional alias hits (route names,
+    // signature features) that point to this corridor specifically.
+    let score = 2; // both endpoints
     for (const alias of c.aliases) {
+      if (alias === start || alias === end) continue;
       if (lower.includes(alias)) score += 1;
     }
-    if (score === 0) continue;
     if (!best || score > best.score) best = { corridor: c, score };
   }
   return best?.corridor ?? null;

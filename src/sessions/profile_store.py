@@ -102,8 +102,7 @@ class UserProfile(BaseModel):
     trip_styles: list[TripStyle] = Field(default_factory=list)
     priorities: list[Priority] = Field(
         default_factory=list,
-        max_length=3,
-        description="At most 3 priorities — forces the user to actually pick.",
+        description="What the cyclist cares about most. The agent biases route and accommodation choices toward these.",
     )
     dietary: list[DietaryRestriction] = Field(default_factory=list)
     additional_notes: str | None = Field(default=None, max_length=500)
@@ -130,7 +129,7 @@ class UserProfileCreate(BaseModel):
     profile_id: str | None = None
     experience: ExperienceLevel
     trip_styles: list[TripStyle] = Field(default_factory=list)
-    priorities: list[Priority] = Field(default_factory=list, max_length=3)
+    priorities: list[Priority] = Field(default_factory=list)
     dietary: list[DietaryRestriction] = Field(default_factory=list)
     additional_notes: str | None = Field(default=None, max_length=500)
 

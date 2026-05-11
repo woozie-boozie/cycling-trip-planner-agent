@@ -20,7 +20,7 @@ from typing import Any, Literal
 import json
 
 import structlog
-from anthropic import AsyncAnthropic
+from anthropic import APIConnectionError, APITimeoutError, AsyncAnthropic, RateLimitError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -43,6 +43,31 @@ from src.sessions import ProfileStore, SessionStore, UserProfile, UserProfileCre
 log = structlog.get_logger(__name__)
 
 router = APIRouter()
+
+
+def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
+    """Map a streaming-turn exception to a (kind, user-message) tuple.
+
+    The streaming endpoint can't raise to FastAPI's exception handler once
+    headers have been sent — instead it yields a structured `error` SSE
+    event the frontend renders inline. The `kind` field lets the UI pick
+    a specific recovery hint (e.g. "Start a new trip" for context-overflow
+    cases) without parsing prose.
+    """
+    if isinstance(exc, RateLimitError):
+        return (
+            "rate_limit",
+            "Hit Anthropic's per-minute rate limit. Wait ~60 seconds and "
+            "retry, or start a new trip to shrink the context.",
+        )
+    if isinstance(exc, APITimeoutError):
+        return ("timeout", "The model took too long to respond. Try again.")
+    if isinstance(exc, APIConnectionError):
+        return (
+            "network",
+            "Couldn't reach the model. Check your connection and try again.",
+        )
+    return ("unknown", "Something went wrong during this turn. Try again.")
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +166,14 @@ class ChatResponse(BaseModel):
     iterations: int = Field(description="LLM round-trips required to resolve this turn.")
     input_tokens: int
     output_tokens: int
+    cache_read_tokens: int = Field(
+        default=0,
+        description="Input tokens served from Anthropic's prompt cache (billed at ~10% rate).",
+    )
+    cache_creation_tokens: int = Field(
+        default=0,
+        description="Input tokens written to prompt cache this turn (one-off ~125% cost).",
+    )
     tool_calls: list[dict[str, Any]] = Field(
         description="Summary of tools invoked this turn — names and argument keys."
     )
@@ -249,6 +282,8 @@ async def chat(
         iterations=response.iterations,
         input_tokens=response.input_tokens,
         output_tokens=response.output_tokens,
+        cache_read_tokens=response.cache_read_tokens,
+        cache_creation_tokens=response.cache_creation_tokens,
         tool_calls=response.tool_calls,
     )
 
@@ -347,6 +382,20 @@ async def chat_stream(
                 if event.get("type") == "done":
                     await store.put(state)
                 yield f"data: {json.dumps(event)}\n\n"
+        except Exception as exc:  # noqa: BLE001
+            # SSE response — headers are already sent, so we can't raise to
+            # FastAPI's exception handler. Convert known errors into a
+            # structured `error` event the frontend can render cleanly.
+            kind, message = _classify_stream_error(exc)
+            log.warning(
+                "chat.stream.turn.error",
+                session_id=state.session_id,
+                kind=kind,
+                error=str(exc),
+            )
+            yield (
+                f"data: {json.dumps({'type': 'error', 'kind': kind, 'message': message})}\n\n"
+            )
         finally:
             # Backstop persist for error paths and partial streams (when the
             # agent loop hits an exception before yielding `done`).

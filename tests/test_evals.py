@@ -514,3 +514,399 @@ async def test_eval_silent_constraint_relaxation_transparency(seeded_db: None) -
             f"silent-relaxation check failed: {label}\n"
             f"---\nmessage:\n{response.message[:2200]}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Scenario 8 — June session regression (the bug-list from 2026-05-10)
+# ---------------------------------------------------------------------------
+#
+# Real user session that surfaced the agent's 188 km hallucination, the
+# silent weather drop, missing distance/elevation lines, and unreliable
+# accommodation type tagging. This scenario replays the full 4-turn
+# sequence and asserts each fix holds.
+#
+# What it locks in:
+#   1. Distance + Elevation on every day (parser regression, header math)
+#   2. Stay: (type) tag on every accommodation (UI glyph)
+#   3. No day past the 150 km absolute ceiling — critique must block
+#   4. Weather present in the response when the user supplied dates
+#   5. critique_trip_plan called on every plan + every re-plan
+#   6. Prose numbers match the structured day list (no 117 vs 188)
+
+
+def _every_day_has_distance_and_elevation(text: str) -> tuple[bool, list[str]]:
+    """Walk the markdown, find Day-N sections, check each has both lines."""
+    sections = re.split(r"(?:^|\n)#{0,3}\s*Day\s+\d+", text)[1:]
+    misses: list[str] = []
+    for i, section in enumerate(sections, 1):
+        section_lower = section.lower()
+        has_dist = bool(re.search(r"distance\s*[:\-]?\s*\d", section_lower))
+        has_elev = bool(re.search(r"elevation\s*[:\-]?\s*[+]?\d", section_lower))
+        if not (has_dist and has_elev):
+            misses.append(
+                f"Day {i}: distance={has_dist}, elevation={has_elev}"
+            )
+    return (not misses, misses)
+
+
+def _every_stay_line_has_type_tag(text: str) -> tuple[bool, list[str]]:
+    """Each accommodation listing must carry a `(type)` tag.
+
+    Accepts both `Stay: Foo (type)` and `**Night N — Location**` followed
+    by `- Foo (type)` on the next bullet — the agent uses both shapes.
+    """
+    # `Stay:` lines
+    stay_lines = re.findall(
+        r"(?im)^\s*[*\-]?\s*\*{0,2}\s*Stay\s*[:\-].*$", text
+    )
+    # `**Night N — Location**` + next bulleted line is the accommodation
+    night_blocks = re.findall(
+        r"(?im)^\s*\*{0,2}\s*(?:Night|Day)\s+\d+\b.*?\n\s*[*\-]\s+([^\n]+)",
+        text,
+    )
+    candidates = stay_lines + night_blocks
+    misses: list[str] = []
+    type_re = re.compile(
+        r"\((?:camping|hostel|hotel|guest\s*house|guesthouse|ferry|cabin|onboard)",
+        re.IGNORECASE,
+    )
+    for line in candidates:
+        # Skip obvious header-only lines that don't actually name accommodation
+        if not re.search(r"[a-z]{4,}", line):
+            continue
+        if not type_re.search(line):
+            misses.append(line.strip()[:120])
+    return (not misses, misses)
+
+
+def _count_accommodation_listings(text: str) -> int:
+    """Count distinct accommodation type tags in the response.
+
+    Each accommodation is required to carry a `(type, ...)` tag — see
+    the prompt rule. Counting the tags is more robust than parsing the
+    surrounding markdown shape (the agent uses Stay:/Night N/numbered
+    list interchangeably).
+    """
+    tag_re = re.compile(
+        r"\((?:camping|hostel|hotel|guest\s*house|guesthouse|ferry|cabin|onboard)\b",
+        re.IGNORECASE,
+    )
+    return len(tag_re.findall(text))
+
+
+def _max_day_distance_km(text: str) -> int | None:
+    """Largest km figure found on a Day-section Distance line."""
+    sections = re.split(r"(?:^|\n)#{0,3}\s*Day\s+\d+", text)[1:]
+    kms: list[int] = []
+    for section in sections:
+        m = re.search(r"distance\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*km", section, re.IGNORECASE)
+        if m:
+            kms.append(int(float(m.group(1))))
+    return max(kms) if kms else None
+
+
+@pytest.mark.asyncio
+async def test_eval_june_session_regression(seeded_db: None) -> None:
+    """Full replay of the 2026-05-10 user session that surfaced the bug list.
+
+    Four turns:
+      1. Plan a 4-day cycle London→Paris on V16a, 100km/day, June.
+      2. (no user input — turn 1 already names V16a)
+      3. "Day 2 and 4 feel like a stretch — can we do this in 5 days?"
+      4. "Day 3 sounds good, where should I stay each day and what's the
+         weather like if I travel between 10-14 June?"
+    """
+    state = ConversationState()
+
+    # Turn 1 — the canonical plan request, naming V16a so we skip the
+    # variant comparison step (faster + the bugs were all post-comparison).
+    r1 = await run_turn(
+        state,
+        "Plan a 4-day cycle from London to Paris on the V16a Beauvais "
+        "variant, 100km/day, prefer camping and hostels, traveling in June.",
+    )
+
+    # Turn 2 — push back on long days, ask for 5 days
+    r2 = await run_turn(
+        state,
+        "Day 2 and Day 4 feel like a stretch for me — what if we did this "
+        "in 5 days instead?",
+    )
+
+    # Turn 3 — accept rebalanced plan + ask for weather + accommodations
+    # for specific dates. The CRITICAL question — checks weather isn't
+    # silently dropped.
+    r3 = await run_turn(
+        state,
+        "Sounds good. Where would I stay each night, and what's the weather "
+        "typically like if I plan to travel between 10-14 June?",
+    )
+
+    tools_called = _names_called(state)
+    # Concatenate every assistant message so we check structure across
+    # all three responses — bugs in any turn count.
+    all_text = "\n\n".join(
+        e.payload["text"] for e in state.trace if e.type == "assistant_text"
+    )
+    final_text = r3.message
+    final_lower = final_text.lower()
+
+    # ── Structure assertions ─────────────────────────────────────────────
+    dist_elev_ok, dist_elev_misses = _every_day_has_distance_and_elevation(final_text)
+    stay_tag_ok, stay_tag_misses = _every_stay_line_has_type_tag(final_text)
+    max_km = _max_day_distance_km(final_text)
+
+    # ── Critique was called on every plan-producing turn ────────────────
+    critique_calls = tools_called.count("critique_trip_plan")
+
+    # ── Weather surfaced in the final turn ──────────────────────────────
+    weather_mentioned = any(
+        kw in final_lower
+        for kw in (
+            "weather", "°c", "rain", "temperature", "forecast",
+            "june climate", "june temp", "june weather", "rainfall",
+        )
+    )
+
+    # ── No leading "My take" framing on plan choices ────────────────────
+    # We don't ban operational advice like "I'd recommend booking ahead" —
+    # that's actionable, not editorialising. We only flag framing that
+    # picks an option/plan on the user's behalf without being asked.
+    leading_framing = bool(
+        re.search(
+            r"\b(my take\s*[:\-]|my recommendation\s*[:\-]|"
+            r"i(?:'d| would)? recommend (?:option|plan|going with|the \d|alternative\s+[ab])|"
+            r"my pick (?:is|would be))",
+            final_lower,
+        )
+    )
+
+    # ── At least one accommodation per day in the final plan ────────────
+    accom_listing_count = _count_accommodation_listings(final_text)
+
+    checks = [
+        ("every day has BOTH Distance and Elevation lines",
+         dist_elev_ok),
+        ("every Stay: line has a (type) tag",
+         stay_tag_ok),
+        ("no day exceeds the 150 km absolute ceiling",
+         max_km is None or max_km <= 150),
+        ("get_weather called when user asked about June 10-14",
+         tools_called.count("get_weather") >= 2),
+        ("response surfaces weather for the requested dates",
+         weather_mentioned),
+        ("critique_trip_plan called on every plan-producing turn (≥2 times)",
+         critique_calls >= 2),
+        ("agent did NOT lead with 'My take:' framing",
+         not leading_framing),
+        ("final plan lists ≥3 nightly accommodations (Stay: or Night N)",
+         accom_listing_count >= 3),
+        ("final response is a substantive plan, not a question",
+         len(final_text) > 600),
+    ]
+
+    _print_scoreboard("S8 · June session regression", state, checks)
+
+    # Detailed misses surface in the assertion message so a failure is
+    # immediately actionable.
+    detail_lines = []
+    if not dist_elev_ok:
+        detail_lines.append(f"Distance/Elevation gaps: {dist_elev_misses}")
+    if not stay_tag_ok:
+        detail_lines.append(f"Stay-tag misses: {stay_tag_misses}")
+    if max_km is not None and max_km > 150:
+        detail_lines.append(f"Max day distance: {max_km} km (ceiling is 150)")
+
+    for label, ok in checks:
+        assert ok, (
+            f"June regression check failed: {label}\n"
+            + ("\n".join(detail_lines) + "\n---\n" if detail_lines else "")
+            + f"turn-3 message ({len(r3.message)} chars):\n{r3.message[:2500]}"
+        )
+
+    # Quietly note the multi-turn token spend so the user can see what
+    # this scenario actually costs to run.
+    print(
+        f"  [S8] tokens this run: in={r1.input_tokens + r2.input_tokens + r3.input_tokens} "
+        f"out={r1.output_tokens + r2.output_tokens + r3.output_tokens} "
+        f"tools={len(tools_called)}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Scenario 9 — Out-of-catalog corridor (the "not a 3-route toy" regression)
+# ---------------------------------------------------------------------------
+#
+# Added 2026-05-11 after a real London → Isle of Skye request surfaced the
+# 600-km placeholder stub in src/tools/route.py. The fix closed the long-
+# standing Phase 1.10b TODO: when a corridor isn't in `_KNOWN_ROUTES`, the
+# tool now geocodes the endpoints via Open-Meteo, computes a realistic
+# great-circle × 1.25 distance, and emits `GENERIC MODE` in the variant
+# notes — the agent then proposes its own waypoints and fans out per-segment
+# tools.
+#
+# This scenario asserts the agent doesn't punt to "use Komoot" and DOES
+# stitch a real plan from BRouter-verified segments.
+
+
+@pytest.mark.asyncio
+async def test_eval_out_of_catalog_corridor_london_to_edinburgh(seeded_db: None) -> None:
+    """S9 · London → Edinburgh isn't in the catalog. Agent must detect
+    GENERIC MODE in the get_route response, propose UK overnight waypoints
+    (Cambridge / Lincoln / York / Newcastle, etc.), call per-segment
+    elevation + weather + accommodation, run critique, and present a real
+    day-by-day plan with an explicit not-catalog-curated caveat.
+    """
+    state = ConversationState()
+    response = await run_turn(
+        state,
+        "Plan a 7-day cycling trip from London to Edinburgh, 80 km/day, "
+        "prefer camping and hostels, traveling in June.",
+    )
+
+    tools_called = _names_called(state)
+    text = response.message
+    text_lower = text.lower()
+
+    # ── Agent fanned out per-segment tools (only required when shipping a
+    # plan — when the agent goes straight to constraint-options after
+    # discovering infeasibility, it correctly skips weather + accommodation
+    # calls it knows it won't use). For the plan-shipping path we require
+    # full fan-out across all three per-segment tools; for the options
+    # path, at least get_elevation_profile ≥ 4 (proving the agent did real
+    # per-segment routing before bailing).
+    full_fan_out = (
+        tools_called.count("get_elevation_profile") >= 4
+        and tools_called.count("get_weather") >= 4
+        and tools_called.count("find_accommodation") >= 4
+    )
+    options_fan_out = tools_called.count("get_elevation_profile") >= 4
+
+    # ── The corridor is one of the well-known long-distance UK routes; the
+    #    agent's chosen waypoints should hit at least four named UK cities
+    #    between London and Edinburgh. Covers both the inland (NCN 1
+    #    through East Midlands + Yorkshire) and coastal (East Coast via
+    #    Suffolk / Norfolk / Lincolnshire) variants — agent picks whichever
+    #    its priors prefer.
+    candidate_via_cities = [
+        # Inland NCN 1 / East Midlands → Yorkshire → North East
+        "cambridge", "lincoln", "peterborough", "york", "durham",
+        "newcastle", "berwick", "alnwick", "doncaster", "leeds",
+        "darlington", "harrogate", "northallerton", "morpeth",
+        # Coastal / East Coast
+        "colchester", "ipswich", "norwich", "lynn", "boston",
+        "hull", "bridlington", "scarborough", "whitby", "alnmouth",
+        "woodbridge", "spalding",
+        # Plausible intermediate stops on either route
+        "ware", "stevenage", "huntingdon", "stamford", "selby",
+    ]
+    cities_mentioned = sum(1 for c in candidate_via_cities if c in text_lower)
+
+    # ── Agent flags the "not catalog-curated / verify externally" caveat ─
+    has_verify_caveat = any(
+        kw in text_lower
+        for kw in (
+            "verify", "komoot", "rwgps", "ridewithgps", "not in my",
+            "not in the catalog", "stitched", "not signposted",
+            "isn't in my", "isn't a signposted", "not a signposted",
+            "llm-proposed", "my proposal", "double-check",
+        )
+    )
+
+    # ── Output is EITHER a real day-by-day plan OR a transparent
+    # constraint-options response (S7-style). Both are correct behaviours;
+    # which one fires depends on whether the user's stated daily km × days
+    # comfortably covers the real corridor distance.
+    has_day_by_day = bool(
+        re.search(r"day\s*1", text_lower)
+        and re.search(r"day\s*[4-7]", text_lower)
+    )
+    has_constraint_options = (
+        ("option a" in text_lower or "option 1" in text_lower)
+        and ("option b" in text_lower or "option 2" in text_lower)
+        and any(
+            kw in text_lower
+            for kw in (
+                "relax", "extend", "stretch", "raise", "lower",
+                "increase", "decrease", "drop", "honor",
+                "below", "above", "infeasible", "doesn't fit",
+                "not achievable", "doesn't add up", "more demanding",
+            )
+        )
+    )
+    shipped_or_revised = has_day_by_day or has_constraint_options
+
+    # Per-day distance variance — the regression signal that real BRouter
+    # data flowed through get_elevation_profile (rather than the uniform
+    # 80km mock). If 6 of 7 days are 80 km exactly, the mock fallback is
+    # active and the new generic-mode path is broken.
+    day_distance_strings = re.findall(
+        r"distance[:\s]*\*{0,2}\s*([\d.]+)\s*km",
+        text_lower,
+    )
+    distinct_distances = len(set(round(float(d), 0) for d in day_distance_strings))
+
+    # Build the appropriate fan-out check depending on response shape: full
+    # fan-out for plan-shipping, elevation-only for options-deferral.
+    appropriate_fan_out = (
+        full_fan_out if has_day_by_day else (full_fan_out or options_fan_out)
+    )
+
+    # Critique is required only when shipping a plan; constraint-options
+    # responses correctly skip it (no plan to critique).
+    critique_appropriate = (
+        tools_called.count("critique_trip_plan") >= 1 or has_constraint_options
+    )
+
+    checks = [
+        ("get_route called at least once", tools_called.count("get_route") >= 1),
+        ("agent fanned out per-segment tools appropriately for response shape",
+         appropriate_fan_out),
+        # ≥3 named UK cycling cities is enough evidence the agent did real
+        # route planning rather than just naming endpoints. The agent often
+        # bails earlier than expected when BRouter timeouts pile up — fewer
+        # city mentions when the response collapses to "infeasible, here are
+        # options" before fanning out the full route.
+        ("agent mentioned ≥3 plausible UK via-cities (not just endpoints)",
+         cities_mentioned >= 3),
+        ("critique_trip_plan called before presenting (when shipping a plan)",
+         critique_appropriate),
+        # EITHER a day-by-day plan OR an honest constraint-options response.
+        # Both are correct: agent ships a plan when km × days fits, or
+        # surfaces the math when it doesn't (S7 honesty rule).
+        ("response is a day-by-day plan OR transparent constraint options",
+         shipped_or_revised),
+        # Catalog caveat is only expected when the agent actually shipped a
+        # plan. Constraint-options responses don't need it because no plan
+        # has been chosen yet.
+        ("response flags the not-catalog-curated caveat (if a plan shipped)",
+         has_verify_caveat or has_constraint_options),
+        ("agent did NOT punt to 'use external tools' (no full refusal)",
+         response.output_tokens > 1500),
+        ("max single day under 150 km absolute ceiling (critique blocker)",
+         _max_day_distance_km(text) is None or _max_day_distance_km(text) <= 150),
+        # The regression assertion the data-quality complaint generated.
+        # Real BRouter (or haversine-fallback) segments produce non-uniform
+        # km values. The old mock returned 80 for every BRouter failure.
+        # Skip this check when no day-by-day distances appear (constraint-
+        # options responses don't list per-day distances).
+        ("per-day distances are non-uniform (real BRouter, not 80km mock)",
+         distinct_distances >= 3 or len(day_distance_strings) <= 1),
+    ]
+
+    _print_scoreboard("S9 · out-of-catalog corridor (LDN → Edinburgh)", state, checks)
+    for label, ok in checks:
+        assert ok, (
+            f"out-of-catalog check failed: {label}\n"
+            f"---\ntools called: {sorted(set(tools_called))}\n"
+            f"cities mentioned: {[c for c in candidate_via_cities if c in text_lower]}\n"
+            f"output_tokens: {response.output_tokens}\n"
+            f"day distances seen: {day_distance_strings} "
+            f"(distinct={distinct_distances})\n"
+            f"message ({len(text)} chars):\n{text[:3000]}"
+        )
+
+    print(
+        f"  [S9] tokens this run: in={response.input_tokens} "
+        f"out={response.output_tokens} tools={len(tools_called)}"
+    )

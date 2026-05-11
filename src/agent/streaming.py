@@ -41,6 +41,7 @@ Event protocol (dict shape, JSON-serialisable):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
@@ -50,6 +51,12 @@ from typing import Any
 import structlog
 from anthropic import AsyncAnthropic
 
+from src.agent.caching import (
+    cached_messages,
+    cached_system,
+    cached_tools,
+    extract_cache_usage,
+)
 from src.agent.config import get_settings
 from src.agent.prompts import SYSTEM_PROMPT, user_profile_context
 from src.agent.state import ConversationState, TraceEvent
@@ -96,6 +103,13 @@ async def run_turn_stream(
     if profile is not None:
         system_prompt = SYSTEM_PROMPT + "\n\n" + user_profile_context(profile)
 
+    # Pre-build cache-marked versions of system + tools once per turn —
+    # both are stable for the entire turn (and indeed the whole session,
+    # unless the profile changes). Marking the LAST tool with
+    # cache_control covers the entire tools array. See src/agent/caching.py.
+    cached_system_blocks = cached_system(system_prompt)
+    cached_tool_defs = cached_tools(tools)
+
     # Append the user's message to the conversation (same as run_turn).
     state.messages.append({"role": "user", "content": user_message})
 
@@ -109,6 +123,8 @@ async def run_turn_stream(
 
     turn_input_tokens = 0
     turn_output_tokens = 0
+    turn_cache_creation = 0
+    turn_cache_read = 0
     tool_call_summary: list[dict[str, Any]] = []
     final_stop_reason = "end_turn"
 
@@ -144,14 +160,19 @@ async def run_turn_stream(
         block_order: list[int] = []
         iteration_input_tokens = 0
         iteration_output_tokens = 0
+        iteration_cache_creation = 0
+        iteration_cache_read = 0
         iteration_stop_reason: str | None = None
 
+        # Re-mark the message history's last block on every iteration so
+        # the cache breakpoint moves forward as the conversation grows.
+        # state.messages is NOT mutated — cached_messages returns a copy.
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=settings.max_tokens,
-            system=system_prompt,
-            tools=tools,
-            messages=state.messages,
+            system=cached_system_blocks,
+            tools=cached_tool_defs,
+            messages=cached_messages(state.messages),
         ) as stream:
             async for event in stream:
                 event_type = getattr(event, "type", None)
@@ -162,6 +183,10 @@ async def run_turn_stream(
                     if usage is not None:
                         iteration_input_tokens = usage.input_tokens
                         iteration_output_tokens = usage.output_tokens
+                        (
+                            iteration_cache_creation,
+                            iteration_cache_read,
+                        ) = extract_cache_usage(usage)
 
                 elif event_type == "content_block_start":
                     block = event.content_block
@@ -261,11 +286,24 @@ async def run_turn_stream(
             assistant_content = [{"type": "text", "text": ""}]
 
         # Token accounting from streamed events (input from message_start,
-        # output from cumulative message_delta).
+        # output from cumulative message_delta). Cache stats let us see at
+        # a glance how much of the input was hit-from-cache vs newly billed.
         turn_input_tokens += iteration_input_tokens
         turn_output_tokens += iteration_output_tokens
+        turn_cache_creation += iteration_cache_creation
+        turn_cache_read += iteration_cache_read
         state.total_input_tokens += iteration_input_tokens
         state.total_output_tokens += iteration_output_tokens
+
+        log.info(
+            "agent.stream.iteration.usage",
+            session_id=state.session_id,
+            iteration=iteration,
+            input_tokens=iteration_input_tokens,
+            output_tokens=iteration_output_tokens,
+            cache_creation=iteration_cache_creation,
+            cache_read=iteration_cache_read,
+        )
 
         # Persist the assistant turn so the next iteration sees it.
         state.messages.append({"role": "assistant", "content": assistant_content})
@@ -306,6 +344,8 @@ async def run_turn_stream(
                 iterations=iteration,
                 input_tokens=turn_input_tokens,
                 output_tokens=turn_output_tokens,
+                cache_creation=turn_cache_creation,
+                cache_read=turn_cache_read,
             )
             yield {
                 "type": "done",
@@ -314,28 +354,42 @@ async def run_turn_stream(
                 "iterations": iteration,
                 "input_tokens": turn_input_tokens,
                 "output_tokens": turn_output_tokens,
+                "cache_read_tokens": turn_cache_read,
+                "cache_creation_tokens": turn_cache_creation,
                 "tool_calls": tool_call_summary,
             }
             return
 
-        # Otherwise, dispatch every tool_use block and yield results.
-        tool_result_blocks: list[dict[str, Any]] = []
-        for idx in block_order:
-            if idx not in accumulated_tool:
-                continue
-            tb = accumulated_tool[idx]
-            t0 = time.perf_counter()
-            result = await dispatch(tb["name"], tb["input"])
-            latency_ms = int((time.perf_counter() - t0) * 1000)
+        # Dispatch all tool_use blocks in PARALLEL via asyncio.as_completed.
+        # SSE events fire as each tool finishes (any order, fastest first),
+        # giving the UI live progress instead of a single 150s stall.
+        # tool_result_blocks for the message history is reassembled in
+        # block_order at the end — Anthropic's tool_use protocol expects
+        # results in the same order as the original tool_use blocks.
+        indexed_tool_calls = [
+            (idx, accumulated_tool[idx])
+            for idx in block_order
+            if idx in accumulated_tool
+        ]
 
-            tool_result_blocks.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": tb["id"],
-                    "content": json.dumps(result.content),
-                    "is_error": result.is_error,
-                }
-            )
+        async def _dispatch_with_idx(
+            idx: int, tb: dict[str, Any],
+        ) -> tuple[int, dict[str, Any], Any, int]:
+            t0 = time.perf_counter()
+            r = await dispatch(tb["name"], tb["input"])
+            return idx, tb, r, int((time.perf_counter() - t0) * 1000)
+
+        tasks = [
+            asyncio.create_task(_dispatch_with_idx(idx, tb))
+            for idx, tb in indexed_tool_calls
+        ]
+
+        # Collect results as they complete (any order) and emit SSE events.
+        # Keyed by idx so we can reassemble in block_order after.
+        completed: dict[int, tuple[dict[str, Any], Any, int]] = {}
+        for completed_task in asyncio.as_completed(tasks):
+            idx, tb, result, latency_ms = await completed_task
+            completed[idx] = (tb, result, latency_ms)
             _trace(
                 state,
                 iteration,
@@ -355,6 +409,21 @@ async def run_turn_stream(
                 "is_error": result.is_error,
                 "latency_ms": latency_ms,
             }
+
+        # Build tool_result_blocks in Claude's expected order.
+        tool_result_blocks: list[dict[str, Any]] = []
+        for idx in block_order:
+            if idx not in completed:
+                continue
+            tb, result, _ = completed[idx]
+            tool_result_blocks.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tb["id"],
+                    "content": json.dumps(result.content),
+                    "is_error": result.is_error,
+                }
+            )
 
         state.messages.append({"role": "user", "content": tool_result_blocks})
 

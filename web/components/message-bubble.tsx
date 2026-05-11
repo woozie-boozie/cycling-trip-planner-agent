@@ -4,13 +4,47 @@ import Image from "next/image";
 import { Bike, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
+import { VisualResponse } from "@/components/visual-response";
+import type { Corridor } from "@/lib/corridors";
+import type { RouteVariantSummary } from "@/lib/route-variants";
 import type { UiMessage } from "@/lib/types";
+import type { ViewMode } from "@/lib/view-mode";
 
 interface MessageBubbleProps {
   message: UiMessage;
+  /** When "visual", assistant messages route through `VisualResponse` */
+  viewMode?: ViewMode;
+  /** Conversation-scoped corridor used by visual mode for card rendering */
+  corridor?: Corridor | null;
+  /**
+   * Fired when the user commits to a variant via the comparison card's
+   * "Plan this route →" CTA. Routed up to the page-level handler that
+   * dispatches a curated chat message ("Let's go with the X route…") so
+   * the agent can proceed to day-by-day planning without the user typing.
+   */
+  onPickVariant?: (variant: RouteVariantSummary) => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+/**
+ * Bubble layout for a single message.
+ *
+ *   - User messages stay right-aligned and capped at ~640px so short
+ *     prompts don't sprawl across the 1200px conversation column.
+ *   - Assistant messages fill the column width so visual responses
+ *     (maps, itinerary cards) get room to breathe; markdown text inside
+ *     self-caps at a comfortable reading measure (~70 chars).
+ */
+function formatCached(n: number): string {
+  if (n >= 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  return n.toLocaleString();
+}
+
+export function MessageBubble({
+  message,
+  viewMode = "text",
+  corridor = null,
+  onPickVariant,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -26,53 +60,82 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {isUser ? <User className="h-4 w-4" aria-hidden /> : <Bike className="h-4 w-4" aria-hidden />}
       </div>
 
-      {/* Bubble */}
       <div
         className={
           isUser
-            ? "max-w-[85%] rounded-2xl rounded-tr-sm bg-primary/15 px-4 py-2.5 text-foreground ring-1 ring-primary/20"
-            : "min-w-0 max-w-[85%] flex-1 rounded-2xl rounded-tl-sm bg-card px-4 py-3 text-foreground ring-1 ring-border/40"
+            ? "flex min-w-0 max-w-[640px] flex-col items-end"
+            : "min-w-0 flex-1"
         }
       >
-        {isUser ? (
-          <>
-            {message.imageDataUrl ? (
-              <div className="mb-2 overflow-hidden rounded-lg ring-1 ring-border/30">
-                <Image
-                  src={message.imageDataUrl}
-                  alt="Attached"
-                  width={400}
-                  height={300}
-                  className="h-auto w-full object-cover"
-                  unoptimized
-                />
-              </div>
-            ) : null}
-            {message.content ? (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-            ) : null}
-          </>
-        ) : (
-          <MarkdownRenderer content={message.content} />
-        )}
+        {/* Bubble */}
+        <div
+          className={
+            isUser
+              ? "rounded-2xl rounded-tr-sm bg-primary/15 px-4 py-2.5 text-foreground ring-1 ring-primary/20"
+              : "min-w-0 rounded-2xl rounded-tl-sm bg-card px-5 py-4 text-foreground ring-1 ring-border/40"
+          }
+        >
+          {isUser ? (
+            <>
+              {message.imageDataUrl ? (
+                <div className="mb-2 overflow-hidden rounded-lg ring-1 ring-border/30">
+                  <Image
+                    src={message.imageDataUrl}
+                    alt="Attached"
+                    width={400}
+                    height={300}
+                    className="h-auto w-full object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : null}
+              {message.content ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+              ) : null}
+            </>
+          ) : viewMode === "visual" ? (
+            <VisualResponse
+              content={message.content}
+              corridor={corridor}
+              onPickVariant={onPickVariant}
+            />
+          ) : (
+            // Cap markdown text at a comfortable reading measure within
+            // the wide bubble. Visual responses ignore this and fill width.
+            <div className="max-w-[72ch]">
+              <MarkdownRenderer content={message.content} />
+            </div>
+          )}
 
-        {/* Per-turn meta for assistant messages */}
-        {!isUser && message.meta ? (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.iterations} iter
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.tool_calls.length} tools
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.input_tokens.toLocaleString()} in
-            </Badge>
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {message.meta.output_tokens.toLocaleString()} out
-            </Badge>
-          </div>
-        ) : null}
+          {/* Per-turn meta for assistant messages */}
+          {!isUser && message.meta ? (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.iterations} iter
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.tool_calls.length} tools
+              </Badge>
+              <Badge
+                variant="secondary"
+                className="font-mono text-[10px]"
+                title={
+                  message.meta.cache_read_tokens
+                    ? `${message.meta.input_tokens.toLocaleString()} newly billed input + ${(message.meta.cache_read_tokens ?? 0).toLocaleString()} read from prompt cache (~10% rate)`
+                    : undefined
+                }
+              >
+                {message.meta.input_tokens.toLocaleString()} in
+                {message.meta.cache_read_tokens
+                  ? ` · ${formatCached(message.meta.cache_read_tokens)} cached`
+                  : ""}
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {message.meta.output_tokens.toLocaleString()} out
+              </Badge>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );

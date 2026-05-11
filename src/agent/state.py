@@ -72,6 +72,16 @@ class AgentResponse(BaseModel):
     iterations: int = Field(description="Number of LLM round-trips this turn took")
     input_tokens: int
     output_tokens: int
+    cache_read_tokens: int = Field(
+        default=0,
+        description="Cumulative input tokens served from Anthropic's prompt cache this turn. "
+        "Bills at ~10% of the regular input rate. Non-zero only when caching breakpoints hit.",
+    )
+    cache_creation_tokens: int = Field(
+        default=0,
+        description="Cumulative input tokens used to *write* new prompt-cache entries this turn. "
+        "Bills at ~125% of the regular input rate — a one-off cost the next request amortises.",
+    )
     tool_calls: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Summary of tools called this turn — name + arg keys, for quick inspection",

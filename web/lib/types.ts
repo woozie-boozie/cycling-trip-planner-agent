@@ -105,6 +105,10 @@ export interface ChatResponse {
   iterations: number;
   input_tokens: number;
   output_tokens: number;
+  /** Cumulative input tokens served from Anthropic's prompt cache this turn. */
+  cache_read_tokens?: number;
+  /** Cumulative input tokens used to write new cache entries this turn. */
+  cache_creation_tokens?: number;
   tool_calls: ToolCallSummary[];
 }
 
@@ -132,6 +136,20 @@ export interface TraceResponse {
   estimated_cost_usd: number;
 }
 
+/**
+ * One tool invocation surfaced inline next to the agent's message while
+ * the stream is in flight. Status flips from "running" to "done" or "error"
+ * as the matching `tool_result` event arrives.
+ */
+export interface InlineTraceItem {
+  toolUseId: string;
+  name: string;
+  status: "running" | "done" | "error";
+  latencyMs?: number;
+  /** Argument keys (not values) — keeps the pill compact + leaks no PII. */
+  argKeys?: string[];
+}
+
 /** Local UI-only message representation for the chat thread. */
 export interface UiMessage {
   id: string;
@@ -142,11 +160,21 @@ export interface UiMessage {
    * the bubble. Stored separately from `content` (which is the text).
    */
   imageDataUrl?: string;
+  /**
+   * In-flight + completed tool calls for this assistant message,
+   * surfaced as inline pills next to the bubble. Visible in both
+   * text and visual modes.
+   */
+  liveTrace?: InlineTraceItem[];
   /** Per-turn snapshot for assistant messages. Undefined while in flight. */
   meta?: {
     iterations: number;
     input_tokens: number;
     output_tokens: number;
+    /** Input tokens served from Anthropic's prompt cache (renders next to "in"). */
+    cache_read_tokens?: number;
+    /** Input tokens written to prompt cache this turn. */
+    cache_creation_tokens?: number;
     tool_calls: ToolCallSummary[];
   };
 }

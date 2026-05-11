@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import math
 
+import httpx
+import structlog
 from sqlmodel import select
 
 from src.db import get_async_session
@@ -29,6 +31,120 @@ from src.db.models import Waypoint as WaypointRow
 from src.tools.base import register_tool
 from src.tools.route_real import _suggest_day_plan, fetch_real_route, use_real_routes
 from src.tools.schemas import GetRouteInput, GetRouteOutput, RouteVariant, Waypoint
+
+log = structlog.get_logger(__name__)
+
+# Open-Meteo geocoding API. Free, no auth, worldwide coverage. Used only
+# in the generic-mode fallback below when the requested corridor isn't in
+# the curated catalog.
+_OPEN_METEO_GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+
+# Cyclists' road-distance multiplier vs great-circle. Empirical: touring
+# routes on real cycling infrastructure are typically ~25% longer than
+# the straight-line distance due to road windings, bridge approaches,
+# climbs being switchbacked, etc. Calibrated against the catalog
+# corridors (e.g. LDN→PAR great-circle is ~340 km, BRouter-verified
+# Avenue Verte is ~380 km → 1.12×; AMS→CPH great-circle 630 km vs 850 km
+# inland → 1.35×). 1.25 is the median.
+_ROAD_DISTANCE_MULTIPLIER = 1.25
+
+
+def _haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:
+    """Great-circle distance between two (lat, lon) points, in km."""
+    lat1, lon1 = a
+    lat2, lon2 = b
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(h))
+
+
+async def _geocode_location(
+    name: str,
+    prefer_near: tuple[float, float] | None = None,
+) -> tuple[float, float] | None:
+    """Resolve a place name to (lat, lon) via Open-Meteo's free geocoding API.
+
+    `prefer_near` is an optional (lat, lon) bias. When set, the function
+    fetches up to 10 candidates and returns the one closest to the bias
+    point by haversine — solves the "Dunbar matches Dunbar, West Virginia
+    instead of Dunbar, Scotland" class of bug. Pass the prior waypoint's
+    coords here when geocoding a route's end city; for an isolated lookup
+    leave it None and the top result wins (preserves the pre-2026-05-11
+    behaviour for catalog code paths that already work).
+
+    Returns None on network error, no matches, or any other failure — the
+    caller falls back to the "truly unknown" stub. We intentionally don't
+    raise so a single bad input doesn't break the agent loop.
+    """
+    # Fetch more candidates when we have a bias signal — Open-Meteo's count=1
+    # always returns the top match by population/relevance, which is wrong
+    # for ambiguous names whose top global match is across an ocean from
+    # what the trip actually means.
+    count = 10 if prefer_near is not None else 1
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                _OPEN_METEO_GEOCODE_URL,
+                params={"name": name, "count": count, "language": "en", "format": "json"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except (httpx.HTTPError, ValueError) as e:
+        log.warning("geocode.http_error", error=str(e), name=name)
+        return None
+
+    results = data.get("results") or []
+    if not results:
+        log.info("geocode.no_match", name=name)
+        return None
+
+    # No bias → keep the historical top-result-wins behaviour. Used by the
+    # first endpoint geocode in any pair (we have nothing to bias toward yet).
+    if prefer_near is None:
+        top = results[0]
+        lat = top.get("latitude")
+        lon = top.get("longitude")
+        if lat is None or lon is None:
+            return None
+        return (float(lat), float(lon))
+
+    # Bias provided → pick the candidate closest to the reference point.
+    best: tuple[float, tuple[float, float]] | None = None  # (distance_km, coords)
+    for r in results:
+        lat = r.get("latitude")
+        lon = r.get("longitude")
+        if lat is None or lon is None:
+            continue
+        coords = (float(lat), float(lon))
+        d = _haversine_km(prefer_near, coords)
+        if best is None or d < best[0]:
+            best = (d, coords)
+
+    if best is None:
+        return None
+
+    # Sanity log — when the bias dramatically reshuffled the choice (top
+    # result was thousands of km from the bias), surface it so we can spot
+    # if Open-Meteo's data shifts. Distance > 5,000 km from the bias is
+    # almost certainly a wrong-continent miss.
+    top_coords = (
+        float(results[0]["latitude"]),
+        float(results[0]["longitude"]),
+    ) if results[0].get("latitude") is not None else None
+    if top_coords is not None and top_coords != best[1]:
+        top_dist = _haversine_km(prefer_near, top_coords)
+        if top_dist > 5000:
+            log.info(
+                "geocode.bias_rejected_top",
+                name=name,
+                top_dist_km=round(top_dist, 0),
+                picked_dist_km=round(best[0], 0),
+            )
+
+    return best[1]
 
 # (name, country, cumulative_km_from_start, ferry_required)
 _WAYPOINTS_AMS_TO_CPH: list[tuple[str, str, float, bool]] = [
@@ -113,46 +229,138 @@ async def get_route(input: GetRouteInput) -> GetRouteOutput:
         )
         route_row = result.scalar_one_or_none()
         if route_row is None:
-            # Unknown corridor — return a minimal stub so the agent can still
-            # operate gracefully ("I don't have detailed waypoints for that
-            # corridor; can you break it into shorter legs?").
-            stub_waypoints = [
+            # Unknown corridor — geocode the endpoints and return GENERIC MODE
+            # with a real great-circle-based distance estimate. The agent then
+            # proposes 5–10 cycling-friendly overnight waypoints itself (Claude
+            # knows the geography), and per-segment elevation/weather/accommodation
+            # tools fan out exactly the same way they do for catalog corridors.
+            #
+            # Replaces the previous hardcoded 600-km stub (Phase 1.10b TODO closed
+            # 2026-05-11): "Suggest the user break the trip into shorter,
+            # well-known legs" was a punt. The agent has everything it needs
+            # to plan ANY corridor — see src/agent/prompts.py "Generic-mode
+            # corridors" section.
+            # Geocode the start with no bias (we have nothing to bias
+            # toward yet), then bias the end toward the start's coords.
+            # This is the headline fix for the Berwick → Dunbar-WV class
+            # of error: "Dunbar" alone geocodes to West Virginia by default,
+            # but with a UK bias the Scottish Dunbar wins comfortably.
+            start_coords = await _geocode_location(input.start)
+            end_coords = await _geocode_location(
+                input.end, prefer_near=start_coords,
+            )
+
+            if start_coords is None or end_coords is None:
+                # Couldn't geocode at all — fall back to the truly-unknown stub
+                # so the agent can ask the user to rephrase the place name.
+                missing = []
+                if start_coords is None:
+                    missing.append(input.start)
+                if end_coords is None:
+                    missing.append(input.end)
+                stub_waypoints = [
+                    Waypoint(
+                        name=input.start, country="Unknown",
+                        distance_from_start_km=0.0, segment_km=0.0,
+                    ),
+                    Waypoint(
+                        name=input.end, country="Unknown",
+                        distance_from_start_km=0.0, segment_km=0.0,
+                    ),
+                ]
+                stub_variant = RouteVariant(
+                    name="ungeocoded",
+                    title="Place name not recognised",
+                    description="Couldn't resolve the start or end to real coordinates.",
+                    total_distance_km=0.0,
+                    estimated_days=1,
+                    waypoints=stub_waypoints,
+                    distinguishing_features=[],
+                    trade_offs=[],
+                    best_for="ask the user to rephrase or use a more specific place name",
+                    notes=(
+                        f"Geocoding failed for: {', '.join(missing)}. Ask the user "
+                        "for a more specific or commonly-known name (e.g. 'Edinburgh' "
+                        "rather than 'Auld Reekie')."
+                    ),
+                    is_default=True,
+                )
+                return GetRouteOutput(
+                    start=input.start,
+                    end=input.end,
+                    variants=[stub_variant],
+                    total_distance_km=0.0,
+                    estimated_days=1,
+                    waypoints=stub_waypoints,
+                    notes=stub_variant.notes,
+                )
+
+            # GENERIC MODE — real geocoded endpoints + great-circle estimate.
+            # The agent reads the GENERIC MODE prefix on `notes` and switches
+            # into "propose waypoints yourself + fan out per-segment tools" flow.
+            great_circle_km = _haversine_km(start_coords, end_coords)
+            realistic_km = round(great_circle_km * _ROAD_DISTANCE_MULTIPLIER, 1)
+            estimated_days = max(1, math.ceil(realistic_km / input.daily_km_target))
+
+            generic_waypoints = [
                 Waypoint(
                     name=input.start, country="Unknown",
                     distance_from_start_km=0.0, segment_km=0.0,
                 ),
                 Waypoint(
                     name=input.end, country="Unknown",
-                    distance_from_start_km=600.0, segment_km=600.0,
+                    distance_from_start_km=realistic_km, segment_km=realistic_km,
                 ),
             ]
-            stub_notes = (
-                "Detailed waypoints are not available for this corridor — only the "
-                "start and end are returned. Suggest the user break the trip into "
-                "shorter, well-known legs."
+            generic_notes = (
+                f"GENERIC MODE — this corridor is not in the curated catalog. "
+                f"The distance estimate ({realistic_km} km) is great-circle × "
+                f"{_ROAD_DISTANCE_MULTIPLIER} (typical road-distance multiplier "
+                f"for touring routes). You MUST propose 5–10 cycling-friendly "
+                f"overnight waypoints yourself based on your knowledge of the "
+                f"geography + long-distance cycling networks (LEJOG, NCN, "
+                f"EuroVelo, etc.), then call get_elevation_profile per consecutive "
+                f"pair to get real BRouter distance + climb. Sum the segments for "
+                f"the true total (discard this estimate). Then call get_weather "
+                f"and find_accommodation per overnight stop, same as catalog "
+                f"corridors. Flag in your response that overnight stops are "
+                f"LLM-proposed (not signposted) and the user should verify each "
+                f"leg via Komoot/RWGPS before riding. Still call critique_trip_plan."
             )
-            stub_days = max(1, math.ceil(600.0 / input.daily_km_target))
-            stub_variant = RouteVariant(
-                name="unknown_stub",
-                title="Unknown corridor — placeholder",
-                description="Detailed route data not available; placeholder distance only.",
-                total_distance_km=600.0,
-                estimated_days=stub_days,
-                waypoints=stub_waypoints,
-                distinguishing_features=[],
-                trade_offs=["No real route data — distances are an approximation"],
-                best_for="not recommended without verifying the route via another source",
-                notes=stub_notes,
+            generic_variant = RouteVariant(
+                name="generic",
+                title=f"{input.start} → {input.end} — generic (not catalog-curated)",
+                description=(
+                    f"Geocoded endpoints + great-circle distance × "
+                    f"{_ROAD_DISTANCE_MULTIPLIER}. Propose intermediate "
+                    f"waypoints and verify per-segment via BRouter."
+                ),
+                total_distance_km=realistic_km,
+                estimated_days=estimated_days,
+                waypoints=generic_waypoints,
+                distinguishing_features=[
+                    "Endpoints geocoded via Open-Meteo (real coordinates)",
+                    "Distance estimate calibrated against catalog corridors",
+                ],
+                trade_offs=[
+                    "No signposted cycle route — overnight stops are LLM-proposed",
+                    "Per-segment elevation + accommodation must be fetched and verified",
+                ],
+                best_for=(
+                    "any corridor outside the curated catalog — agent stitches a "
+                    "plan from BRouter-verified segments"
+                ),
+                notes=generic_notes,
                 is_default=True,
             )
             return GetRouteOutput(
                 start=input.start,
                 end=input.end,
-                variants=[stub_variant],
-                total_distance_km=600.0,
-                estimated_days=stub_days,
-                waypoints=stub_waypoints,
-                notes=stub_notes,
+                variants=[generic_variant],
+                total_distance_km=realistic_km,
+                estimated_days=estimated_days,
+                waypoints=generic_waypoints,
+                notes=generic_notes,
             )
 
         waypoint_result = await session.execute(

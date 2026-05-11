@@ -23,11 +23,15 @@ import type {
   ExperienceLevel,
   Priority,
   TripStyle,
+  UserProfile,
 } from "@/lib/types";
 
 interface WizardProps {
   onComplete: (profileId: string) => void;
   onDismiss: () => void;
+  /** When provided, the wizard pre-populates with the user's saved answers
+   *  and upserts back to the same profile_id. */
+  existing?: UserProfile | null;
 }
 
 const STEP_LABELS = ["Experience", "Style", "Priorities", "Dietary", "Notes"];
@@ -88,16 +92,20 @@ function toggleInArray<T>(arr: T[], value: T, max?: number): T[] {
   return [...arr, value];
 }
 
-export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
+export function OnboardingWizard({ onComplete, onDismiss, existing }: WizardProps) {
+  const isEditing = Boolean(existing);
   const [step, setStep] = useState(0);
-  const [experience, setExperience] = useState<ExperienceLevel | null>(null);
-  const [tripStyles, setTripStyles] = useState<TripStyle[]>([]);
-  const [priorities, setPriorities] = useState<Priority[]>([]);
-  const [dietary, setDietary] = useState<DietaryRestriction[]>([]);
-  const [notes, setNotes] = useState("");
+  const [experience, setExperience] = useState<ExperienceLevel | null>(
+    existing?.experience ?? null,
+  );
+  const [tripStyles, setTripStyles] = useState<TripStyle[]>(existing?.trip_styles ?? []);
+  const [priorities, setPriorities] = useState<Priority[]>(existing?.priorities ?? []);
+  const [dietary, setDietary] = useState<DietaryRestriction[]>(existing?.dietary ?? []);
+  const [notes, setNotes] = useState(existing?.additional_notes ?? "");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const existingProfileId = existing?.profile_id;
   const handleSubmit = useCallback(async () => {
     if (!experience) return;
     setError(null);
@@ -108,7 +116,10 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
       const cleanedDietary =
         dietary.length > 1 ? dietary.filter((d) => d !== "none") : dietary;
 
+      // Pass existing profile_id so the server upserts in place — the
+      // user's saved answers are updated, not duplicated.
       const profile = await postProfile({
+        profile_id: existingProfileId,
         experience,
         trip_styles: tripStyles,
         priorities,
@@ -125,7 +136,7 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
       }
       setSubmitting(false);
     }
-  }, [experience, tripStyles, priorities, dietary, notes, onComplete]);
+  }, [experience, tripStyles, priorities, dietary, notes, onComplete, existingProfileId]);
 
   const isLast = step === STEP_LABELS.length - 1;
   const canAdvance = step === 0 ? experience !== null : true;
@@ -151,10 +162,12 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
         {/* Header */}
         <div className="border-b border-border/60 px-6 pb-4 pt-5">
           <h2 id="wizard-title" className="text-base font-semibold tracking-tight text-foreground">
-            Tell me about your riding
+            {isEditing ? "Edit your profile" : "Tell me about your riding"}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Five quick questions — I&apos;ll tailor the plan to you. Skip any time.
+            {isEditing
+              ? "Update any answers — your next plan will reflect the changes."
+              : "Five quick questions — I'll tailor the plan to you. Skip any time."}
           </p>
           <ProgressDots step={step} total={STEP_LABELS.length} labels={STEP_LABELS} />
         </div>
@@ -203,14 +216,13 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
 
           {step === 2 && (
             <ChipPickerStep
-              title="What matters most? (max 3)"
-              hint="Forces a real ranking. I&apos;ll bias route + accommodation toward these."
+              title="What matters most?"
+              hint="I&apos;ll bias route + accommodation toward these."
               options={PRIORITY_OPTIONS}
               selected={priorities}
               onToggle={(v) =>
-                setPriorities((prev) => toggleInArray(prev, v, 3))
+                setPriorities((prev) => toggleInArray(prev, v))
               }
-              maxNote={priorities.length >= 3 ? "Three's the cap — deselect to swap." : undefined}
             />
           )}
 
@@ -228,8 +240,8 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
             <div className="space-y-3">
               <p className="text-sm font-medium text-foreground">Anything else?</p>
               <p className="text-xs text-muted-foreground">
-                Free text. Examples: <em>cycling for charity, have asthma, want only quiet
-                roads, this is my honeymoon</em>.
+                Free text. Examples: cycling for charity, have asthma, want only quiet
+                roads, this is my honeymoon.
               </p>
               <Textarea
                 value={notes}
@@ -261,7 +273,7 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
             disabled={submitting}
             className="text-xs text-muted-foreground"
           >
-            Skip for now
+            {isEditing ? "Cancel" : "Skip for now"}
           </Button>
           <div className="flex gap-2">
             <Button
@@ -279,6 +291,8 @@ export function OnboardingWizard({ onComplete, onDismiss }: WizardProps) {
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                     Saving
                   </>
+                ) : isEditing ? (
+                  "Save changes"
                 ) : (
                   "Save & continue"
                 )}
@@ -343,7 +357,7 @@ function ChipPickerStep<T extends string>({
         })}
       </div>
       {maxNote && (
-        <p className="text-[11px] italic text-muted-foreground">{maxNote}</p>
+        <p className="text-[11px] text-muted-foreground">{maxNote}</p>
       )}
     </div>
   );

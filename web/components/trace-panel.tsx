@@ -96,16 +96,16 @@ export function TracePanel({ trace, isLoading, hasSession, corridor }: TracePane
 
       {/* Header */}
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <h3 className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
           Trace · receipts
         </h3>
-        <p className="mt-1 text-[11px] text-muted-foreground/70">
-          What the agent did this session — every tool call with latency, total tokens, and
-          estimated cost. The same data the eval harness asserts.
+        <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/80">
+          Every tool call this session — latencies, tokens, cost. Same data the
+          eval harness asserts.
         </p>
       </div>
 
-      {/* Stats grid */}
+      {/* Stats grid — borderless cards, italic-serif numbers */}
       <div className="grid grid-cols-2 gap-2">
         <StatCard
           label="Iterations"
@@ -113,10 +113,14 @@ export function TracePanel({ trace, isLoading, hasSession, corridor }: TracePane
           hint={`${assistantTurns} assistant turns`}
           icon={Activity}
         />
-        <StatCard label="Tool calls" value={String(calls.length)} icon={Wrench} />
+        <StatCard
+          label="Tool calls"
+          value={String(calls.length)}
+          icon={Wrench}
+        />
         <StatCard
           label="Tokens"
-          value={`${(trace.total_input_tokens + trace.total_output_tokens).toLocaleString()}`}
+          value={(trace.total_input_tokens + trace.total_output_tokens).toLocaleString()}
           hint={`${trace.total_input_tokens.toLocaleString()} in · ${trace.total_output_tokens.toLocaleString()} out`}
           icon={Cpu}
         />
@@ -125,6 +129,7 @@ export function TracePanel({ trace, isLoading, hasSession, corridor }: TracePane
           value={`$${trace.estimated_cost_usd.toFixed(4)}`}
           hint="Sonnet pricing"
           icon={Coins}
+          accent="primary"
         />
       </div>
 
