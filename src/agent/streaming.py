@@ -41,6 +41,7 @@ Event protocol (dict shape, JSON-serialisable):
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from collections.abc import AsyncIterator
@@ -359,24 +360,36 @@ async def run_turn_stream(
             }
             return
 
-        # Otherwise, dispatch every tool_use block and yield results.
-        tool_result_blocks: list[dict[str, Any]] = []
-        for idx in block_order:
-            if idx not in accumulated_tool:
-                continue
-            tb = accumulated_tool[idx]
-            t0 = time.perf_counter()
-            result = await dispatch(tb["name"], tb["input"])
-            latency_ms = int((time.perf_counter() - t0) * 1000)
+        # Dispatch all tool_use blocks in PARALLEL via asyncio.as_completed.
+        # SSE events fire as each tool finishes (any order, fastest first),
+        # giving the UI live progress instead of a single 150s stall.
+        # tool_result_blocks for the message history is reassembled in
+        # block_order at the end — Anthropic's tool_use protocol expects
+        # results in the same order as the original tool_use blocks.
+        indexed_tool_calls = [
+            (idx, accumulated_tool[idx])
+            for idx in block_order
+            if idx in accumulated_tool
+        ]
 
-            tool_result_blocks.append(
-                {
-                    "type": "tool_result",
-                    "tool_use_id": tb["id"],
-                    "content": json.dumps(result.content),
-                    "is_error": result.is_error,
-                }
-            )
+        async def _dispatch_with_idx(
+            idx: int, tb: dict[str, Any],
+        ) -> tuple[int, dict[str, Any], Any, int]:
+            t0 = time.perf_counter()
+            r = await dispatch(tb["name"], tb["input"])
+            return idx, tb, r, int((time.perf_counter() - t0) * 1000)
+
+        tasks = [
+            asyncio.create_task(_dispatch_with_idx(idx, tb))
+            for idx, tb in indexed_tool_calls
+        ]
+
+        # Collect results as they complete (any order) and emit SSE events.
+        # Keyed by idx so we can reassemble in block_order after.
+        completed: dict[int, tuple[dict[str, Any], Any, int]] = {}
+        for completed_task in asyncio.as_completed(tasks):
+            idx, tb, result, latency_ms = await completed_task
+            completed[idx] = (tb, result, latency_ms)
             _trace(
                 state,
                 iteration,
@@ -396,6 +409,21 @@ async def run_turn_stream(
                 "is_error": result.is_error,
                 "latency_ms": latency_ms,
             }
+
+        # Build tool_result_blocks in Claude's expected order.
+        tool_result_blocks: list[dict[str, Any]] = []
+        for idx in block_order:
+            if idx not in completed:
+                continue
+            tb, result, _ = completed[idx]
+            tool_result_blocks.append(
+                {
+                    "type": "tool_result",
+                    "tool_use_id": tb["id"],
+                    "content": json.dumps(result.content),
+                    "is_error": result.is_error,
+                }
+            )
 
         state.messages.append({"role": "user", "content": tool_result_blocks})
 

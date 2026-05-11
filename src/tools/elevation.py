@@ -91,6 +91,21 @@ def _difficulty_from(distance_km: float, gain_m: float, max_grade_pct: float) ->
     return "extreme"
 
 
+def _difficulty_from_distance(distance_km: float) -> Difficulty:
+    """Distance-only difficulty for the haversine fallback path where we
+    don't have real elevation data. Conservative — long flat days still
+    flag as 'hard' so the agent doesn't underestimate fatigue."""
+    if distance_km < 50:
+        return "easy"
+    if distance_km < 90:
+        return "easy"
+    if distance_km < 115:
+        return "moderate"
+    if distance_km < 145:
+        return "hard"
+    return "extreme"
+
+
 async def _fetch_real_elevation(
     start: str, end: str
 ) -> GetElevationProfileOutput | None:
@@ -104,11 +119,16 @@ async def _fetch_real_elevation(
     """
     # Local imports — these modules pull database + httpx clients at import
     # time, so deferring keeps `from src.tools.elevation import …` light.
-    from src.tools.route import _geocode_location
+    from src.tools.route import _geocode_location, _haversine_km
     from src.tools.route_real import Anchor, _brouter_segment
 
+    # Geocode start with no bias, then bias end toward start's coords —
+    # disambiguates same-name places across continents (Boston Lincs vs MA,
+    # Newcastle Tyne vs upon Lyme, Dunbar Scotland vs WV). The route.py
+    # generic-mode branch uses the same pattern; we keep them consistent
+    # because both tools see the same ambiguity-prone inputs.
     start_coords = await _geocode_location(start)
-    end_coords = await _geocode_location(end)
+    end_coords = await _geocode_location(end, prefer_near=start_coords)
     if start_coords is None or end_coords is None:
         log.info("elevation.geocode_miss", start=start, end=end)
         return None
@@ -120,14 +140,55 @@ async def _fetch_real_elevation(
         name=end, country="?", lat=end_coords[0], lon=end_coords[1],
     )
 
+    # 10s ceiling — healthy BRouter responses are 2–5s; 10s gives comfortable
+    # headroom while keeping the haversine fallback prompt when the public
+    # instance is overloaded. Matches the spirit of route_real._BROUTER_TIMEOUT
+    # (15s) but tighter so multi-segment fan-outs aren't dominated by dead
+    # waits. A 30s value here cost ~150s of compounded latency on a real
+    # 5-timeout LDN→Edinburgh request before this was tightened.
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             distance_km, ascend_m, _time_s = await _brouter_segment(
                 client, start_anchor, end_anchor,
             )
     except (httpx.HTTPError, ValueError, KeyError) as e:
-        log.warning("elevation.brouter_failed", error=str(e), start=start, end=end)
-        return None
+        # BRouter unavailable BUT we already have valid geocodes. Compute a
+        # great-circle × 1.25 distance estimate (same multiplier the get_route
+        # generic-mode fallback uses) instead of returning None and dropping to
+        # the universal 80 km stub. This is the difference between *all 7
+        # timeouts becoming uniform 80 km* and *each timeout becoming roughly
+        # right per its geography* (Durham → Newcastle ~23 km, Lincoln → York
+        # ~111 km, etc.).
+        #
+        # Added 2026-05-11 after a web-Claude fact-check pinpointed the uniform
+        # 80 km values as broken: Newcastle → Durham real is ~26 km, Lincoln →
+        # York real is ~130 km, the 80 km mock was sometimes 3× off in either
+        # direction. Worse, the under-stated 80 km for Lincoln → York hid a
+        # day that would otherwise trip the joint blocker.
+        log.warning("elevation.brouter_failed_haversine_fallback",
+                    error=str(e), start=start, end=end)
+        gc_km = _haversine_km(start_coords, end_coords)
+        realistic_km = round(gc_km * 1.25, 1)
+        return GetElevationProfileOutput(
+            start=start,
+            end=end,
+            distance_km=realistic_km,
+            # Elevation is genuinely unknown without BRouter or DEM data — set
+            # to 0 with a clear caveat in `notes` rather than fabricating a
+            # number that masquerades as data.
+            elevation_gain_m=0,
+            elevation_loss_m=0,
+            max_grade_percent=0.0,
+            difficulty=_difficulty_from_distance(realistic_km),
+            notes=(
+                f"Distance is geocode + great-circle × 1.25 (~{realistic_km} km, "
+                f"within ~15% of real cycling distance — PLAN WITH IT). "
+                f"Elevation is unknown for this specific segment (BRouter "
+                f"unavailable) — surface 'verify gradient via Komoot' in your "
+                f"Heads up section but DO NOT refuse to plan; the distance "
+                f"is sufficient to compute pacing + accommodation."
+            ),
+        )
 
     # Touring routes are typically near-symmetric in gain/loss; ~0.95× ascent
     # is a reasonable estimate without a second BRouter call. For genuinely
