@@ -1,0 +1,61 @@
+id: amsterdam-berlin
+label: Amsterdam → Berlin
+start: Amsterdam
+end: Berlin
+aliases:
+- amsterdam to berlin
+- europaradweg
+- eurovelo 4 north
+- amsterdam berlin
+description: |-
+  Amsterdam → Berlin — the European capital-to-capital ride. ~580 km via Utrecht, Münster, Hannover and Magdeburg. Mostly flat, mix of Dutch LF paths and German Radwege. 6-8 days at intermediate pace.
+variants:
+- name: amsterdam_berlin_classic
+  title: Amsterdam → Berlin — Dutch LF + German Radwege
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The mostly-signposted capital-to-capital route from Amsterdam via Utrecht and Arnhem into Germany, then through Münster, Hannover, Magdeburg to Berlin. Mix of dedicated cycle paths and quiet country roads.
+  distinguishing_features:
+  - Two of Europe's flagship cycling capitals as start + end
+  - Münsterland — Germany's most-cycled rural region
+  - Magdeburg + Hannover for mid-trip bike-shop density
+  - Mostly flat throughout — no real climbs
+  trade_offs:
+  - Signposting varies — Dutch LF excellent, German Radwege patchier
+  - 580 km in a week is steady going — not a holiday pace
+  best_for: |-
+    European capital-collectors, riders extending a Berlin tour west into NL, week-long intermediate tourers
+  anchors:
+  - name: Amsterdam
+    country: Netherlands
+    lat: 52.37
+    lon: 4.9
+  - name: Utrecht
+    country: Netherlands
+    lat: 52.09
+    lon: 5.12
+  - name: Arnhem
+    country: Netherlands
+    lat: 51.98
+    lon: 5.91
+  - name: Münster
+    country: Germany
+    lat: 51.96
+    lon: 7.63
+  - name: Osnabrück
+    country: Germany
+    lat: 52.28
+    lon: 8.05
+  - name: Hannover
+    country: Germany
+    lat: 52.37
+    lon: 9.74
+  - name: Magdeburg
+    country: Germany
+    lat: 52.13
+    lon: 11.63
+  - name: Berlin
+    country: Germany
+    lat: 52.52
+    lon: 13.4

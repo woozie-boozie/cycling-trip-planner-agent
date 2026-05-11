@@ -1,0 +1,65 @@
+id: loire-a-velo
+label: Nevers → Saint-Brevin-les-Pins
+start: Nevers
+end: Saint-Brevin-les-Pins
+aliases:
+- loire
+- loire a velo
+- loire à vélo
+- eurovelo 6 france
+- nevers
+description: |-
+  Loire à Vélo — the canonical signposted EuroVelo 6 western segment. ~800 km of mostly flat, dedicated cycle paths along France's longest river, through vineyards, châteaux country, and gentle Atlantic-coast finale. The flattest 800 km of any EV6 segment.
+variants:
+- name: ev6_loire
+  title: EuroVelo 6 Loire — the canonical signposted path
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The fully signposted EuroVelo 6 from Nevers via Sancerre, Orléans, Blois, Tours, Saumur, Angers and Nantes to the Atlantic at Saint-Brevin-les-Pins.
+  distinguishing_features:
+  - Flattest 800 km of any EuroVelo 6 segment
+  - Vineyard + château villages every 30-40 km
+  - Loire river views for ~60% of the ride
+  - Mostly dedicated traffic-free cycle paths
+  trade_offs:
+  - Tourist-heavy in July/August around the major châteaux
+  - Some sections traffic-shared near Tours and Nantes
+  best_for: first-time multi-day tourers wanting flat + scenic + signposted
+  anchors:
+  - name: Nevers
+    country: France
+    lat: 47.0
+    lon: 3.16
+  - name: Sancerre
+    country: France
+    lat: 47.33
+    lon: 2.84
+  - name: Orléans
+    country: France
+    lat: 47.9
+    lon: 1.91
+  - name: Blois
+    country: France
+    lat: 47.58
+    lon: 1.34
+  - name: Tours
+    country: France
+    lat: 47.39
+    lon: 0.69
+  - name: Saumur
+    country: France
+    lat: 47.26
+    lon: -0.07
+  - name: Angers
+    country: France
+    lat: 47.47
+    lon: -0.55
+  - name: Nantes
+    country: France
+    lat: 47.22
+    lon: -1.55
+  - name: Saint-Brevin-les-Pins
+    country: France
+    lat: 47.25
+    lon: -2.17

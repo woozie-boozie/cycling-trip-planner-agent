@@ -1,0 +1,55 @@
+id: algarve-coast
+label: Lagos → Tavira
+start: Lagos
+end: Tavira
+aliases:
+- algarve
+- portugal coast
+- lagos to tavira
+- south portugal
+description: |-
+  Algarve coast — Portugal's southern coast end-to-end by bike. ~100 km of mostly flat coastal cycling from Lagos in the west to Tavira near the Spanish border. Short trip, big winter-sun appeal.
+variants:
+- name: algarve_full
+  title: Algarve coast — Lagos to Tavira full traverse
+  headline_tag: Coastal
+  is_default: true
+  description: |-
+    The signposted Ecovia do Litoral from Lagos via Portimão, Albufeira and Faro to Tavira. Mostly flat, cliff-top + estuary cycling, end-to-end in 2-3 days.
+  distinguishing_features:
+  - |-
+    Year-round cyclable — Algarve has the warmest winter in mainland Europe
+  - Cliff-top sections between Lagos and Albufeira
+  - Ria Formosa wetlands UNESCO biosphere reserve
+  - Seafood + Portuguese pasteís every overnight
+  trade_offs:
+  - Coastal road can be busy with tourist traffic in summer
+  - Limited inland options if the coast gets crowded
+  - Short trip — only 2-3 days at any reasonable pace
+  best_for: |-
+    winter tourers, short-break riders, families with older kids wanting a flat coastal week
+  anchors:
+  - name: Lagos
+    country: Portugal
+    lat: 37.1
+    lon: -8.67
+  - name: Portimão
+    country: Portugal
+    lat: 37.14
+    lon: -8.54
+  - name: Albufeira
+    country: Portugal
+    lat: 37.09
+    lon: -8.25
+  - name: Faro
+    country: Portugal
+    lat: 37.02
+    lon: -7.93
+  - name: Olhão
+    country: Portugal
+    lat: 37.03
+    lon: -7.84
+  - name: Tavira
+    country: Portugal
+    lat: 37.13
+    lon: -7.65

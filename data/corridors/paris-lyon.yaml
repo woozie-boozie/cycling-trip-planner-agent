@@ -1,0 +1,59 @@
+id: paris-lyon
+label: Paris → Lyon
+start: Paris
+end: Lyon
+aliases:
+- paris to lyon
+- bourgogne canal
+- via fluvia
+- paris lyon
+- burgundy bike
+description: |-
+  Paris → Lyon via the Burgundy canals — France's other headline corridor. ~500 km via Sens, Auxerre, Dijon and Beaune. Burgundy wine country, canal towpaths, châteaux, and gastronomic legend en route.
+variants:
+- name: paris_lyon_bourgogne
+  title: Paris → Lyon — via the Burgundy canals
+  headline_tag: Heritage
+  is_default: true
+  description: |-
+    Cycling-friendly canal-towpath corridor from Paris via the Yonne and Burgundy canals to Dijon and the Côte d'Or wine villages, then south to Mâcon and Lyon. Mostly flat with vineyard climbs around Beaune.
+  distinguishing_features:
+  - Burgundy Grand Cru wine villages — Beaune, Pommard, Meursault
+  - Canal towpaths for ~70% of the trip — traffic-free, flat
+  - Dijon mustard + Burgundy beef + Mâcon Chardonnay region
+  - Lyon as a finish — France's gastronomic capital
+  trade_offs:
+  - Côte d'Or vineyard sections have real short climbs
+  - Towpath surfaces vary — some unpaved, gravel-bike preferred
+  - Cellar tastings can shorten cycling time considerably
+  best_for: |-
+    wine + food tourists, gravel-bike riders, week-long France-deep-cut tours
+  anchors:
+  - name: Paris
+    country: France
+    lat: 48.86
+    lon: 2.35
+  - name: Sens
+    country: France
+    lat: 48.2
+    lon: 3.28
+  - name: Auxerre
+    country: France
+    lat: 47.8
+    lon: 3.57
+  - name: Dijon
+    country: France
+    lat: 47.32
+    lon: 5.04
+  - name: Beaune
+    country: France
+    lat: 47.02
+    lon: 4.83
+  - name: Mâcon
+    country: France
+    lat: 46.31
+    lon: 4.83
+  - name: Lyon
+    country: France
+    lat: 45.76
+    lon: 4.84

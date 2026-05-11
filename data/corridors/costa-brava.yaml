@@ -1,0 +1,62 @@
+id: costa-brava
+label: Barcelona → Cap de Creus
+start: Barcelona
+end: Cap de Creus
+aliases:
+- costa brava
+- barcelona to cap de creus
+- catalan coast
+- girona coast
+description: |-
+  Costa Brava — Catalonia's wild coast. ~280 km from Barcelona north along the Mediterranean via Tossa de Mar, Palamós and Cadaqués to the rocky finale at Cap de Creus. Mix of beach towns and Dalí country.
+variants:
+- name: costa_brava_coast
+  title: Costa Brava coast — Barcelona to Cap de Creus
+  headline_tag: Coastal
+  is_default: true
+  description: |-
+    Coastal route from Barcelona via the Maresme then Tossa, Palamós, L'Escala and Cadaqués to Cap de Creus — Europe's easternmost point of the Iberian peninsula.
+  distinguishing_features:
+  - Wild Mediterranean coves between Tossa and Palamós
+  - Cadaqués — Dalí's coastal village
+  - Cap de Creus — easternmost point of mainland Spain
+  - Beach swimming + tapas + Catalan wine every overnight
+  trade_offs:
+  - Coastal road traffic between Barcelona and Blanes
+  - July/August tourist density, especially around Tossa
+  - Final 30 km to Cap de Creus has serious short climbs
+  best_for: |-
+    Mediterranean lovers, Dalí enthusiasts, riders wanting a short 5-day coastal trip with a dramatic finish
+  anchors:
+  - name: Barcelona
+    country: Spain
+    lat: 41.39
+    lon: 2.17
+  - name: Mataró
+    country: Spain
+    lat: 41.54
+    lon: 2.44
+  - name: Blanes
+    country: Spain
+    lat: 41.67
+    lon: 2.79
+  - name: Tossa de Mar
+    country: Spain
+    lat: 41.72
+    lon: 2.93
+  - name: Palamós
+    country: Spain
+    lat: 41.85
+    lon: 3.13
+  - name: L'Escala
+    country: Spain
+    lat: 42.12
+    lon: 3.13
+  - name: Cadaqués
+    country: Spain
+    lat: 42.29
+    lon: 3.28
+  - name: Cap de Creus
+    country: Spain
+    lat: 42.32
+    lon: 3.32

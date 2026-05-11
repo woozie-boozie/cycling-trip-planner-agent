@@ -1,0 +1,53 @@
+id: prague-vienna
+label: Prague → Vienna
+start: Prague
+end: Vienna
+aliases:
+- prague to vienna
+- greenways prague vienna
+- czech vienna
+- prague vienna
+description: |-
+  Prague → Vienna Greenways — the signposted Czech/Austrian cycle corridor. ~400 km via Český Krumlov UNESCO town and the Moravian wine region. 5-6 days at intermediate pace.
+variants:
+- name: prague_vienna_greenways
+  title: Prague → Vienna Greenways — UNESCO + Moravian wine
+  headline_tag: Heritage
+  is_default: true
+  description: |-
+    The signposted Greenways route from Prague via Český Krumlov (UNESCO old town), České Budějovice (Budvar beer), and the Moravian wine region (Mikulov, Břeclav) into Vienna.
+  distinguishing_features:
+  - Český Krumlov UNESCO World Heritage town as the mid-trip stop
+  - Moravian wine region — Czech rieslings + small-grower cellars
+  - Pilsner / Budvar / Austrian beer geography in one trip
+  - Czech sections quieter than the more popular Danube
+  trade_offs:
+  - Less signposted than the EuroVelos — bring GPX
+  - Some Czech sections traffic-shared on regional roads
+  best_for: |-
+    Central European heritage tourists, wine + beer cyclists, riders wanting quieter alternative to the Danube
+  anchors:
+  - name: Prague
+    country: Czech Republic
+    lat: 50.08
+    lon: 14.43
+  - name: České Budějovice
+    country: Czech Republic
+    lat: 48.97
+    lon: 14.47
+  - name: Český Krumlov
+    country: Czech Republic
+    lat: 48.81
+    lon: 14.32
+  - name: Mikulov
+    country: Czech Republic
+    lat: 48.81
+    lon: 16.64
+  - name: Břeclav
+    country: Czech Republic
+    lat: 48.76
+    lon: 16.88
+  - name: Vienna
+    country: Austria
+    lat: 48.21
+    lon: 16.37

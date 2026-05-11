@@ -1,0 +1,50 @@
+id: danube-passau-vienna
+label: Passau → Vienna
+start: Passau
+end: Vienna
+aliases:
+- danube
+- donauradweg
+- eurovelo 6 austria
+- passau
+- vienna
+description: |-
+  Donauradweg / EuroVelo 6 — the most popular long-distance cycling route in Europe. ~330 km along the Danube through Austria, with Linz, Melk's hilltop monastery, and the Wachau wine valley en route. Doable in 4-7 days.
+variants:
+- name: donauradweg
+  title: Donauradweg — the classic Danube week
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The signposted Donauradweg from Passau (Bavaria/Austria border) via Linz, Melk and Krems to Vienna. Mostly traffic-free river path on both banks, ferry crossings to swap sides as needed.
+  distinguishing_features:
+  - Most-cycled long-distance route in Europe
+  - Wachau valley UNESCO World Heritage (between Melk and Krems)
+  - Linz, Melk and Krems for hostel density + Austrian beer
+  - Mostly flat, both-bank cycle paths, ferry crossings to swap sides
+  trade_offs:
+  - Booked-out accommodation in July/August — reserve ahead
+  - Cruise-boat traffic can spoil the views at popular waypoints
+  best_for: |-
+    first-time bike-tourers, gravel-shy roadies, or anyone wanting a stress-free week of European river cycling
+  anchors:
+  - name: Passau
+    country: Germany
+    lat: 48.57
+    lon: 13.46
+  - name: Linz
+    country: Austria
+    lat: 48.31
+    lon: 14.29
+  - name: Melk
+    country: Austria
+    lat: 48.23
+    lon: 15.33
+  - name: Krems
+    country: Austria
+    lat: 48.41
+    lon: 15.61
+  - name: Vienna
+    country: Austria
+    lat: 48.21
+    lon: 16.37
