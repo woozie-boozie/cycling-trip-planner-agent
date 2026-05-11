@@ -1,0 +1,793 @@
+[
+  {
+    "lat": 51.5047795,
+    "lon": -0.127044,
+    "layer": "photo",
+    "label": "Horse Guards",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.0912159,
+    "lon": -0.1799236,
+    "layer": "photo",
+    "label": "Go Ape",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5046612,
+    "lon": -0.1282961,
+    "layer": "photo",
+    "label": "Horse Guards Parade",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.499892,
+    "lon": -0.1253567,
+    "layer": "photo",
+    "label": "Westminster Hall",
+    "description": "Attraction"
+  },
+  {
+    "lat": 50.8223927,
+    "lon": -0.1376249,
+    "layer": "photo",
+    "label": "Royal Pavilion",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5005499,
+    "lon": -0.1263325,
+    "layer": "photo",
+    "label": "Flags Of UK Overseas Territories",
+    "description": "Attraction"
+  },
+  {
+    "lat": 50.8728657,
+    "lon": 0.0075256,
+    "layer": "photo",
+    "label": "Lewes Castle",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5045773,
+    "lon": -0.1259162,
+    "layer": "photo",
+    "label": "Banqueting House",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5007042,
+    "lon": -0.1245721,
+    "layer": "photo",
+    "label": "Big Ben",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5007011,
+    "lon": -0.1245731,
+    "layer": "photo",
+    "label": "Elizabeth Tower",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5006259,
+    "lon": -0.126826,
+    "layer": "photo",
+    "label": "Parliament Square",
+    "description": "Square where many demonstrations are held. Views of several notable buildings."
+  },
+  {
+    "lat": 51.486771,
+    "lon": -0.1198903,
+    "layer": "photo",
+    "label": "horses",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.4994013,
+    "lon": -0.1273907,
+    "layer": "photo",
+    "label": "Westminster Abbey",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.4626168,
+    "lon": -0.1156652,
+    "layer": "photo",
+    "label": "David Bowie mural",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.4990317,
+    "lon": -0.1271403,
+    "layer": "photo",
+    "label": "Chapter House and Pyx Chamber",
+    "description": "Attraction"
+  },
+  {
+    "lat": 50.903768,
+    "lon": -0.131974,
+    "layer": "photo",
+    "label": "Clayton Holt",
+    "description": "The landscape is undulating; many of the mounds are not natural but tumuli or ancient burial mounds. Before the windmills is Clayton Holt, an ancient woodland e"
+  },
+  {
+    "lat": 51.4869414,
+    "lon": -0.1194183,
+    "layer": "photo",
+    "label": "horses",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.487143,
+    "lon": -0.1194901,
+    "layer": "photo",
+    "label": "goats",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.2096069,
+    "lon": -0.1719887,
+    "layer": "wildlife",
+    "label": "Petridgewood Common",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.9426919,
+    "lon": -0.1302927,
+    "layer": "wildlife",
+    "label": "Batchelors Farm Nature Conservation Site",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.4162321,
+    "lon": -0.1436462,
+    "layer": "wildlife",
+    "label": "Eardley Road Sidings",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.424953,
+    "lon": -0.1055261,
+    "layer": "wildlife",
+    "label": "Knight's Hill Wood Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8297672,
+    "lon": -0.109192,
+    "layer": "wildlife",
+    "label": "Whitehawk Hill Local Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8319543,
+    "lon": -0.1406827,
+    "layer": "wildlife",
+    "label": "Greenway",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8677831,
+    "lon": -0.1310669,
+    "layer": "wildlife",
+    "label": "Ladies Mile Local Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.3189419,
+    "lon": -0.0640796,
+    "layer": "wildlife",
+    "label": "Hamsey Green Pond",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8520243,
+    "lon": -0.1412106,
+    "layer": "wildlife",
+    "label": "Sealed spoil heap",
+    "description": "UNDER CONSTRUCTION\nSealed spoil heap to be landscaped for flora and fauna"
+  },
+  {
+    "lat": 50.9443361,
+    "lon": -0.1374416,
+    "layer": "wildlife",
+    "label": "Nightingale Lane Meadows Nature Conservation Site",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8498533,
+    "lon": -0.1416095,
+    "layer": "wildlife",
+    "label": "Liz Williams Butterfly Haven",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8495896,
+    "lon": -0.1422364,
+    "layer": "wildlife",
+    "label": "Dorothy Stringer Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.9162735,
+    "lon": -0.1322292,
+    "layer": "camp",
+    "label": "Southdown Way Caravan & Camping Park",
+    "description": "Campsites near Southdown Way National Trail"
+  },
+  {
+    "lat": 50.8424232,
+    "lon": -0.0833895,
+    "layer": "camp",
+    "label": "Chalky Downs Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.189655,
+    "lon": -0.0268203,
+    "layer": "camp",
+    "label": "Edenbridge and Oxted Show - Air Cadets Camp",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.1891232,
+    "lon": -0.02643,
+    "layer": "camp",
+    "label": "Edenbridge and Oxted Show - Cavanpark",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 51.1084194,
+    "lon": -0.0127439,
+    "layer": "camp",
+    "label": "Evergreen Farm Woodland Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.0189446,
+    "lon": 0.0036116,
+    "layer": "camp",
+    "label": "Heaven Farm",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9917191,
+    "lon": -0.0059816,
+    "layer": "camp",
+    "label": "Wowo Campsite - Lower Brook",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9394434,
+    "lon": 0.0094429,
+    "layer": "camp",
+    "label": "The Secret Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.1885116,
+    "lon": -0.0353412,
+    "layer": "camp",
+    "label": "Edenbridge and Oxted Show - Livestock Park",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.9926425,
+    "lon": -0.0072382,
+    "layer": "camp",
+    "label": "Wowo Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9903722,
+    "lon": -0.0071864,
+    "layer": "camp",
+    "label": "Wowo Campsite - Grassy Field",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.977721,
+    "lon": 0.0086879,
+    "layer": "camp",
+    "label": "Wyld Wood Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9921554,
+    "lon": -0.0083905,
+    "layer": "camp",
+    "label": "Wowo Campsite - Middle Brook",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9899536,
+    "lon": -0.0104868,
+    "layer": "camp",
+    "label": "Wowo Campsite - Upper Moat",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9976372,
+    "lon": -0.0193624,
+    "layer": "camp",
+    "label": "Kitt's Cottage Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.8223883,
+    "lon": -0.0966832,
+    "layer": "camp",
+    "label": "Sheepcote Valley",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.1657466,
+    "lon": -0.0420597,
+    "layer": "camp",
+    "label": "Long Acres Caravan & Camping",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 51.16681,
+    "lon": -0.04273,
+    "layer": "camp",
+    "label": "Long Acres Caravan & Camping",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.2833058,
+    "lon": -0.1386576,
+    "layer": "camp",
+    "label": "Alderstead Heath",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.8674464,
+    "lon": -0.0557856,
+    "layer": "camp",
+    "label": "Housedean Farm Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.8683422,
+    "lon": -0.0562572,
+    "layer": "camp",
+    "label": "Housedean Farm Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.3092598,
+    "lon": -0.1840768,
+    "layer": "camp",
+    "label": "Banstead & District Scout Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.0870072,
+    "lon": -0.2100843,
+    "layer": "camp",
+    "label": "Stanford (Scout Campsite)",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.921508,
+    "lon": -0.1019194,
+    "layer": "camp",
+    "label": "Stoneywish",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.0152236,
+    "lon": -0.0342701,
+    "layer": "camp",
+    "label": "Wild Boar Wood",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.240326,
+    "lon": -0.1679009,
+    "layer": "repair",
+    "label": "C&N cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.4633235,
+    "lon": -0.1332123,
+    "layer": "repair",
+    "label": "Evans Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8282591,
+    "lon": -0.135649,
+    "layer": "repair",
+    "label": "Baker St. Bikes",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.4355802,
+    "lon": -0.1039825,
+    "layer": "repair",
+    "label": "Bon Velo",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.3573668,
+    "lon": -0.1485364,
+    "layer": "repair",
+    "label": "Wallington Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.4761405,
+    "lon": -0.130848,
+    "layer": "repair",
+    "label": "South Bank Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.955968,
+    "lon": -0.1301024,
+    "layer": "repair",
+    "label": "Anthony Hole & Sons",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8308531,
+    "lon": -0.1349401,
+    "layer": "repair",
+    "label": "Strudwicks Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.4641498,
+    "lon": -0.1321002,
+    "layer": "repair",
+    "label": "ApexCycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8319853,
+    "lon": -0.1344023,
+    "layer": "repair",
+    "label": "Cycle Wand",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8295754,
+    "lon": -0.1401832,
+    "layer": "repair",
+    "label": "Amsterdammers",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8333609,
+    "lon": -0.1402158,
+    "layer": "repair",
+    "label": "Rayment Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8218787,
+    "lon": -0.13132,
+    "layer": "repair",
+    "label": "Cranks DIY Bicycle Workshop",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.1337233,
+    "lon": -0.1879445,
+    "layer": "repair",
+    "label": "Bike Hut",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.3189133,
+    "lon": -0.1507141,
+    "layer": "repair",
+    "label": "Rolling On Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8260622,
+    "lon": -0.1425289,
+    "layer": "repair",
+    "label": "All Bikes Electric",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.5083707,
+    "lon": -0.1331899,
+    "layer": "repair",
+    "label": "Pinarello",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8241935,
+    "lon": -0.1435284,
+    "layer": "repair",
+    "label": "Evans Cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 50.8734872,
+    "lon": 0.0144745,
+    "layer": "repair",
+    "label": "Cycle Shack 2",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.480046,
+    "lon": -0.1116139,
+    "layer": "repair",
+    "label": "Nazaan Cycling",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.4853549,
+    "lon": -0.1342783,
+    "layer": "water",
+    "label": "Pimlico Gardens, Grosvenor Road",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.4837457,
+    "lon": -0.1083852,
+    "layer": "water",
+    "label": "Kennington Park fountain",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5128257,
+    "lon": -0.1381492,
+    "layer": "water",
+    "label": "Water fountain",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5063058,
+    "lon": -0.1422582,
+    "layer": "water",
+    "label": "The Constance Fund Diana Fountain Green Park",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5065,
+    "lon": -0.142865,
+    "layer": "water",
+    "label": "Green Park 5",
+    "description": "Outside Green Park station work to  relocate this statue and fountain is almost complete. “Diana of the Treetops” by Estcourt J. Clack was originally unveiled i"
+  },
+  {
+    "lat": 51.5062121,
+    "lon": -0.1055298,
+    "layer": "water",
+    "label": "Drinking Fountain",
+    "description": "This fountain in the churchyard in Columbo Street has been neglected in recent years, although still functions well  http://www.christchurchsouthwark.org.uk/his"
+  },
+  {
+    "lat": 51.5234737,
+    "lon": -0.1194647,
+    "layer": "water",
+    "label": "Guilford Place fountain",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5254672,
+    "lon": -0.1360646,
+    "layer": "water",
+    "label": "Trinkwasserbrunnen",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.513,
+    "lon": -0.0984049,
+    "layer": "water",
+    "label": "Carter Lane Gardens",
+    "description": "First fully certified drinking fountain in London for 30 years. Switched on 21st of May 2010"
+  },
+  {
+    "lat": 51.5129367,
+    "lon": -0.0973143,
+    "layer": "water",
+    "label": "St Lawrence Jewry",
+    "description": "St Lawrence Jewry Memorial Fountain, designed by Architect John Robinson with bronze sculpture by artist Joseph Durham. Erected in 1866 outside St Lawrence Jewr"
+  },
+  {
+    "lat": 51.5255776,
+    "lon": -0.1088675,
+    "layer": "water",
+    "label": "Spa Fields Extension 1",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5120398,
+    "lon": -0.1625554,
+    "layer": "water",
+    "label": "Freeman Family Drinking Fountain",
+    "description": "The fountain is a sphere made from mirror-polished, marine-grade stainless steel. It has four drinking fountains at different heights to cater for different use"
+  },
+  {
+    "lat": 51.5301981,
+    "lon": -0.124503,
+    "layer": "water",
+    "label": "Captain Robert Hansler J.P. Fountain",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5061,
+    "lon": -0.166426,
+    "layer": "water",
+    "label": "The Serpentine",
+    "description": "On the north side of the Serpentine  http://en.wikipedia.org/wiki/Serpentine_%28lake%29"
+  },
+  {
+    "lat": 51.4173829,
+    "lon": -0.1796324,
+    "layer": "water",
+    "label": "John Feeney memorial",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.4902043,
+    "lon": -0.1689954,
+    "layer": "water",
+    "label": "St Luke's Church Playground",
+    "description": "These seems to have been aesthetically neglected a little of late, but it is still a fully functional drinking water fountain"
+  },
+  {
+    "lat": 51.5272,
+    "lon": -0.102332,
+    "layer": "water",
+    "label": "Northampton Square",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5046009,
+    "lon": -0.1693093,
+    "layer": "water",
+    "label": "Hyde Park 6",
+    "description": "Found at the Serpentine lido"
+  },
+  {
+    "lat": 51.5299,
+    "lon": -0.108318,
+    "layer": "water",
+    "label": "Myddelton Square",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5222,
+    "lon": -0.09333,
+    "layer": "water",
+    "label": "Fortune Square",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5291,
+    "lon": -0.1617097,
+    "layer": "water",
+    "label": "Regents Park 2",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 51.5109532,
+    "lon": -0.1762446,
+    "layer": "water",
+    "label": "Hyde Park 9",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 50.8306388,
+    "lon": -0.1145203,
+    "layer": "hospital",
+    "label": "Brighton General Hospital",
+    "description": "Hospital"
+  },
+  {
+    "lat": 50.8308984,
+    "lon": -0.135651,
+    "layer": "hospital",
+    "label": "Equilibrium Therapy Clinic",
+    "description": "Clinic"
+  },
+  {
+    "lat": 51.3752994,
+    "lon": -0.0876756,
+    "layer": "hospital",
+    "label": "East Croydon Medical Centre",
+    "description": "Clinic"
+  },
+  {
+    "lat": 51.496756,
+    "lon": -0.1259686,
+    "layer": "hospital",
+    "label": "Capital Physio",
+    "description": "Clinic"
+  },
+  {
+    "lat": 50.8278819,
+    "lon": -0.1249444,
+    "layer": "hospital",
+    "label": "Stanford Medical Centre",
+    "description": "Clinic"
+  },
+  {
+    "lat": 50.825294,
+    "lon": -0.1386485,
+    "layer": "hospital",
+    "label": "Sk:n",
+    "description": "Clinic"
+  },
+  {
+    "lat": 50.8306914,
+    "lon": -0.1350843,
+    "layer": "hospital",
+    "label": "St Peter's Medical Centre",
+    "description": "Clinic"
+  },
+  {
+    "lat": 51.1060446,
+    "lon": -0.1877781,
+    "layer": "hospital",
+    "label": "SLC Aesthetics",
+    "description": "Clinic"
+  },
+  {
+    "lat": 51.39741,
+    "lon": -0.0955589,
+    "layer": "hospital",
+    "label": "Thornton Heath Health Centre",
+    "description": "Clinic"
+  },
+  {
+    "lat": 51.1320946,
+    "lon": -0.0128396,
+    "layer": "hospital",
+    "label": "East Grinstead Health Clinic",
+    "description": "Clinic"
+  },
+  {
+    "lat": 51.4917769,
+    "lon": -0.1246974,
+    "layer": "ferry",
+    "label": "Millbank Millennium Pier",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.5017374,
+    "lon": -0.1231427,
+    "layer": "ferry",
+    "label": "Westminster Pier",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.4863147,
+    "lon": -0.1272602,
+    "layer": "ferry",
+    "label": "St. George Wharf",
+    "description": "This pier is wheelchair-accessible at high tide. At low tide, the pier floats lower, & because it is below ground level, the ramp is steeper."
+  },
+  {
+    "lat": 51.5034484,
+    "lon": -0.1204713,
+    "layer": "ferry",
+    "label": "London Eye - Waterloo Pier",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.5069899,
+    "lon": -0.1213336,
+    "layer": "ferry",
+    "label": "Embankment",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.5070119,
+    "lon": -0.1177867,
+    "layer": "ferry",
+    "label": "Festival Pier",
+    "description": "Ferry terminal"
+  }
+]

@@ -1,0 +1,793 @@
+[
+  {
+    "lat": 51.5047795,
+    "lon": -0.127044,
+    "layer": "photo",
+    "label": "Horse Guards",
+    "description": "Attraction"
+  },
+  {
+    "lat": 48.8659656,
+    "lon": 2.3550493,
+    "layer": "photo",
+    "label": "Pendule de Foucault",
+    "description": "Attraction"
+  },
+  {
+    "lat": 48.8827946,
+    "lon": 2.3111548,
+    "layer": "photo",
+    "label": "Ancienne Légation de Lituanie (1925-40)",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.499892,
+    "lon": -0.1253567,
+    "layer": "photo",
+    "label": "Westminster Hall",
+    "description": "Attraction"
+  },
+  {
+    "lat": 49.9271318,
+    "lon": 1.0728643,
+    "layer": "photo",
+    "label": "Mini-golf",
+    "description": "Attraction"
+  },
+  {
+    "lat": 49.0258939,
+    "lon": 2.0850814,
+    "layer": "photo",
+    "label": "La butte à Juju",
+    "description": "Butte de terre, nommé ainsi en hommage au paysagiste Dominique Juglar"
+  },
+  {
+    "lat": 51.5005499,
+    "lon": -0.1263325,
+    "layer": "photo",
+    "label": "Flags Of UK Overseas Territories",
+    "description": "Attraction"
+  },
+  {
+    "lat": 48.8650062,
+    "lon": 2.3378176,
+    "layer": "photo",
+    "label": "Jardin du Palais Royal",
+    "description": "Attraction"
+  },
+  {
+    "lat": 48.8579983,
+    "lon": 2.3489178,
+    "layer": "photo",
+    "label": "Tour Saint-Jacques",
+    "description": "Attraction"
+  },
+  {
+    "lat": 50.8728657,
+    "lon": 0.0075256,
+    "layer": "photo",
+    "label": "Lewes Castle",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5045773,
+    "lon": -0.1259162,
+    "layer": "photo",
+    "label": "Banqueting House",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5007042,
+    "lon": -0.1245721,
+    "layer": "photo",
+    "label": "Big Ben",
+    "description": "Attraction"
+  },
+  {
+    "lat": 48.8654941,
+    "lon": 2.336613,
+    "layer": "photo",
+    "label": "Fontaine Molière",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5007011,
+    "lon": -0.1245731,
+    "layer": "photo",
+    "label": "Elizabeth Tower",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.5006259,
+    "lon": -0.126826,
+    "layer": "photo",
+    "label": "Parliament Square",
+    "description": "Square where many demonstrations are held. Views of several notable buildings."
+  },
+  {
+    "lat": 51.5046612,
+    "lon": -0.1282961,
+    "layer": "photo",
+    "label": "Horse Guards Parade",
+    "description": "Attraction"
+  },
+  {
+    "lat": 49.9292246,
+    "lon": 1.0724885,
+    "layer": "photo",
+    "label": "Plage de Dieppe",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.486771,
+    "lon": -0.1198903,
+    "layer": "photo",
+    "label": "horses",
+    "description": "Attraction"
+  },
+  {
+    "lat": 51.424953,
+    "lon": -0.1055261,
+    "layer": "wildlife",
+    "label": "Knight's Hill Wood Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.3189419,
+    "lon": -0.0640796,
+    "layer": "wildlife",
+    "label": "Hamsey Green Pond",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 48.9884118,
+    "lon": 2.1380145,
+    "layer": "wildlife",
+    "label": "L'Île aux Oiseaux",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.7934255,
+    "lon": 0.0651304,
+    "layer": "wildlife",
+    "label": "Ouse Valley",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.800214,
+    "lon": 0.0605891,
+    "layer": "wildlife",
+    "label": "Drove Park",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8710847,
+    "lon": 0.0182985,
+    "layer": "wildlife",
+    "label": "Lewes Railway Land Local Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.1797021,
+    "lon": -0.0171055,
+    "layer": "wildlife",
+    "label": "Lingfield Nature Reserve",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.8000069,
+    "lon": 0.0422842,
+    "layer": "wildlife",
+    "label": "Riverside Park",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.3189286,
+    "lon": -0.0796509,
+    "layer": "wildlife",
+    "label": "Sanderstead to Whyteleafe Countryside Area",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 51.4415015,
+    "lon": -0.1186587,
+    "layer": "wildlife",
+    "label": "Palace Road  Nature Gardens",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.7967015,
+    "lon": 0.0429294,
+    "layer": "wildlife",
+    "label": "Valley Ponds",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 50.924848,
+    "lon": 0.0160679,
+    "layer": "wildlife",
+    "label": "Wild About Barcombe",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 49.4244662,
+    "lon": 2.0806584,
+    "layer": "camp",
+    "label": "Aire de camping-cars de Beauvais",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.83127,
+    "lon": 0.0333402,
+    "layer": "camp",
+    "label": "YHA South Downs",
+    "description": "Camp site"
+  },
+  {
+    "lat": 49.268859,
+    "lon": 1.7706214,
+    "layer": "camp",
+    "label": "Aire de camping-car du Vexin Normand Gisors",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 51.189655,
+    "lon": -0.0268203,
+    "layer": "camp",
+    "label": "Edenbridge and Oxted Show - Air Cadets Camp",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.1891232,
+    "lon": -0.02643,
+    "layer": "camp",
+    "label": "Edenbridge and Oxted Show - Cavanpark",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 49.6077349,
+    "lon": 1.5427534,
+    "layer": "camp",
+    "label": "Camping de La Miniere",
+    "description": "Labélisé Accueil Vélo,"
+  },
+  {
+    "lat": 51.1084194,
+    "lon": -0.0127439,
+    "layer": "camp",
+    "label": "Evergreen Farm Woodland Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 49.6057869,
+    "lon": 1.5423031,
+    "layer": "camp",
+    "label": "La Minière aire de camping-car de Forges-les-Eaux",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 51.0189446,
+    "lon": 0.0036116,
+    "layer": "camp",
+    "label": "Heaven Farm",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.7796945,
+    "lon": 0.0803749,
+    "layer": "camp",
+    "label": "Buckle Holiday Park",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.9917191,
+    "lon": -0.0059816,
+    "layer": "camp",
+    "label": "Wowo Campsite - Lower Brook",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9394434,
+    "lon": 0.0094429,
+    "layer": "camp",
+    "label": "The Secret Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.1885116,
+    "lon": -0.0353412,
+    "layer": "camp",
+    "label": "Edenbridge and Oxted Show - Livestock Park",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.9926425,
+    "lon": -0.0072382,
+    "layer": "camp",
+    "label": "Wowo Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9903722,
+    "lon": -0.0071864,
+    "layer": "camp",
+    "label": "Wowo Campsite - Grassy Field",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.7789359,
+    "lon": 0.0832912,
+    "layer": "camp",
+    "label": "Sunnyside Caravan Park",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.977721,
+    "lon": 0.0086879,
+    "layer": "camp",
+    "label": "Wyld Wood Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.9921554,
+    "lon": -0.0083905,
+    "layer": "camp",
+    "label": "Wowo Campsite - Middle Brook",
+    "description": "Camp site"
+  },
+  {
+    "lat": 50.8120226,
+    "lon": 0.0548823,
+    "layer": "camp",
+    "label": "Three Ponds Holiday Park and Fishery",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 50.9899536,
+    "lon": -0.0104868,
+    "layer": "camp",
+    "label": "Wowo Campsite - Upper Moat",
+    "description": "Camp site"
+  },
+  {
+    "lat": 49.9322246,
+    "lon": 1.0836423,
+    "layer": "camp",
+    "label": "Front de Mer - Dieppe",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 49.9307465,
+    "lon": 1.0868274,
+    "layer": "camp",
+    "label": "Aire Pollet à Dieppe",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 49.6745749,
+    "lon": 1.4245573,
+    "layer": "camp",
+    "label": "I.C. Art",
+    "description": "Camping de l'association I.C.Art. Pour tente uniquement."
+  },
+  {
+    "lat": 50.9976372,
+    "lon": -0.0193624,
+    "layer": "camp",
+    "label": "Kitt's Cottage Campsite",
+    "description": "Camp site"
+  },
+  {
+    "lat": 51.1657466,
+    "lon": -0.0420597,
+    "layer": "camp",
+    "label": "Long Acres Caravan & Camping",
+    "description": "Caravan site"
+  },
+  {
+    "lat": 49.1945133,
+    "lon": 2.4653658,
+    "layer": "repair",
+    "label": "Bobebike",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8866876,
+    "lon": 2.3046891,
+    "layer": "repair",
+    "label": "Holland Bikes",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8729996,
+    "lon": 2.3577101,
+    "layer": "repair",
+    "label": "Repair and Run",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8601962,
+    "lon": 2.3536354,
+    "layer": "repair",
+    "label": "66 Origin",
+    "description": "La Maison 66 Origin crée des expériences, des services et des produits à fort impact. Nous vendons des vêtements et proposons un service de gonflage de pneus de"
+  },
+  {
+    "lat": 49.0453063,
+    "lon": 2.0712969,
+    "layer": "repair",
+    "label": "Vélo Services",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 49.0502068,
+    "lon": 2.0714183,
+    "layer": "repair",
+    "label": "M Ride Cycle Store",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 49.9216187,
+    "lon": 1.0808618,
+    "layer": "repair",
+    "label": "Actif Véloc",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8936804,
+    "lon": 2.2947953,
+    "layer": "repair",
+    "label": "Cycles Cossia",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8578784,
+    "lon": 2.3534515,
+    "layer": "repair",
+    "label": "Mobicity",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8720458,
+    "lon": 2.3265905,
+    "layer": "repair",
+    "label": "La Roue Liber",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 51.4355802,
+    "lon": -0.1039825,
+    "layer": "repair",
+    "label": "Bon Velo",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 49.4264136,
+    "lon": 2.0890601,
+    "layer": "repair",
+    "label": "Beauvélo",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 49.4148733,
+    "lon": 2.1150087,
+    "layer": "repair",
+    "label": "Cycles Clémer",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 49.4265338,
+    "lon": 2.0883761,
+    "layer": "repair",
+    "label": "Mon Beau Vélo 78 avenue de la république, 60000 Beauvais",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.85605,
+    "lon": 2.35035,
+    "layer": "repair",
+    "label": "SoliCycle Rives de Seine",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.9219013,
+    "lon": 2.2524736,
+    "layer": "repair",
+    "label": "Colombes cycles",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8726722,
+    "lon": 2.3595906,
+    "layer": "repair",
+    "label": "Alternative Bike",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 49.434391,
+    "lon": 2.066992,
+    "layer": "repair",
+    "label": "Pro Cycle",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8727485,
+    "lon": 2.3595243,
+    "layer": "repair",
+    "label": "City Riders",
+    "description": "Bike shop"
+  },
+  {
+    "lat": 48.8955708,
+    "lon": 2.3622974,
+    "layer": "repair",
+    "label": "AR La Bonne Tambouille",
+    "description": "Self-service repair station"
+  },
+  {
+    "lat": 48.9598327,
+    "lon": 2.1898554,
+    "layer": "water",
+    "label": "Fontaine du Gymnase",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8621198,
+    "lon": 2.3530207,
+    "layer": "water",
+    "label": "Ancien point d'eau (à sec)",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8671548,
+    "lon": 2.3531769,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 49.0972546,
+    "lon": 2.4313313,
+    "layer": "water",
+    "label": "Fontaine Messire Gilles",
+    "description": "Natural spring"
+  },
+  {
+    "lat": 48.8835986,
+    "lon": 2.3135853,
+    "layer": "water",
+    "label": "Fontaine de la place Lévis",
+    "description": "Fontaine Wallace"
+  },
+  {
+    "lat": 48.8711656,
+    "lon": 2.3608619,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Fontaine Wallace"
+  },
+  {
+    "lat": 48.8551241,
+    "lon": 2.3559623,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8552512,
+    "lon": 2.3476157,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8552816,
+    "lon": 2.3474675,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8774814,
+    "lon": 2.3271935,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8684023,
+    "lon": 2.3502078,
+    "layer": "water",
+    "label": "Fontaine Wallace- Saint-Spire",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.884908,
+    "lon": 2.2982604,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8805363,
+    "lon": 2.3247765,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8554435,
+    "lon": 2.3595073,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8526052,
+    "lon": 2.3472283,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8560751,
+    "lon": 2.3406591,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8849654,
+    "lon": 2.3524798,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8518483,
+    "lon": 2.3476069,
+    "layer": "water",
+    "label": "Square Rene Viviani",
+    "description": "Found near Eglise Saint Julien le Pauvre"
+  },
+  {
+    "lat": 48.8868265,
+    "lon": 2.3174741,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 48.8844724,
+    "lon": 2.3214773,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 49.6215234,
+    "lon": 1.5152164,
+    "layer": "water",
+    "label": "Cristal Fontaine",
+    "description": "Natural spring"
+  },
+  {
+    "lat": 48.8774494,
+    "lon": 2.3685338,
+    "layer": "water",
+    "label": "Fontaine Wallace",
+    "description": "Fontaine Wallace"
+  },
+  {
+    "lat": 51.125268,
+    "lon": -0.0092338,
+    "layer": "hospital",
+    "label": "Boots",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.860925,
+    "lon": 2.3534975,
+    "layer": "hospital",
+    "label": "Pharmacie du Centre Pompidou",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.8898494,
+    "lon": 2.3629189,
+    "layer": "hospital",
+    "label": "Pharmacie Pajol",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.8718551,
+    "lon": 2.3283293,
+    "layer": "hospital",
+    "label": "Pharmacie Caumartin",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.8687592,
+    "lon": 2.3559193,
+    "layer": "hospital",
+    "label": "La Croix de Malte",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 49.3201034,
+    "lon": 2.3288584,
+    "layer": "hospital",
+    "label": "Pharmacie Dupuis et Sarmiento",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 51.4382708,
+    "lon": -0.1060699,
+    "layer": "hospital",
+    "label": "Elmcourt Pharmacy",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.926073,
+    "lon": 2.243064,
+    "layer": "hospital",
+    "label": "Pharmacie de l'Europe",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.9556711,
+    "lon": 2.3838986,
+    "layer": "hospital",
+    "label": "Pharmacie Du Centre",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 48.8639497,
+    "lon": 2.3401609,
+    "layer": "hospital",
+    "label": "Pharmacie de la Banque",
+    "description": "Pharmacy"
+  },
+  {
+    "lat": 51.4917769,
+    "lon": -0.1246974,
+    "layer": "ferry",
+    "label": "Millbank Millennium Pier",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.5017374,
+    "lon": -0.1231427,
+    "layer": "ferry",
+    "label": "Westminster Pier",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 48.85457,
+    "lon": 2.3534647,
+    "layer": "ferry",
+    "label": "Hôtel-de-Ville",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.4863147,
+    "lon": -0.1272602,
+    "layer": "ferry",
+    "label": "St. George Wharf",
+    "description": "This pier is wheelchair-accessible at high tide. At low tide, the pier floats lower, & because it is below ground level, the ramp is steeper."
+  },
+  {
+    "lat": 50.7883593,
+    "lon": 0.055558,
+    "layer": "ferry",
+    "label": "Newhaven Ferry Port",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 51.5034484,
+    "lon": -0.1204713,
+    "layer": "ferry",
+    "label": "London Eye - Waterloo Pier",
+    "description": "Ferry terminal"
+  }
+]

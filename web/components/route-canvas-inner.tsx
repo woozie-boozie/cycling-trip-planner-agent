@@ -18,10 +18,24 @@
  */
 
 import L from "leaflet";
+import {
+  AlertTriangle,
+  Bird,
+  Camera,
+  Cross,
+  Droplet,
+  Landmark,
+  Ship,
+  Tent,
+  Utensils,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useMemo } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import {
   CircleMarker,
   MapContainer,
+  Marker,
   Polyline,
   TileLayer,
   Tooltip,
@@ -30,7 +44,42 @@ import {
 import "leaflet/dist/leaflet.css";
 
 import { mapboxTileUrl } from "@/lib/mapbox";
-import { LAYER_META, type Poi } from "@/lib/pois";
+import { LAYER_META, type Poi, type PoiLayer } from "@/lib/pois";
+
+// Render each Lucide layer icon to a static SVG string ONCE at module load.
+// Embedded in Leaflet `divIcon` HTML — the SVG inherits `color: white` from
+// the parent div so the stroke renders white against the coloured circle.
+const POI_ICON_SVG: Record<PoiLayer, string> = {
+  photo: renderToStaticMarkup(<Camera size={14} strokeWidth={2.5} />),
+  wildlife: renderToStaticMarkup(<Bird size={14} strokeWidth={2.5} />),
+  camp: renderToStaticMarkup(<Tent size={14} strokeWidth={2.5} />),
+  food: renderToStaticMarkup(<Utensils size={14} strokeWidth={2.5} />),
+  heritage: renderToStaticMarkup(<Landmark size={14} strokeWidth={2.5} />),
+  repair: renderToStaticMarkup(<Wrench size={14} strokeWidth={2.5} />),
+  water: renderToStaticMarkup(<Droplet size={14} strokeWidth={2.5} />),
+  hospital: renderToStaticMarkup(<Cross size={14} strokeWidth={2.5} />),
+  ferry: renderToStaticMarkup(<Ship size={14} strokeWidth={2.5} />),
+  warning: renderToStaticMarkup(<AlertTriangle size={14} strokeWidth={2.5} />),
+};
+
+/** Build a Leaflet divIcon for a POI: coloured circle + centred Lucide icon. */
+function poiDivIcon(layer: PoiLayer): L.DivIcon {
+  const color = LAYER_META[layer].color;
+  const html = `<div style="
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    color:white;background-color:${color};
+    border:2px solid white;
+    box-shadow:0 1px 3px rgba(20,19,15,0.35);
+    cursor:pointer;
+  ">${POI_ICON_SVG[layer]}</div>`;
+  return L.divIcon({
+    className: "",
+    html,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
 
 interface Waypoint {
   name: string;
@@ -156,25 +205,19 @@ export default function RouteCanvasInner({
         );
       })}
 
-      {/* POI markers */}
+      {/* POI markers — Lucide icon inside a coloured circle */}
       {pois.map((p, i) => {
         const meta = LAYER_META[p.layer];
         return (
-          <CircleMarker
+          <Marker
             key={`poi-${i}-${p.label}`}
-            center={[p.lat, p.lon]}
-            radius={7}
-            pathOptions={{
-              color: meta.color,
-              fillColor: "#FFFFFF",
-              fillOpacity: 1,
-              weight: 2.5,
-            }}
+            position={[p.lat, p.lon]}
+            icon={poiDivIcon(p.layer)}
             eventHandlers={{
               click: () => onSelectPoi(p),
             }}
           >
-            <Tooltip direction="top" offset={[0, -8]} opacity={0.95}>
+            <Tooltip direction="top" offset={[0, -14]} opacity={0.95}>
               <div className="min-w-[120px]">
                 <div
                   className="text-[9px] font-bold uppercase tracking-wider"
@@ -185,7 +228,7 @@ export default function RouteCanvasInner({
                 <div className="text-[11px] font-semibold">{p.label}</div>
               </div>
             </Tooltip>
-          </CircleMarker>
+          </Marker>
         );
       })}
     </MapContainer>

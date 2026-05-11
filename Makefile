@@ -24,6 +24,14 @@ test:
 evals:
 	$(VENV)/bin/pytest -v -s -m evals
 
+# Refresh the visual-map POI cache from OpenStreetMap (Overpass API).
+# Writes web/lib/data/pois-{corridor}.json — committed to git so the
+# frontend has data without making runtime API calls. Run when the OSM
+# data is materially stale (every few months for stable corridors) or
+# when adding a new corridor.
+pois:
+	$(VENV)/bin/python scripts/fetch_corridor_pois.py
+
 lint:
 	$(VENV)/bin/ruff check src tests
 	$(VENV)/bin/mypy src

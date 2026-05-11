@@ -1,13 +1,28 @@
 /**
- * Curated POIs per corridor — Phase B visual layer (Path A).
+ * POIs per corridor — visual-map data layer.
  *
- * This data mirrors the seed catalog and is the visual map's view of
- * each corridor. The agent's per-turn POI fetches use Google Places
- * live (`USE_REAL_PLACES=true`); this file is for visualization, not
- * for the agent's reasoning.
+ * This data is the visual map's view of each corridor; it does NOT drive
+ * the agent's reasoning. The agent uses Google Places live (`USE_REAL_PLACES=true`)
+ * for accommodation and `find_pois` lookups.
  *
- * If we ever expose tool-result payloads in trace events (Phase 3),
- * this file becomes the fallback when no live results are available.
+ * Two sources merged together:
+ *
+ *   1. **Hand-curated narrative anchors** — declared inline below. Rich:
+ *      they carry `rating`, `price`, `species`, `hours`, `km_from_start`,
+ *      and a hand-written `description`. These are the "story" POIs that
+ *      tell you why a corridor is interesting (Beauvais Cathedral, Pays
+ *      de Bray cheese country, Ditchling Beacon climb).
+ *
+ *   2. **OSM scatter** — fetched at build time via
+ *      `scripts/fetch_corridor_pois.py` from OpenStreetMap's Overpass API,
+ *      committed to `web/lib/data/pois-{corridor}.json`. ~100-150 POIs
+ *      per corridor, real cycling-relevant data (`shop=bicycle`,
+ *      `tourism=camp_site`, `amenity=drinking_water`, etc.). Filtered to
+ *      within 8 km of the route polyline, capped per category.
+ *
+ * Merge rule: curated POIs win on collision (case-insensitive name +
+ * coordinate rounded to 2 d.p.). Re-run `make pois` or
+ * `python scripts/fetch_corridor_pois.py` to refresh the OSM tier.
  *
  * 10 layers (matches Velocycle mockup):
  *   photo · wildlife · camp · food · heritage · repair · water ·
@@ -15,6 +30,9 @@
  */
 
 import type { CorridorId } from "@/lib/corridors";
+import OSM_LDN_PAR from "@/lib/data/pois-ldn-par.json";
+import OSM_AMS_CPH from "@/lib/data/pois-ams-cph.json";
+import OSM_LDN_BRI from "@/lib/data/pois-ldn-bri.json";
 
 export type PoiLayer =
   | "photo"
@@ -76,10 +94,10 @@ export const LAYER_ORDER: PoiLayer[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Per-corridor POIs
+// Curated POIs — the narrative anchors per corridor
 // ---------------------------------------------------------------------------
 
-const POIS_LDN_PAR: Poi[] = [
+const CURATED_LDN_PAR: Poi[] = [
   // London end
   { lat: 51.461, lon: -0.115, layer: "repair", label: "Brixton Cycles", description: "Co-op bike shop, last-chance service before the Avenue Verte.", km_from_start: 5, hours: "10–18 Mon-Sat" },
   { lat: 51.508, lon: -0.128, layer: "water", label: "Embankment drinking fountains", description: "Refill London fountains along Victoria Embankment.", km_from_start: 1 },
@@ -110,7 +128,7 @@ const POIS_LDN_PAR: Poi[] = [
   { lat: 48.857, lon: 2.352, layer: "food", label: "Le Bouillon Pigalle", description: "Affordable French classics; queue-friendly post-ride.", km_from_start: 364 },
 ];
 
-const POIS_AMS_CPH: Poi[] = [
+const CURATED_AMS_CPH: Poi[] = [
   // Amsterdam
   { lat: 52.368, lon: 4.904, layer: "repair", label: "Cycles Roberto", description: "Independent shop, popular with locals + tourers.", km_from_start: 0 },
   { lat: 52.368, lon: 4.904, layer: "water", label: "Vondelpark fountains", description: "Multiple refill points in Amsterdam's biggest park.", km_from_start: 0 },
@@ -138,7 +156,7 @@ const POIS_AMS_CPH: Poi[] = [
   { lat: 55.676, lon: 12.568, layer: "camp", label: "Camping Charlottenlund Fort", description: "Seafront pitches, direct cycle path into the city.", km_from_start: 850, price: "€30/night" },
 ];
 
-const POIS_LDN_BRI: Poi[] = [
+const CURATED_LDN_BRI: Poi[] = [
   // London
   { lat: 51.461, lon: -0.115, layer: "repair", label: "Brixton Cycles", description: "Co-op bike shop, repairs while you wait.", km_from_start: 5 },
   { lat: 51.508, lon: -0.128, layer: "water", label: "Embankment fountains", description: "Refill London fountains along Victoria Embankment.", km_from_start: 1 },
@@ -159,8 +177,37 @@ const POIS_LDN_BRI: Poi[] = [
   { lat: 50.822, lon: -0.137, layer: "camp", label: "Sheepcote Valley Caravan Park", description: "Brighton's main campsite, 4 km from the seafront.", km_from_start: 99, price: "£28/night" },
 ];
 
+// ---------------------------------------------------------------------------
+// Merge: curated narrative anchors + OSM scatter
+// ---------------------------------------------------------------------------
+
+/** Coarse dedupe key — case-insensitive label + lat/lon rounded to 2 d.p. */
+function dedupeKey(poi: Poi): string {
+  return `${poi.label.trim().toLowerCase()}|${poi.lat.toFixed(2)}|${poi.lon.toFixed(2)}`;
+}
+
+function mergePois(curated: Poi[], osm: Poi[]): Poi[] {
+  const seen = new Set(curated.map(dedupeKey));
+  const out = [...curated];
+  for (const p of osm) {
+    const k = dedupeKey(p);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(p);
+  }
+  return out;
+}
+
+// JSON files arrive as `unknown` types; runtime data is guaranteed by the
+// build-time script to match the Poi shape.
+const OSM_POIS: Record<CorridorId, Poi[]> = {
+  "ldn-par": OSM_LDN_PAR as unknown as Poi[],
+  "ams-cph": OSM_AMS_CPH as unknown as Poi[],
+  "ldn-bri": OSM_LDN_BRI as unknown as Poi[],
+};
+
 export const POIS_BY_CORRIDOR: Record<CorridorId, Poi[]> = {
-  "ldn-par": POIS_LDN_PAR,
-  "ams-cph": POIS_AMS_CPH,
-  "ldn-bri": POIS_LDN_BRI,
+  "ldn-par": mergePois(CURATED_LDN_PAR, OSM_POIS["ldn-par"]),
+  "ams-cph": mergePois(CURATED_AMS_CPH, OSM_POIS["ams-cph"]),
+  "ldn-bri": mergePois(CURATED_LDN_BRI, OSM_POIS["ldn-bri"]),
 };

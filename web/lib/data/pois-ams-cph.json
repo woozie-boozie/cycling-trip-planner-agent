@@ -1,0 +1,282 @@
+[
+  {
+    "lat": 53.4677438,
+    "lon": 7.988933,
+    "layer": "wildlife",
+    "label": "Sandentnahmestelle Neustadtgödens",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 52.6512998,
+    "lon": 5.0801326,
+    "layer": "wildlife",
+    "label": "Ecoproject Het Lantaarntje",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.1617245,
+    "lon": 6.4129377,
+    "layer": "wildlife",
+    "label": "Elzenbroek",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.3319913,
+    "lon": 6.884944,
+    "layer": "wildlife",
+    "label": "Biessummerbos",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 52.5861178,
+    "lon": 5.0238241,
+    "layer": "wildlife",
+    "label": "Polder De Oosterkoog",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.1187667,
+    "lon": 8.2079325,
+    "layer": "wildlife",
+    "label": "Buschhagenniederung",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 55.6370555,
+    "lon": 12.5353001,
+    "layer": "wildlife",
+    "label": "Sydhavnstippen",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.604439,
+    "lon": 9.7627584,
+    "layer": "wildlife",
+    "label": "Schnaakenmoor",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.4360275,
+    "lon": 7.7024279,
+    "layer": "wildlife",
+    "label": "Wiesmoor-Klinge",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.1303319,
+    "lon": 8.9205271,
+    "layer": "wildlife",
+    "label": "Sodenstich",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 52.9311178,
+    "lon": 4.7608301,
+    "layer": "wildlife",
+    "label": "De Nollen",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.3733963,
+    "lon": 7.1816296,
+    "layer": "wildlife",
+    "label": "Vogelbrutgebiet",
+    "description": "Nature reserve"
+  },
+  {
+    "lat": 53.2189309,
+    "lon": 6.5691084,
+    "layer": "water",
+    "label": "Watertappunt Nieuwe Markt",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.1975595,
+    "lon": 6.5139935,
+    "layer": "water",
+    "label": "Watertappunt OV Hub Hoogkerk",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.6679925,
+    "lon": 10.2417322,
+    "layer": "water",
+    "label": "Notbrunnen",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.2962475,
+    "lon": 6.6099489,
+    "layer": "water",
+    "label": "Watertappunt Cruyff Court Bedum",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.1964602,
+    "lon": 5.7922693,
+    "layer": "water",
+    "label": "Watertappunt NS",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.3335775,
+    "lon": 6.9241682,
+    "layer": "water",
+    "label": "Watertappunt OV Hub Delfzijl",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.374733,
+    "lon": 4.8945414,
+    "layer": "water",
+    "label": "Water Point Fish",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.3747489,
+    "lon": 4.894504,
+    "layer": "water",
+    "label": "Drinking Water Fountain",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.5445145,
+    "lon": 8.5740851,
+    "layer": "water",
+    "label": "Euro-Trinkbrunnen",
+    "description": "Anlässlich der Kampagne “EIN SPIEL – EIN TRINKBRUNNEN” für die Fußball-EM 2024 der Männer aufgestellt. Vom Bundesministerium für Umwelt, Naturschutz, nukleare S"
+  },
+  {
+    "lat": 53.2127793,
+    "lon": 6.5658303,
+    "layer": "water",
+    "label": "Watertappunt Ubbo Emmiussingel",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.2213008,
+    "lon": 6.5536863,
+    "layer": "water",
+    "label": "Watertappunt Noorderplantsoen Nassaulaan",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.5564477,
+    "lon": 10.0217424,
+    "layer": "water",
+    "label": "Foyer vom Berliner Tor 5",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.5625116,
+    "lon": 9.9773263,
+    "layer": "water",
+    "label": "Trinkbrunnen",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.3639017,
+    "lon": 4.9139808,
+    "layer": "water",
+    "label": "Join The Pipe",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.2250826,
+    "lon": 6.557071,
+    "layer": "water",
+    "label": "Watertappunt Noorderplantsoen Nieuw Kijk in 't Jatstraat",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.306516,
+    "lon": 6.5936526,
+    "layer": "water",
+    "label": "Watertappunt OV Hub Bedum",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.0730966,
+    "lon": 8.8127856,
+    "layer": "water",
+    "label": "Euro-Trinkbrunnen",
+    "description": "Anlässlich der Kampagne “EIN SPIEL – EIN TRINKBRUNNEN” für die Fußball-EM 2024 der Männer aufgestellt. Vom Bundesministerium für Umwelt, Naturschutz, nukleare S"
+  },
+  {
+    "lat": 52.3688245,
+    "lon": 4.8888488,
+    "layer": "water",
+    "label": "Kraanwaterpunt",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.3589209,
+    "lon": 4.9083275,
+    "layer": "water",
+    "label": "Join The Pipe",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.3587183,
+    "lon": 4.9000859,
+    "layer": "water",
+    "label": "Join The Pipe",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.384358,
+    "lon": 4.8835141,
+    "layer": "water",
+    "label": "Waternet",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 53.1638152,
+    "lon": 6.3894715,
+    "layer": "water",
+    "label": "Watertappunt Oosterheerdtstraat",
+    "description": "Public drinking water"
+  },
+  {
+    "lat": 52.3957676,
+    "lon": 4.8964739,
+    "layer": "ferry",
+    "label": "Distelweg",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 53.0808356,
+    "lon": 8.7900744,
+    "layer": "ferry",
+    "label": "Schlachte Anleger 13",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 52.3806768,
+    "lon": 4.8993817,
+    "layer": "ferry",
+    "label": "Centraal Station",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 53.543818,
+    "lon": 9.9792272,
+    "layer": "ferry",
+    "label": "Abfahrtsstelle Barkassen Ehlers",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 52.3821461,
+    "lon": 4.9031727,
+    "layer": "ferry",
+    "label": "Buiksloterweg",
+    "description": "Ferry terminal"
+  },
+  {
+    "lat": 53.8630481,
+    "lon": 8.7230394,
+    "layer": "ferry",
+    "label": "Brücke 2",
+    "description": "Ferry terminal"
+  }
+]
