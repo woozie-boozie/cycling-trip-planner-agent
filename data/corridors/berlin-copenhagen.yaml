@@ -1,0 +1,59 @@
+id: berlin-copenhagen
+label: Berlin → Copenhagen
+start: Berlin
+end: Copenhagen
+aliases:
+- berlin to copenhagen
+- eurovelo 7 north
+- rostock to copenhagen
+- berlin copenhagen
+description: |-
+  Berlin → Copenhagen — EuroVelo 7's northern German + Danish segment. ~700 km via Rostock and the Warnemünde-Gedser ferry. Flat throughout, both ends being two of Europe's most cyclist-friendly capitals.
+variants:
+- name: berlin_copenhagen_ev7
+  title: Berlin → Copenhagen — EuroVelo 7 + Gedser ferry
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    EuroVelo 7 north from Berlin via Wittstock and Rostock to Warnemünde, then the Scandlines ferry to Gedser in Denmark, and on via Vordingborg to Copenhagen.
+  distinguishing_features:
+  - Two of Europe's most cyclist-friendly capitals as start + end
+  - Pancake-flat throughout — Brandenburg + Mecklenburg lakelands
+  - Warnemünde-Gedser ferry — 1h45m, cyclists ride on/off
+  - |-
+    Connects the LDN → Berlin route below for a London → Copenhagen super-tour
+  trade_offs:
+  - Mecklenburg is sparser than the Avenue Verte — fewer overnight options
+  - Ferry timing constrains the day-2 / day-3 split
+  best_for: |-
+    Scandinavia-curious cyclists, capital-city collectors, riders wanting a flat 7-day tour
+  anchors:
+  - name: Berlin
+    country: Germany
+    lat: 52.52
+    lon: 13.4
+  - name: Wittstock
+    country: Germany
+    lat: 53.16
+    lon: 12.49
+  - name: Rostock
+    country: Germany
+    lat: 54.09
+    lon: 12.13
+  - name: Warnemünde
+    country: Germany
+    lat: 54.18
+    lon: 12.08
+  - name: Gedser
+    country: Denmark
+    lat: 54.57
+    lon: 11.93
+    is_ferry_arrival: true
+  - name: Vordingborg
+    country: Denmark
+    lat: 55.01
+    lon: 11.91
+  - name: Copenhagen
+    country: Denmark
+    lat: 55.68
+    lon: 12.57

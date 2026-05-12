@@ -6,6 +6,7 @@ An AI agent that helps a cyclist plan a multi-day bike trip through conversation
 
 | | |
 |---|---|
+| **Walkthrough video** | **https://www.loom.com/share/470644591b0a4e668f6b3efa78233fcc** |
 | **Web app** | **https://cycling-trip-planner-nu.vercel.app** |
 | **Backend API** | https://cycling-trip-planner-backend-5ko5j6u6mq-ew.a.run.app |
 | **API docs (Swagger)** | https://cycling-trip-planner-backend-5ko5j6u6mq-ew.a.run.app/docs |

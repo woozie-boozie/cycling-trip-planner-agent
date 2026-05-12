@@ -164,6 +164,15 @@ class RouteVariant(BaseModel):
         description="Who/when this variant fits, e.g. 'targeting the fastest crossing"
         " and prefer modern cities to chateaux'",
     )
+    headline_tag: str | None = Field(
+        default=None,
+        description=(
+            "One-word at-a-glance category tag for this variant within the corridor, "
+            "e.g. 'Direct', 'Scenic', 'Quiet', 'Coastal', 'Heritage', 'Climbing'. "
+            "Picked from the axes that actually differ between variants in this "
+            "corridor — leave None if the variant set is too homogeneous to label."
+        ),
+    )
     notes: str | None = None
     is_default: bool = Field(
         default=False,

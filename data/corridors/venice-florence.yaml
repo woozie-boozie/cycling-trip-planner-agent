@@ -1,0 +1,55 @@
+id: venice-florence
+label: Venice → Florence
+start: Venice
+end: Florence
+aliases:
+- venice to florence
+- venezia firenze
+- italy classic
+- po valley to tuscany
+description: |-
+  Venice → Florence — Italy's most heritage-dense corridor. ~370 km via the Po valley flatlands and Apennine foothills. Padua, Ferrara, Bologna and Pistoia as overnight stops, each a major UNESCO or near-UNESCO heritage city.
+variants:
+- name: venice_florence_classic
+  title: Venice → Florence — Po valley + Apennines
+  headline_tag: Heritage
+  is_default: true
+  description: |-
+    The flat-then-hilly traverse from the Venetian lagoon south through the Po valley to Bologna, then the Apennine climb to Florence via Pistoia. Mix of cycle paths and quiet lanes.
+  distinguishing_features:
+  - Four UNESCO or near-UNESCO cities (Venice, Ferrara, Bologna, Florence)
+  - Po valley pancake-flat first 200 km
+  - Bologna food scene — best gastronomic stop in Italy
+  - |-
+    Apennine climb to Pistoia (gentle but sustained) as the only real elevation
+  trade_offs:
+  - Po valley summer heat brutal in July/August
+  - Bologna → Pistoia involves real climbing
+  - Less signposting than the EuroVelo network
+  best_for: |-
+    heritage-focused tourers, gastronomes, intermediate-and-up riders who don't mind one climbing day
+  anchors:
+  - name: Venice
+    country: Italy
+    lat: 45.44
+    lon: 12.32
+  - name: Padua
+    country: Italy
+    lat: 45.41
+    lon: 11.88
+  - name: Ferrara
+    country: Italy
+    lat: 44.84
+    lon: 11.62
+  - name: Bologna
+    country: Italy
+    lat: 44.49
+    lon: 11.34
+  - name: Pistoia
+    country: Italy
+    lat: 43.93
+    lon: 10.92
+  - name: Florence
+    country: Italy
+    lat: 43.77
+    lon: 11.25

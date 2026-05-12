@@ -1,0 +1,72 @@
+id: velodyssee
+label: Roscoff → Hendaye
+start: Roscoff
+end: Hendaye
+aliases:
+- velodyssee
+- vélodyssée
+- atlantic france
+- eurovelo 1
+- roscoff
+- hendaye
+description: |-
+  La Vélodyssée — France's longest signposted cycle route. ~1,200 km of Atlantic coast from Brittany to the Spanish border, EuroVelo 1's French segment. Pine forest paths, Bordeaux wine country detour, surf towns, Basque coast finish.
+variants:
+- name: velodyssee_full
+  title: La Vélodyssée — full Atlantic-coast traverse
+  headline_tag: Coastal
+  is_default: true
+  description: |-
+    The full signposted Vélodyssée from the Brittany ferry port of Roscoff to the Spanish border at Hendaye. Includes the Nantes-Brest canal section, the Landes pine forest cycle paths, and the Basque-country coastal finale.
+  distinguishing_features:
+  - Longest signposted French cycle route
+  - Landes pine forests — 200 km of dedicated traffic-free paths
+  - Surf towns (Lacanau, Hossegor) for off-bike rest days
+  - Crosses into Spain at Hendaye if extending to San Sebastián
+  trade_offs:
+  - 12+ days at 100 km/day — significant time commitment
+  - 'Atlantic-side weather: cool summer evenings, frequent fog'
+  - Pine-forest sections can feel monotonous after Day 4
+  best_for: |-
+    experienced multi-day tourers wanting a flagship French tour, Basque-coast riders, surfers cycling between breaks
+  anchors:
+  - name: Roscoff
+    country: France
+    lat: 48.72
+    lon: -3.99
+  - name: Brest
+    country: France
+    lat: 48.39
+    lon: -4.49
+  - name: Quimper
+    country: France
+    lat: 47.99
+    lon: -4.1
+  - name: Nantes
+    country: France
+    lat: 47.22
+    lon: -1.55
+  - name: La Rochelle
+    country: France
+    lat: 46.16
+    lon: -1.15
+  - name: Royan
+    country: France
+    lat: 45.62
+    lon: -1.03
+  - name: Bordeaux
+    country: France
+    lat: 44.84
+    lon: -0.58
+  - name: Arcachon
+    country: France
+    lat: 44.66
+    lon: -1.17
+  - name: Hossegor
+    country: France
+    lat: 43.66
+    lon: -1.39
+  - name: Hendaye
+    country: France
+    lat: 43.36
+    lon: -1.78

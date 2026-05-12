@@ -24,8 +24,8 @@ from typing import Any, Literal
 
 import structlog
 from anthropic import APIConnectionError, APITimeoutError, AsyncAnthropic, RateLimitError
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from src.agent import (
@@ -672,4 +672,92 @@ async def get_trace(
         total_input_tokens=state.total_input_tokens,
         total_output_tokens=state.total_output_tokens,
         estimated_cost_usd=_estimate_cost(state.total_input_tokens, state.total_output_tokens),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GPX export — the canonical artifact a cyclist rides with
+# ---------------------------------------------------------------------------
+
+
+@router.get("/route/gpx", tags=["route"])
+async def route_gpx(
+    start: str = Query(..., description="Corridor start city (e.g. 'London')"),
+    end: str = Query(..., description="Corridor end city (e.g. 'Paris')"),
+    variant: str | None = Query(
+        None, description="Variant name from CorridorVariant.name (e.g. 'v16a_beauvais'). Defaults to the corridor's is_default variant."
+    ),
+    daily_km: float = Query(
+        80.0, gt=0, le=300, description="Daily target km — used to derive the per-day split for mode=day when from/to are not supplied."
+    ),
+    mode: Literal["full", "day"] = Query(
+        "full", description="full = whole trip in one GPX; day = a single day's stretch."
+    ),
+    day: int | None = Query(
+        None, ge=1, description="1-indexed day number. Required when mode=day unless from/to are supplied."
+    ),
+    from_city: str | None = Query(
+        None,
+        alias="from",
+        description="Day start waypoint name (preferred for mode=day — ensures the GPX boundaries match the UI exactly).",
+    ),
+    to_city: str | None = Query(
+        None,
+        alias="to",
+        description="Day end waypoint name (preferred for mode=day — ensures the GPX boundaries match the UI exactly).",
+    ),
+) -> Response:
+    """Return a GPX 1.1 file for the planned route. The file includes the
+    BRouter track polyline + named ``<wpt>`` pins for every overnight stop
+    so head-units (Garmin, Wahoo, Karoo) show pins at hotels and ferries
+    along the track.
+
+    Reuses BRouter's geometry from the shared segment cache — the first
+    call after a plan is sub-second; subsequent downloads are instant.
+    """
+    from src.tools.route_gpx import GPX_MIME, build_gpx_for_variant
+
+    if mode == "day" and day is None and not (from_city and to_city):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="`day` (or both `from` and `to`) is required when mode=day",
+        )
+
+    try:
+        build = await build_gpx_for_variant(
+            start=start,
+            end=end,
+            variant_name=variant,
+            daily_km=daily_km,
+            mode=mode,
+            day=day,
+            from_city=from_city,
+            to_city=to_city,
+        )
+    except Exception as exc:
+        log.exception("gpx_build_failed", start=start, end=end, variant=variant)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to build GPX: {exc!s}",
+        ) from exc
+
+    if build is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                f"No GPX available for {start} → {end}"
+                + (f" variant={variant}" if variant else "")
+                + (f" day={day}" if day else "")
+            ),
+        )
+
+    return Response(
+        content=build.xml,
+        media_type=GPX_MIME,
+        headers={
+            "Content-Disposition": f'attachment; filename="{build.filename}"',
+            # CORS-friendly headers so a browser <a download> from the web
+            # app can read the filename from this header.
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )

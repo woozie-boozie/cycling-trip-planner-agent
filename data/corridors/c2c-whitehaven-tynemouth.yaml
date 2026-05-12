@@ -1,0 +1,60 @@
+id: c2c-whitehaven-tynemouth
+label: Whitehaven → Tynemouth
+start: Whitehaven
+end: Tynemouth
+aliases:
+- coast to coast
+- c2c
+- ncn 7
+- ncn 14
+- whitehaven
+- tynemouth
+- lake district coast to coast
+description: |-
+  Coast to Coast (C2C) — Britain's most-ridden multi-day challenge. ~225 km from the Irish Sea (Whitehaven) over the Pennines to the North Sea (Tynemouth). Doable in 3-5 days, signposted as NCN 7/14.
+variants:
+- name: c2c_classic
+  title: C2C classic — Whitehaven to Tynemouth via Penrith
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The classic NCN 7 + NCN 14 routing from the Cumbrian coast via Keswick, Penrith and the North Pennines to Newcastle and Tynemouth. Includes the Hartside climb.
+  distinguishing_features:
+  - Britain's most-ridden multi-day challenge
+  - Lake District scenery on day 1-2
+  - Hartside Pass — the headline climb (~580 m at the top)
+  - Disused railway paths (Waskerley Way) on the eastern half
+  trade_offs:
+  - Hartside climb is a real challenge — not flat
+  - Western Lake District weather can be wet even in summer
+  best_for: |-
+    intermediate-and-up riders wanting a proper UK challenge in under a week
+  anchors:
+  - name: Whitehaven
+    country: United Kingdom
+    lat: 54.55
+    lon: -3.59
+  - name: Keswick
+    country: United Kingdom
+    lat: 54.6
+    lon: -3.13
+  - name: Penrith
+    country: United Kingdom
+    lat: 54.66
+    lon: -2.75
+  - name: Alston
+    country: United Kingdom
+    lat: 54.81
+    lon: -2.44
+  - name: Consett
+    country: United Kingdom
+    lat: 54.85
+    lon: -1.83
+  - name: Newcastle upon Tyne
+    country: United Kingdom
+    lat: 54.97
+    lon: -1.61
+  - name: Tynemouth
+    country: United Kingdom
+    lat: 55.02
+    lon: -1.42

@@ -1,0 +1,80 @@
+id: eurovelo-15-rhine
+label: Andermatt → Hook of Holland
+start: Andermatt
+end: Hook of Holland
+aliases:
+- eurovelo 15
+- rhine cycle route
+- rheinradweg
+- rhine bike
+- andermatt hook of holland
+description: |-
+  EuroVelo 15 — the full Rhine from the Swiss source town of Andermatt to the North Sea at Hook of Holland. ~1,230 km through Switzerland, France, Germany and the Netherlands. One of EuroVelo's signature long-distance corridors.
+variants:
+- name: ev15_rhine_full
+  title: EuroVelo 15 Rhine — source-to-sea full traverse
+  headline_tag: Scenic
+  is_default: true
+  description: |-
+    The fully-signposted EuroVelo 15 from the Alps source at Andermatt down through Basel, Strasbourg, the German Rhine Gorge UNESCO area, Cologne and Nijmegen to Hook of Holland. 12-14 days at 100 km/day.
+  distinguishing_features:
+  - Rhine Gorge UNESCO World Heritage section (Mainz → Koblenz)
+  - Four-country traverse with three currency zones
+  - Strasbourg, Cologne, Mainz — major heritage stops
+  - |-
+    Pancake-flat from Basel northwards — descent from the Alps does the work
+  trade_offs:
+  - Big-river barge traffic + industrial sections south of Cologne
+  - 12+ days is a serious commitment
+  - Crowded with cruise-boat tourists between Koblenz and Mainz
+  best_for: |-
+    experienced long-distance tourers, EuroVelo enthusiasts, riders ticking off the iconic European cycling routes
+  anchors:
+  - name: Andermatt
+    country: Switzerland
+    lat: 46.64
+    lon: 8.59
+  - name: Chur
+    country: Switzerland
+    lat: 46.85
+    lon: 9.53
+  - name: Basel
+    country: Switzerland
+    lat: 47.56
+    lon: 7.59
+  - name: Strasbourg
+    country: France
+    lat: 48.58
+    lon: 7.75
+  - name: Karlsruhe
+    country: Germany
+    lat: 49.0
+    lon: 8.4
+  - name: Mainz
+    country: Germany
+    lat: 50.0
+    lon: 8.27
+  - name: Koblenz
+    country: Germany
+    lat: 50.35
+    lon: 7.59
+  - name: Cologne
+    country: Germany
+    lat: 50.94
+    lon: 6.96
+  - name: Düsseldorf
+    country: Germany
+    lat: 51.23
+    lon: 6.78
+  - name: Nijmegen
+    country: Netherlands
+    lat: 51.84
+    lon: 5.86
+  - name: Rotterdam
+    country: Netherlands
+    lat: 51.92
+    lon: 4.48
+  - name: Hook of Holland
+    country: Netherlands
+    lat: 51.98
+    lon: 4.13

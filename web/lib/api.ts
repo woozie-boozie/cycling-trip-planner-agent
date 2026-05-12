@@ -188,3 +188,56 @@ export async function postChatStream(
 }
 
 export const apiBaseUrl = API_URL;
+
+// ---------------------------------------------------------------------------
+// GPX export — the artifact a cyclist uploads to their head-unit
+// ---------------------------------------------------------------------------
+
+export interface GpxUrlInput {
+  start: string;
+  end: string;
+  /** Variant identifier from backend `CorridorVariant.name` (e.g.
+   *  "v16a_beauvais"). When omitted the backend uses the corridor's
+   *  default variant. */
+  variant?: string | null;
+  /** Daily km target — fallback for `mode="day"` when from/to aren't
+   *  supplied. The from/to path is preferred. */
+  dailyKm?: number;
+  /** "full" = one GPX for the whole trip; "day" = one GPX scoped to a
+   *  single day's stretch. */
+  mode: "full" | "day";
+  /** 1-indexed day number — used for the GPX filename label and as a
+   *  fallback when from/to aren't supplied. */
+  day?: number;
+  /** Day start waypoint name — preferred for mode="day" so the GPX day
+   *  boundaries match the UI exactly. */
+  fromCity?: string;
+  /** Day end waypoint name — preferred for mode="day" so the GPX day
+   *  boundaries match the UI exactly. */
+  toCity?: string;
+}
+
+/**
+ * Compose the backend URL for downloading a GPX file. The result is meant
+ * to be set as `href` on an anchor with `download` — the browser triggers
+ * the native download flow and the backend sets `Content-Disposition`
+ * with a kebab-cased filename like ``london-paris-v16a_beauvais-day-3.gpx``.
+ *
+ * No fetch wrapper here — for downloads we want the browser's native
+ * dialog and the file streaming directly to disk.
+ */
+export function getGpxUrl(input: GpxUrlInput): string {
+  const params = new URLSearchParams({
+    start: input.start,
+    end: input.end,
+    mode: input.mode,
+  });
+  if (input.variant) params.set("variant", input.variant);
+  if (input.dailyKm) params.set("daily_km", String(input.dailyKm));
+  if (input.mode === "day") {
+    if (input.day) params.set("day", String(input.day));
+    if (input.fromCity) params.set("from", input.fromCity);
+    if (input.toCity) params.set("to", input.toCity);
+  }
+  return `${API_URL}/route/gpx?${params.toString()}`;
+}

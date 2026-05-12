@@ -39,397 +39,41 @@ import logging
 import math
 import os
 import time
-from dataclasses import dataclass
 
 import httpx
 import structlog
 
+# Anchor + CorridorVariant moved to corridor_registry on 2026-05-12 as
+# part of the YAML-catalog refactor. Re-exported here for backwards
+# compatibility — every caller that did `from src.tools.route_real import
+# Anchor, CorridorVariant` keeps working unchanged.
+from src.tools.corridor_registry import (
+    Anchor,
+    CorridorVariant,
+    get_corridor_variants,
+)
 from src.tools.schemas import DayPlan, GetRouteOutput, RouteVariant, Waypoint
 
 log = structlog.get_logger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
+__all__ = [
+    "Anchor",
+    "CorridorVariant",
+    "fetch_real_route",
+    "use_real_routes",
+    "_brouter_segment",
+    "aclose_client",
+]
+
+
 # ---------------------------------------------------------------------------
-# Per-corridor anchor catalog — one entry per signposted variant
+# Per-corridor anchor catalog — sourced from data/corridors/*.yaml via
+# corridor_registry. The Anchor + CorridorVariant + bidirectional catalog
+# dict that used to live inline here moved out on 2026-05-12. Adding the
+# 21st corridor is now one YAML file in data/corridors/, not a Python edit.
 # ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class Anchor:
-    name: str
-    country: str
-    lat: float
-    lon: float
-    is_ferry_arrival: bool = False
-    # Through-towns set is_overnight=False — they steer BRouter along the
-    # signposted route but don't surface in the agent-facing waypoint list.
-    is_overnight: bool = True
-
-
-@dataclass(frozen=True)
-class CorridorVariant:
-    """A single variant within a corridor — name + anchors + presentation."""
-
-    name: str  # short identifier, e.g. "v16a_beauvais"
-    title: str  # human-readable, e.g. "V16a Beauvais — fastest signposted"
-    description: str
-    anchors: list[Anchor]
-    distinguishing_features: list[str]
-    trade_offs: list[str]
-    best_for: str
-    is_default: bool = False
-
-
-# ---- Avenue Verte — 3 variants ─────────────────────────────────────────────
-
-# Shared UK side: London → ... → Newhaven (signposted Avenue Verte UK).
-_AVENUE_VERTE_UK: list[Anchor] = [
-    Anchor("London", "United Kingdom", 51.5074, -0.1278),
-    Anchor("Wandsworth", "United Kingdom", 51.4530, -0.1845, is_overnight=False),
-    Anchor("Crystal Palace", "United Kingdom", 51.4216, -0.0746, is_overnight=False),
-    Anchor("Coulsdon", "United Kingdom", 51.3208, -0.1395, is_overnight=False),
-    Anchor("Redhill", "United Kingdom", 51.2400, -0.1714, is_overnight=False),
-    Anchor("Crawley", "United Kingdom", 51.1092, -0.1872, is_overnight=False),
-    Anchor("East Grinstead", "United Kingdom", 51.1283, -0.0094),
-    Anchor("Forest Row", "United Kingdom", 51.1006, 0.0312, is_overnight=False),
-    Anchor("Lewes", "United Kingdom", 50.8736, 0.0080),
-    Anchor("Newhaven", "United Kingdom", 50.7935, 0.0570),
-]
-
-# Variant A · V16a Beauvais — fastest signposted French side.
-_AV_V16A_FR: list[Anchor] = [
-    Anchor("Dieppe", "France", 49.9229, 1.0784, is_ferry_arrival=True),
-    Anchor("Forges-les-Eaux", "France", 49.6111, 1.5439),
-    Anchor("Gournay-en-Bray", "France", 49.4869, 1.7269, is_overnight=False),
-    Anchor("Saint-Germer-de-Fly", "France", 49.4317, 1.7747, is_overnight=False),
-    Anchor("Beauvais", "France", 49.4314, 2.0807),
-    Anchor("Beaumont-sur-Oise", "France", 49.1432, 2.2825, is_overnight=False),
-    Anchor("Cergy-Pontoise", "France", 49.0356, 2.0707),
-    Anchor("Paris", "France", 48.8566, 2.3522),
-]
-
-# Variant B · Oise/Chantilly — scenic detour via Senlis & Chantilly chateaux.
-_AV_OISE_CHANTILLY_FR: list[Anchor] = [
-    Anchor("Dieppe", "France", 49.9229, 1.0784, is_ferry_arrival=True),
-    Anchor("Forges-les-Eaux", "France", 49.6111, 1.5439),
-    Anchor("Gournay-en-Bray", "France", 49.4869, 1.7269, is_overnight=False),
-    Anchor("Saint-Germer-de-Fly", "France", 49.4317, 1.7747, is_overnight=False),
-    Anchor("Beauvais", "France", 49.4314, 2.0807),
-    Anchor("Clermont", "France", 49.3779, 2.4140, is_overnight=False),
-    Anchor("Senlis", "France", 49.2069, 2.5817),
-    Anchor("Chantilly", "France", 49.1939, 2.4598),
-    Anchor("Cergy-Pontoise", "France", 49.0356, 2.0707, is_overnight=False),
-    Anchor("Paris", "France", 48.8566, 2.3522),
-]
-
-# Variant C · Gisors / Pays de Bray — western route, no Beauvais cathedral
-# but the Epte valley + medieval Gisors keep + Vexin villages.
-_AV_GISORS_FR: list[Anchor] = [
-    Anchor("Dieppe", "France", 49.9229, 1.0784, is_ferry_arrival=True),
-    Anchor("Forges-les-Eaux", "France", 49.6111, 1.5439),
-    Anchor("Gournay-en-Bray", "France", 49.4869, 1.7269, is_overnight=False),
-    Anchor("Gisors", "France", 49.2806, 1.7783),
-    Anchor("Vétheuil", "France", 49.0833, 1.6378, is_overnight=False),
-    Anchor("Conflans-Sainte-Honorine", "France", 48.9988, 2.0985, is_overnight=False),
-    Anchor("Cergy-Pontoise", "France", 49.0356, 2.0707),
-    Anchor("Paris", "France", 48.8566, 2.3522),
-]
-
-
-_AVENUE_VERTE_VARIANTS: list[CorridorVariant] = [
-    CorridorVariant(
-        name="v16a_beauvais",
-        title="V16a Beauvais — fastest signposted",
-        description=(
-            "The most direct of the signposted Avenue Verte variants. Crosses "
-            "the Pays de Bray to Beauvais (UNESCO Gothic cathedral, tallest "
-            "choir vault in the world), then drops to Cergy via Beaumont-sur-Oise."
-        ),
-        anchors=_AVENUE_VERTE_UK + _AV_V16A_FR,
-        distinguishing_features=[
-            "Beauvais Cathedral (tallest Gothic choir vault, 48 m)",
-            "Pays de Bray cheese country (Neufchâtel AOC)",
-            "Mostly disused railway path on French side — gentle gradients",
-            "Shortest of the three Avenue Verte variants",
-        ],
-        trade_offs=[
-            "Misses the Senlis/Chantilly chateaux loop",
-            "More A-road sections in the UK approach to East Grinstead",
-        ],
-        best_for=(
-            "targeting the fastest signposted crossing with one cathedral stop"
-        ),
-        is_default=True,
-    ),
-    CorridorVariant(
-        name="oise_chantilly",
-        title="Oise/Chantilly — scenic chateaux loop",
-        description=(
-            "Adds the Senlis (medieval town) + Chantilly (chateau, racecourse, "
-            "lace) detour after Beauvais. ~20–30 km longer than V16a but the "
-            "most photogenic variant — three world-class historic stops."
-        ),
-        anchors=_AVENUE_VERTE_UK + _AV_OISE_CHANTILLY_FR,
-        distinguishing_features=[
-            "Chantilly Château + Grand Stables (one of France's finest)",
-            "Senlis medieval old town with intact Gallo-Roman walls",
-            "Beauvais Cathedral retained",
-            "Forest of Chantilly cycle paths",
-        ],
-        trade_offs=[
-            "20–30 km longer than V16a (one extra day for casual riders)",
-            "Chantilly + Senlis can be expensive for food and accommodation",
-        ],
-        best_for=(
-            "riders prioritising heritage + photography over distance, "
-            "or honeymoon/special-occasion trips"
-        ),
-    ),
-    CorridorVariant(
-        name="gisors_western",
-        title="Gisors — western Epte valley",
-        description=(
-            "Skips Beauvais entirely. From Gournay-en-Bray, drops south via "
-            "Gisors (12th-century keep, William the Conqueror history) and "
-            "the Epte valley to the Seine. Quieter, more rural, fewer tourists."
-        ),
-        anchors=_AVENUE_VERTE_UK + _AV_GISORS_FR,
-        distinguishing_features=[
-            "Gisors medieval keep (Knights Templar history)",
-            "Epte valley — the historic Norman/French frontier",
-            "Vexin Français Regional Natural Park",
-            "Far fewer tourists than the Beauvais/Chantilly variants",
-        ],
-        trade_offs=[
-            "No Beauvais Cathedral",
-            "More rural — food + accommodation density lower",
-            "Rougher signposting in places (V32 + local cycle network)",
-        ],
-        best_for=(
-            "experienced tourers wanting solitude + rural Normandy/Vexin "
-            "over headline tourist stops"
-        ),
-    ),
-]
-
-
-# ---- Amsterdam → Copenhagen — 2 variants ───────────────────────────────────
-
-_AMS_INLAND: list[Anchor] = [
-    Anchor("Amsterdam", "Netherlands", 52.3676, 4.9041),
-    Anchor("Hoorn", "Netherlands", 52.6425, 5.0597),
-    Anchor("Groningen", "Netherlands", 53.2194, 6.5665),
-    Anchor("Bremen", "Germany", 53.0793, 8.8017),
-    Anchor("Hamburg", "Germany", 53.5511, 9.9937),
-    Anchor("Lübeck", "Germany", 53.8655, 10.6866),
-    Anchor("Puttgarden", "Germany", 54.5021, 11.2378),
-    Anchor("Rødby", "Denmark", 54.6907, 11.3469, is_ferry_arrival=True),
-    Anchor("Vordingborg", "Denmark", 55.0085, 11.9105),
-    Anchor("Copenhagen", "Denmark", 55.6761, 12.5683),
-]
-
-_AMS_COASTAL_EV12: list[Anchor] = [
-    Anchor("Amsterdam", "Netherlands", 52.3676, 4.9041),
-    Anchor("IJmuiden", "Netherlands", 52.4602, 4.6103, is_overnight=False),
-    Anchor("Den Helder", "Netherlands", 52.9612, 4.7600),
-    Anchor("Harlingen", "Netherlands", 53.1740, 5.4220, is_overnight=False),
-    Anchor("Leeuwarden", "Netherlands", 53.2012, 5.7999),
-    Anchor("Groningen", "Netherlands", 53.2194, 6.5665, is_overnight=False),
-    Anchor("Bremerhaven", "Germany", 53.5396, 8.5810),
-    Anchor("Cuxhaven", "Germany", 53.8665, 8.7010, is_overnight=False),
-    Anchor("Hamburg", "Germany", 53.5511, 9.9937),
-    Anchor("Lübeck", "Germany", 53.8655, 10.6866),
-    Anchor("Travemünde", "Germany", 53.9620, 10.8730, is_overnight=False),
-    Anchor("Puttgarden", "Germany", 54.5021, 11.2378),
-    Anchor("Rødby", "Denmark", 54.6907, 11.3469, is_ferry_arrival=True),
-    Anchor("Vordingborg", "Denmark", 55.0085, 11.9105),
-    Anchor("Copenhagen", "Denmark", 55.6761, 12.5683),
-]
-
-
-_AMS_TO_CPH_VARIANTS: list[CorridorVariant] = [
-    CorridorVariant(
-        name="inland_ev7_hybrid",
-        title="Inland EV7/12 hybrid — fastest",
-        description=(
-            "Cuts inland through Hoorn and Groningen rather than following "
-            "the coast. The popular 'Amsterdam → Copenhagen tour' that most "
-            "do — flat, well-signposted, ~9 days for an 80 km/day rider."
-        ),
-        anchors=_AMS_INLAND,
-        distinguishing_features=[
-            "Mostly LF / EuroVelo 7 (Sun Route) signage in NL/DE",
-            "Fewer ferry/coastal complications",
-            "Bremen + Hamburg for hostel density and food variety",
-            "Rødby–Puttgarden ferry crossing (~45 min, bikes free)",
-        ],
-        trade_offs=[
-            "Misses the North Sea coast and Wadden Sea UNESCO area",
-            "Fewer dramatic seaside stretches",
-        ],
-        best_for=(
-            "riders prioritising distance/day balance and flat, well-signposted "
-            "infrastructure"
-        ),
-        is_default=True,
-    ),
-    CorridorVariant(
-        name="coastal_ev12",
-        title="Coastal EV12 North Sea — scenic but long",
-        description=(
-            "True EuroVelo 12 along the North Sea coast — Den Helder, Frisian "
-            "islands gateway, Wadden Sea National Park (UNESCO), Bremerhaven "
-            "maritime museum. Adds 250+ km vs the inland route."
-        ),
-        anchors=_AMS_COASTAL_EV12,
-        distinguishing_features=[
-            "Wadden Sea UNESCO World Heritage coast",
-            "Frisian islands gateway at Harlingen",
-            "Bremerhaven Auswandererhaus + maritime museum",
-            "Cuxhaven sea-bathing town",
-        ],
-        trade_offs=[
-            "~250 km longer than the inland route (12+ days at 80 km/day)",
-            "Stronger headwind risk — North Sea westerlies",
-            "Some coastal gravel sections; pace slower than tarmac inland",
-        ],
-        best_for=(
-            "riders who want the EuroVelo 12 'proper' experience with time "
-            "to enjoy the coast — not for tight schedules"
-        ),
-    ),
-]
-
-
-# ---- London → Brighton — 2 variants ────────────────────────────────────────
-
-_LDN_TO_BRI_NCN20: list[Anchor] = [
-    Anchor("London", "United Kingdom", 51.5074, -0.1278),
-    Anchor("Wandsworth", "United Kingdom", 51.4530, -0.1845, is_overnight=False),
-    Anchor("Mitcham", "United Kingdom", 51.4040, -0.1683, is_overnight=False),
-    Anchor("Coulsdon", "United Kingdom", 51.3208, -0.1395, is_overnight=False),
-    Anchor("Crawley", "United Kingdom", 51.1092, -0.1872, is_overnight=False),
-    Anchor("Cuckfield", "United Kingdom", 51.0007, -0.1421),
-    Anchor("Burgess Hill", "United Kingdom", 50.9551, -0.1316, is_overnight=False),
-    Anchor("Brighton", "United Kingdom", 50.8225, -0.1372),
-]
-
-# Avenue Verte UK + Lewes detour to Brighton — adds the Sussex Weald + South
-# Downs scenic stretch, popular with cyclists who want a proper South Downs
-# overnight before the coastal arrival.
-_LDN_TO_BRI_AV_LEWES: list[Anchor] = [
-    Anchor("London", "United Kingdom", 51.5074, -0.1278),
-    Anchor("Crystal Palace", "United Kingdom", 51.4216, -0.0746, is_overnight=False),
-    Anchor("Coulsdon", "United Kingdom", 51.3208, -0.1395, is_overnight=False),
-    Anchor("Redhill", "United Kingdom", 51.2400, -0.1714, is_overnight=False),
-    Anchor("East Grinstead", "United Kingdom", 51.1283, -0.0094),
-    Anchor("Forest Row", "United Kingdom", 51.1006, 0.0312, is_overnight=False),
-    Anchor("Lewes", "United Kingdom", 50.8736, 0.0080),
-    Anchor("Brighton", "United Kingdom", 50.8225, -0.1372),
-]
-
-
-_LDN_TO_BRI_VARIANTS: list[CorridorVariant] = [
-    CorridorVariant(
-        name="ncn20",
-        title="NCN 20 signposted — fastest",
-        description=(
-            "The classic National Cycle Network 20 route, the standard "
-            "London→Brighton signposted ride. Ridden by ~30,000 cyclists "
-            "every June for the British Heart Foundation event."
-        ),
-        anchors=_LDN_TO_BRI_NCN20,
-        distinguishing_features=[
-            "Wandle Trail through south London",
-            "Cuckoo Trail disused railway in East Sussex",
-            "Ditchling Beacon climb (the famous final ascent)",
-            "Best signposting of any UK cycle route",
-        ],
-        trade_offs=[
-            "Urban south London first 25 km can feel stop-start",
-            "Brighton seafront finish but no Lewes/South Downs detour",
-        ],
-        best_for=(
-            "the canonical day-ride or a fast 2-day weekend; charity riders"
-        ),
-        is_default=True,
-    ),
-    CorridorVariant(
-        name="avenue_verte_lewes",
-        title="Avenue Verte UK + Lewes — South Downs detour",
-        description=(
-            "Follows the Avenue Verte UK signposted route via East Grinstead, "
-            "Forest Row, Lewes — adding the South Downs scenic spur and the "
-            "historic county town of Lewes (Anne of Cleves' house, castle). "
-            "Brighton arrival via the South Downs Way."
-        ),
-        anchors=_LDN_TO_BRI_AV_LEWES,
-        distinguishing_features=[
-            "Forest of Ashdown (Winnie-the-Pooh country)",
-            "Lewes — Tudor architecture, castle, real-ale pubs",
-            "South Downs ridge approach to Brighton",
-            "Quieter than NCN 20 — lower traffic on Sussex lanes",
-        ],
-        trade_offs=[
-            "10–20 km longer than NCN 20",
-            "More climbing (Ashdown Forest + South Downs ridge)",
-            "Less signposting on the Lewes→Brighton spur",
-        ],
-        best_for=(
-            "riders wanting a proper 2-day trip with a Lewes overnight, or "
-            "those who care more about countryside than the canonical route"
-        ),
-    ),
-]
-
-
-# Master corridor catalog — start/end (case-insensitive) → variants.
-_CORRIDORS: dict[tuple[str, str], list[CorridorVariant]] = {
-    ("london", "paris"): _AVENUE_VERTE_VARIANTS,
-    ("paris", "london"): [
-        # Reverse direction: same variants but reversed anchor order.
-        CorridorVariant(
-            name=v.name,
-            title=v.title,
-            description=v.description,
-            anchors=list(reversed(v.anchors)),
-            distinguishing_features=v.distinguishing_features,
-            trade_offs=v.trade_offs,
-            best_for=v.best_for,
-            is_default=v.is_default,
-        )
-        for v in _AVENUE_VERTE_VARIANTS
-    ],
-    ("amsterdam", "copenhagen"): _AMS_TO_CPH_VARIANTS,
-    ("copenhagen", "amsterdam"): [
-        CorridorVariant(
-            name=v.name,
-            title=v.title,
-            description=v.description,
-            anchors=list(reversed(v.anchors)),
-            distinguishing_features=v.distinguishing_features,
-            trade_offs=v.trade_offs,
-            best_for=v.best_for,
-            is_default=v.is_default,
-        )
-        for v in _AMS_TO_CPH_VARIANTS
-    ],
-    ("london", "brighton"): _LDN_TO_BRI_VARIANTS,
-    ("brighton", "london"): [
-        CorridorVariant(
-            name=v.name,
-            title=v.title,
-            description=v.description,
-            anchors=list(reversed(v.anchors)),
-            distinguishing_features=v.distinguishing_features,
-            trade_offs=v.trade_offs,
-            best_for=v.best_for,
-            is_default=v.is_default,
-        )
-        for v in _LDN_TO_BRI_VARIANTS
-    ],
-}
 
 
 # ---------------------------------------------------------------------------
@@ -441,7 +85,11 @@ _BROUTER_PROFILE = "trekking"
 _BROUTER_TIMEOUT = 15.0
 _CACHE_TTL_SECONDS = 60 * 60 * 24  # 24h
 
-_segment_cache: dict[tuple[float, float, float, float], tuple[float, float, float]] = {}
+# Per-segment cache. Stores everything BRouter returns for an a→b call so
+# the variant-build path and the GPX-export path share one round-trip.
+# Coordinates are kept as raw [lon, lat, ele?] floats (lists from JSON).
+_SegmentCache = tuple[float, float, float, list[list[float]]]
+_segment_cache: dict[tuple[float, float, float, float], _SegmentCache] = {}
 _cache_timestamps: dict[tuple[float, float, float, float], float] = {}
 
 _client: httpx.AsyncClient | None = None
@@ -468,7 +116,7 @@ def _cache_key(a: Anchor, b: Anchor) -> tuple[float, float, float, float]:
     return (round(a.lat, 4), round(a.lon, 4), round(b.lat, 4), round(b.lon, 4))
 
 
-def _cached_segment(a: Anchor, b: Anchor) -> tuple[float, float, float] | None:
+def _cached_segment(a: Anchor, b: Anchor) -> _SegmentCache | None:
     key = _cache_key(a, b)
     ts = _cache_timestamps.get(key)
     if ts is None or (time.time() - ts) > _CACHE_TTL_SECONDS:
@@ -477,18 +125,26 @@ def _cached_segment(a: Anchor, b: Anchor) -> tuple[float, float, float] | None:
 
 
 def _cache_segment(
-    a: Anchor, b: Anchor, distance_km: float, ascend_m: float, time_s: float
+    a: Anchor,
+    b: Anchor,
+    distance_km: float,
+    ascend_m: float,
+    time_s: float,
+    coordinates: list[list[float]],
 ) -> None:
     key = _cache_key(a, b)
-    _segment_cache[key] = (distance_km, ascend_m, time_s)
+    _segment_cache[key] = (distance_km, ascend_m, time_s, coordinates)
     _cache_timestamps[key] = time.time()
 
 
-async def _brouter_segment(
+async def _brouter_fetch(
     client: httpx.AsyncClient, a: Anchor, b: Anchor
-) -> tuple[float, float, float]:
-    """Real road distance for one cycling segment a→b. Returns
-    (distance_km, ascend_m, time_seconds). Raises on any failure."""
+) -> _SegmentCache:
+    """Fetch one BRouter segment a→b. Returns
+    (distance_km, ascend_m, time_seconds, coordinates) where coordinates is
+    the raw GeoJSON LineString — each entry is [lon, lat] or [lon, lat, ele].
+    Cached for ``_CACHE_TTL_SECONDS`` so the variant-build path and the
+    GPX-export path share a single round-trip."""
     cached = _cached_segment(a, b)
     if cached is not None:
         return cached
@@ -510,7 +166,25 @@ async def _brouter_segment(
     ascend_m = float(props.get("filtered ascend", 0))
     time_s = float(props.get("total-time", 0))
     distance_km = track_length_m / 1000.0
-    _cache_segment(a, b, distance_km, ascend_m, time_s)
+    geometry = features[0].get("geometry", {})
+    raw_coords = geometry.get("coordinates", []) or []
+    # Normalise to plain float lists — robust to numpy/tuple variants if any
+    # transport upstream changes how the JSON gets parsed.
+    coordinates: list[list[float]] = [[float(x) for x in pt] for pt in raw_coords]
+    _cache_segment(a, b, distance_km, ascend_m, time_s, coordinates)
+    return distance_km, ascend_m, time_s, coordinates
+
+
+async def _brouter_segment(
+    client: httpx.AsyncClient, a: Anchor, b: Anchor
+) -> tuple[float, float, float]:
+    """Back-compat shim: (distance_km, ascend_m, time_seconds) only.
+
+    Variant building doesn't need geometry — keeping the 3-tuple return
+    avoids touching the variant-build call sites. GPX export uses
+    ``_brouter_fetch`` directly to also grab the polyline.
+    """
+    distance_km, ascend_m, time_s, _coords = await _brouter_fetch(client, a, b)
     return distance_km, ascend_m, time_s
 
 
@@ -529,7 +203,16 @@ def _normalize(s: str) -> str:
 
 
 def _variants_for(start: str, end: str) -> list[CorridorVariant] | None:
-    return _CORRIDORS.get((_normalize(start), _normalize(end)))
+    """Look up the variant list for a corridor direction.
+
+    Delegates to ``corridor_registry.get_corridor_variants``, which reads
+    from ``data/corridors/*.yaml``. Returns ``None`` for out-of-catalog
+    pairs — caller falls through to generic mode. The reverse direction
+    (e.g. paris→london) is built at registry load time by reversing each
+    variant's anchor list, so this function doesn't need to know about
+    directionality.
+    """
+    return get_corridor_variants(start, end)
 
 
 def _ferry_notes(anchors: list[Anchor]) -> str | None:
@@ -722,6 +405,7 @@ async def _build_variant(
         distinguishing_features=list(cv.distinguishing_features),
         trade_offs=list(cv.trade_offs),
         best_for=cv.best_for,
+        headline_tag=cv.headline_tag,
         notes=notes,
         is_default=cv.is_default,
     )

@@ -33,6 +33,13 @@ export interface RouteVariantSummary {
   tagline: string;
   total_distance_km: number;
   estimated_days: number;
+  /**
+   * One-word at-a-glance category tag — "Direct", "Scenic", "Quiet",
+   * "Coastal", "Heritage", "Climbing", etc. Picked from the axes that
+   * actually differ between variants in this corridor. Mirrors backend
+   * `CorridorVariant.headline_tag`. Renders as a pill above the tagline.
+   */
+  headline_tag?: string;
   /** Two/three short bullets — matches backend `distinguishing_features` */
   distinguishing_features: string[];
   /** Two/three short bullets — matches backend `trade_offs` */
@@ -66,12 +73,19 @@ const _UK_AVENUE_VERTE: VariantWaypoint[] = [
   { name: "Newhaven", lat: 50.7935, lon: 0.057 },
 ];
 
-export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
+// Partial — only the 3 hand-curated corridors have RouteVariantSummary
+// entries here (these drive the homepage "compare variants" card UI).
+// The other 20 catalog corridors get their variants from the backend at
+// runtime via the agent's get_route response — consumers null-check
+// (getVariants returns undefined for unknown corridors, which renders
+// a single-variant card instead of a side-by-side comparison).
+export const ROUTE_VARIANTS: Partial<Record<CorridorId, RouteVariantSummary[]>> = {
   "ldn-par": [
     {
       name: "v16a_beauvais",
       title: "V16a Beauvais",
       tagline: "fastest signposted",
+      headline_tag: "Direct",
       total_distance_km: 364,
       estimated_days: 4,
       distinguishing_features: [
@@ -100,6 +114,7 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       name: "oise_chantilly",
       title: "Oise / Chantilly",
       tagline: "scenic châteaux loop",
+      headline_tag: "Heritage",
       total_distance_km: 414,
       estimated_days: 5,
       distinguishing_features: [
@@ -128,6 +143,7 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       name: "gisors",
       title: "Gisors",
       tagline: "western Epte valley",
+      headline_tag: "Quiet",
       total_distance_km: 374,
       estimated_days: 4,
       distinguishing_features: [
@@ -159,6 +175,7 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       name: "ev7_inland",
       title: "Inland EV7/12 hybrid",
       tagline: "default — fastest, flattest",
+      headline_tag: "Direct",
       total_distance_km: 836,
       estimated_days: 11,
       distinguishing_features: [
@@ -192,6 +209,7 @@ export const ROUTE_VARIANTS: Record<CorridorId, RouteVariantSummary[]> = {
       name: "ev12_coastal",
       title: "Coastal EV12 North Sea",
       tagline: "scenic but long",
+      headline_tag: "Coastal",
       total_distance_km: 1058,
       estimated_days: 14,
       distinguishing_features: [

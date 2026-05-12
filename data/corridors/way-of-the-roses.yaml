@@ -1,0 +1,59 @@
+id: way-of-the-roses
+label: Morecambe → Bridlington
+start: Morecambe
+end: Bridlington
+aliases:
+- way of the roses
+- morecambe
+- bridlington
+- lancashire to yorkshire
+- sea to sea north
+- ncn 69
+description: |-
+  Way of the Roses — the 170-mile sea-to-sea across northern England's two historic rose counties (Lancashire's red, Yorkshire's white). ~270 km, signposted as NCN 69 + variants, 3-4 days at intermediate pace.
+variants:
+- name: way_of_the_roses
+  title: Way of the Roses — west-to-east
+  headline_tag: Heritage
+  is_default: true
+  description: |-
+    The signposted NCN 69 route from Morecambe Bay over the Yorkshire Dales via Settle, Pateley Bridge and York to Bridlington on the North Sea coast. Quieter alternative to the Coast to Coast.
+  distinguishing_features:
+  - Yorkshire Dales National Park — limestone landscape
+  - Historic York with its walls + Minster as a mid-trip stop
+  - Quieter than the C2C — less famous, less ridden
+  - Sea-to-sea structure with photogenic start and finish piers
+  trade_offs:
+  - Climbing through the Dales — not flat
+  - Pateley Bridge to Ripon is a single long-day option
+  best_for: |-
+    Yorkshire Dales aficionados, riders wanting a less-crowded alternative to the C2C, York heritage stop
+  anchors:
+  - name: Morecambe
+    country: United Kingdom
+    lat: 54.07
+    lon: -2.86
+  - name: Settle
+    country: United Kingdom
+    lat: 54.07
+    lon: -2.28
+  - name: Pateley Bridge
+    country: United Kingdom
+    lat: 54.09
+    lon: -1.77
+  - name: Ripon
+    country: United Kingdom
+    lat: 54.14
+    lon: -1.52
+  - name: York
+    country: United Kingdom
+    lat: 53.96
+    lon: -1.08
+  - name: Pocklington
+    country: United Kingdom
+    lat: 53.93
+    lon: -0.78
+  - name: Bridlington
+    country: United Kingdom
+    lat: 54.08
+    lon: -0.2

@@ -1,0 +1,155 @@
+id: ams-cph
+label: Amsterdam → Copenhagen
+start: Amsterdam
+end: Copenhagen
+aliases:
+- amsterdam
+- copenhagen
+- eurovelo 7
+- eurovelo 12
+- ams cph
+- amsterdam to copenhagen
+description: |-
+  The classic North Sea ↔ Baltic crossing. Two variants — the inland EV7/12 hybrid (fastest, ~850 km via Hoorn and Bremen/Hamburg), and the coastal EV12 'proper' (~1,100 km via the Wadden Sea UNESCO coast and Bremerhaven). Both use the Rødby–Puttgarden ferry across the Fehmarn Belt.
+variants:
+- name: inland_ev7_hybrid
+  title: Inland EV7/12 hybrid — fastest
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    Cuts inland through Hoorn and Groningen rather than following the coast. The popular 'Amsterdam → Copenhagen tour' that most do — flat, well-signposted, ~9 days for an 80 km/day rider.
+  distinguishing_features:
+  - Mostly LF / EuroVelo 7 (Sun Route) signage in NL/DE
+  - Fewer ferry/coastal complications
+  - Bremen + Hamburg for hostel density and food variety
+  - Rødby–Puttgarden ferry crossing (~45 min, bikes free)
+  trade_offs:
+  - Misses the North Sea coast and Wadden Sea UNESCO area
+  - Fewer dramatic seaside stretches
+  best_for: |-
+    riders prioritising distance/day balance and flat, well-signposted infrastructure
+  anchors:
+  - name: Amsterdam
+    country: Netherlands
+    lat: 52.3676
+    lon: 4.9041
+  - name: Hoorn
+    country: Netherlands
+    lat: 52.6425
+    lon: 5.0597
+  - name: Groningen
+    country: Netherlands
+    lat: 53.2194
+    lon: 6.5665
+  - name: Bremen
+    country: Germany
+    lat: 53.0793
+    lon: 8.8017
+  - name: Hamburg
+    country: Germany
+    lat: 53.5511
+    lon: 9.9937
+  - name: Lübeck
+    country: Germany
+    lat: 53.8655
+    lon: 10.6866
+  - name: Puttgarden
+    country: Germany
+    lat: 54.5021
+    lon: 11.2378
+  - name: Rødby
+    country: Denmark
+    lat: 54.6907
+    lon: 11.3469
+    is_ferry_arrival: true
+  - name: Vordingborg
+    country: Denmark
+    lat: 55.0085
+    lon: 11.9105
+  - name: Copenhagen
+    country: Denmark
+    lat: 55.6761
+    lon: 12.5683
+- name: coastal_ev12
+  title: Coastal EV12 North Sea — scenic but long
+  headline_tag: Coastal
+  description: |-
+    True EuroVelo 12 along the North Sea coast — Den Helder, Frisian islands gateway, Wadden Sea National Park (UNESCO), Bremerhaven maritime museum. Adds 250+ km vs the inland route.
+  distinguishing_features:
+  - Wadden Sea UNESCO World Heritage coast
+  - Frisian islands gateway at Harlingen
+  - Bremerhaven Auswandererhaus + maritime museum
+  - Cuxhaven sea-bathing town
+  trade_offs:
+  - ~250 km longer than the inland route (12+ days at 80 km/day)
+  - Stronger headwind risk — North Sea westerlies
+  - Some coastal gravel sections; pace slower than tarmac inland
+  best_for: |-
+    riders who want the EuroVelo 12 'proper' experience with time to enjoy the coast — not for tight schedules
+  anchors:
+  - name: Amsterdam
+    country: Netherlands
+    lat: 52.3676
+    lon: 4.9041
+  - name: IJmuiden
+    country: Netherlands
+    lat: 52.4602
+    lon: 4.6103
+    is_overnight: false
+  - name: Den Helder
+    country: Netherlands
+    lat: 52.9612
+    lon: 4.76
+  - name: Harlingen
+    country: Netherlands
+    lat: 53.174
+    lon: 5.422
+    is_overnight: false
+  - name: Leeuwarden
+    country: Netherlands
+    lat: 53.2012
+    lon: 5.7999
+  - name: Groningen
+    country: Netherlands
+    lat: 53.2194
+    lon: 6.5665
+    is_overnight: false
+  - name: Bremerhaven
+    country: Germany
+    lat: 53.5396
+    lon: 8.581
+  - name: Cuxhaven
+    country: Germany
+    lat: 53.8665
+    lon: 8.701
+    is_overnight: false
+  - name: Hamburg
+    country: Germany
+    lat: 53.5511
+    lon: 9.9937
+  - name: Lübeck
+    country: Germany
+    lat: 53.8655
+    lon: 10.6866
+  - name: Travemünde
+    country: Germany
+    lat: 53.962
+    lon: 10.873
+    is_overnight: false
+  - name: Puttgarden
+    country: Germany
+    lat: 54.5021
+    lon: 11.2378
+  - name: Rødby
+    country: Denmark
+    lat: 54.6907
+    lon: 11.3469
+    is_ferry_arrival: true
+  - name: Vordingborg
+    country: Denmark
+    lat: 55.0085
+    lon: 11.9105
+  - name: Copenhagen
+    country: Denmark
+    lat: 55.6761
+    lon: 12.5683

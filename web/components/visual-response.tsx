@@ -1,12 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { GpxDownloadStrip } from "@/components/gpx-download-strip";
 import { MarkdownRenderer } from "@/components/markdown-renderer";
 import { RouteCanvas } from "@/components/route-canvas";
 import { RouteComparisonCard } from "@/components/route-comparison-card";
 import { matchCorridor, type Corridor } from "@/lib/corridors";
-import { parseItinerary } from "@/lib/parse-itinerary";
-import { getVariants, type RouteVariantSummary } from "@/lib/route-variants";
+import {
+  parseItinerary,
+  parseRouteHeader,
+  type DayRow,
+} from "@/lib/parse-itinerary";
+import {
+  getVariants,
+  ROUTE_VARIANTS,
+  type RouteVariantSummary,
+} from "@/lib/route-variants";
 
 interface VisualResponseProps {
   /** The assistant message body (markdown) */
@@ -67,12 +76,24 @@ export function VisualResponse({ content, corridor, onPickVariant }: VisualRespo
       // date suffixes leaking into city names, missing km columns, fake totals).
       // We keep the map at the top for visual orientation and let the agent's
       // markdown be the source of truth for the day list itself. Same rendering
-      // path as text mode, framed by the corridor map. ItineraryCard is kept
-      // in the codebase but no longer rendered — easy to revive once the
-      // agent emits structured day data alongside prose.
+      // path as text mode, framed by the corridor map.
+      //
+      // GPX download strip renders alongside the markdown — same parsed days
+      // we use elsewhere drive the per-day download buttons. Sits between
+      // the canvas and the markdown so cyclists see the artifact-they-ride-with
+      // before the day breakdown.
       return (
         <div className="space-y-3">
           {detection.corridor && <RouteCanvas corridor={detection.corridor} />}
+          {detection.corridor && detection.days.length > 0 && (
+            <GpxDownloadStrip
+              start={detection.routeStart}
+              end={detection.routeEnd}
+              variantName={detection.variantName}
+              days={detection.days}
+              label={detection.corridor.label}
+            />
+          )}
           <div className="prose prose-sm max-w-none text-sm leading-relaxed text-foreground">
             <MarkdownRenderer content={content} />
           </div>
@@ -149,6 +170,14 @@ type Detection =
       kind: "itinerary";
       /** Corridor inferred from the conversation (if any) — drives the map */
       corridor: Corridor | null;
+      /** Parsed day rows — drive the per-day GPX download buttons */
+      days: DayRow[];
+      /** Origin city extracted from the agent's header for the GPX endpoint */
+      routeStart: string;
+      /** Destination city extracted from the agent's header for the GPX endpoint */
+      routeEnd: string;
+      /** Variant identifier matched against ROUTE_VARIANTS, or null */
+      variantName: string | null;
     }
   | { kind: "markdown" };
 
@@ -193,15 +222,21 @@ function detectResponseShape(content: string, corridor: Corridor | null): Detect
     }
   }
 
-  // Multi-day itinerary detection — used purely as a signal that the response
-  // IS a day-by-day plan (so the map renders above the markdown body). The
-  // parsed day[] array isn't used downstream; the markdown body is rendered
-  // as-is by MarkdownRenderer, which gives identical output to text mode.
+  // Multi-day itinerary detection — used as a signal that the response IS a
+  // day-by-day plan (so the map renders above the markdown body) AND to feed
+  // the GpxDownloadStrip with parsed day rows for the per-day download
+  // buttons. The markdown body itself is still rendered by MarkdownRenderer.
   const days = parseItinerary(content);
   if (days && days.length >= 3) {
+    const allVariants = Object.values(ROUTE_VARIANTS).flat();
+    const header = parseRouteHeader(content, allVariants);
     return {
       kind: "itinerary",
       corridor,
+      days,
+      routeStart: header?.start ?? corridor.label.split("→")[0]?.trim() ?? "",
+      routeEnd: header?.end ?? corridor.label.split("→")[1]?.trim() ?? "",
+      variantName: header?.variantName ?? null,
     };
   }
 

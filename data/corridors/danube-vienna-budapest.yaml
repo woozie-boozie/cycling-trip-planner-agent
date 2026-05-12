@@ -1,0 +1,53 @@
+id: danube-vienna-budapest
+label: Vienna → Budapest
+start: Vienna
+end: Budapest
+aliases:
+- danube east
+- donauradweg east
+- vienna to budapest
+- eurovelo 6 hungary
+description: |-
+  Donauradweg east — Vienna to Budapest via Bratislava and Győr. ~330 km, ~5 days, the natural continuation if you've already done Passau → Vienna. Three capital cities in one tour, mostly flat, signposted both banks.
+variants:
+- name: donauradweg_east
+  title: Donauradweg east — Vienna → Budapest via Bratislava
+  headline_tag: Direct
+  is_default: true
+  description: |-
+    The continuation of EuroVelo 6 east from Vienna through Slovakia (Bratislava) and Hungary (Győr, Esztergom) to Budapest. Excellent for week-long ride at 70-80 km/day.
+  distinguishing_features:
+  - Three capital cities (Vienna, Bratislava, Budapest) in one tour
+  - Esztergom Basilica — one of the largest churches in Europe
+  - Hungarian thermal baths every overnight
+  - Mostly flat both-bank cycle paths
+  trade_offs:
+  - Hungarian sections less signposted than Austrian
+  - Currency change at the Slovak/Hungarian borders
+  best_for: |-
+    riders extending a Passau → Vienna trip, capital-city collectors, Central European history enthusiasts
+  anchors:
+  - name: Vienna
+    country: Austria
+    lat: 48.21
+    lon: 16.37
+  - name: Bratislava
+    country: Slovakia
+    lat: 48.15
+    lon: 17.11
+  - name: Győr
+    country: Hungary
+    lat: 47.68
+    lon: 17.64
+  - name: Komárom
+    country: Hungary
+    lat: 47.74
+    lon: 18.13
+  - name: Esztergom
+    country: Hungary
+    lat: 47.79
+    lon: 18.74
+  - name: Budapest
+    country: Hungary
+    lat: 47.5
+    lon: 19.04

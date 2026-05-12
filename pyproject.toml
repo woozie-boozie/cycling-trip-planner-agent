@@ -19,6 +19,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "aiosqlite>=0.20.0",  # for SQLite-backed tests
     "greenlet>=3.0.0",  # required by SQLAlchemy async
+    "PyYAML>=6.0",  # corridor catalog YAML (data/corridors/*.yaml)
 ]
 
 [project.optional-dependencies]

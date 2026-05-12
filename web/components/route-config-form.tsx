@@ -18,6 +18,11 @@ import { ROUTE_DETAILS } from "@/lib/route-details";
 
 interface RouteConfigFormProps {
   corridor: Corridor;
+  /** The rider's stated comfortable daily distance, captured at onboarding
+   *  via `UserProfile.max_daily_km_comfort`. Anchors the three relative
+   *  pace options (Easy / Achievable / Challenging). Falls back to 80 km
+   *  when no profile exists yet. */
+  anchorKm: number;
   onBack: () => void;
   onPlan: (prompt: string) => void;
 }
@@ -68,15 +73,47 @@ const SEASON_HINT: Record<Month, { tone: string; tag: string }> = {
   Nov: { tone: "autumn", tag: "cool · wet · short days" },
 };
 
-const KM_OPTIONS = [60, 80, 100, 120, 150] as const;
-type KmTarget = (typeof KM_OPTIONS)[number];
-const KM_DESCRIPTOR: Record<KmTarget, string> = {
-  60: "Easy days · plenty of stops",
-  80: "Casual touring pace",
-  100: "Steady · brief stops",
-  120: "Strong rider · earnest pace",
-  150: "Endurance · early starts",
+/**
+ * Relative pace bands anchored on the rider's stated daily distance.
+ *
+ * The previous design offered five fixed chips (60/80/100/120/150 km) which
+ * (a) asked the user to re-state their pace after onboarding had already
+ * captured it, and (b) frequently presented options that resolved to the
+ * same day count for the route at hand (e.g. 100 vs 120 km/day on a 364 km
+ * trip — both 4 days). Real cyclists called this out as noise. Anchoring
+ * on `max_daily_km_comfort` and showing the resulting day count inline
+ * makes the trade-off visible before commit.
+ */
+const PACE_CHOICES = ["easy", "achievable", "challenging"] as const;
+type PaceChoice = (typeof PACE_CHOICES)[number];
+
+const PACE_MULTIPLIER: Record<PaceChoice, number> = {
+  easy: 0.7,
+  achievable: 1.0,
+  challenging: 1.25,
 };
+
+const PACE_LABEL: Record<PaceChoice, string> = {
+  easy: "Easy",
+  achievable: "Achievable",
+  challenging: "Challenging",
+};
+
+const PACE_HINT: Record<PaceChoice, string> = {
+  easy: "comfortably under your stated pace · more rest",
+  achievable: "your stated pace",
+  challenging: "a notch above · fewer days, real effort",
+};
+
+function paceKm(choice: PaceChoice, anchorKm: number): number {
+  // Floor at 20 km/day so an anchor of, say, 25 km doesn't produce a 17 km
+  // "easy" band that splits short corridors into too many tiny days.
+  return Math.max(20, Math.round(anchorKm * PACE_MULTIPLIER[choice]));
+}
+
+function paceDays(choice: PaceChoice, anchorKm: number, totalKm: number): number {
+  return Math.max(1, Math.ceil(totalKm / paceKm(choice, anchorKm)));
+}
 
 type Accom = "camping" | "hostel" | "hotel";
 interface AccomOption {
@@ -108,14 +145,15 @@ const ACCOM_OPTIONS: AccomOption[] = [
 
 interface FormState {
   month: Month;
-  kmPerDay: KmTarget;
+  paceChoice: PaceChoice;
   accommodations: Accom[];
 }
 
 const STEPS = ["When", "Distance", "Stay"] as const;
 
-function buildPrompt(corridor: Corridor, state: FormState): string {
-  const days = Math.max(1, Math.ceil(corridor.total_km / state.kmPerDay));
+function buildPrompt(corridor: Corridor, state: FormState, anchorKm: number): string {
+  const kmPerDay = paceKm(state.paceChoice, anchorKm);
+  const days = Math.max(1, Math.ceil(corridor.total_km / kmPerDay));
   const monthFull = MONTH_FULL[state.month];
 
   let accom: string;
@@ -134,21 +172,25 @@ function buildPrompt(corridor: Corridor, state: FormState): string {
   return (
     `Plan a ${days}-day cycling trip ${corridor.label.toLowerCase()} ` +
     `(roughly ${corridor.total_km} km), ` +
-    `${state.kmPerDay} km/day, ` +
+    `${kmPerDay} km/day, ` +
     `${accom}, traveling in ${monthFull}.`
   );
 }
 
-export function RouteConfigForm({ corridor, onBack, onPlan }: RouteConfigFormProps) {
+export function RouteConfigForm({ corridor, anchorKm, onBack, onPlan }: RouteConfigFormProps) {
   const [step, setStep] = useState(0);
   const [state, setState] = useState<FormState>({
     month: "Jun",
-    kmPerDay: 80,
+    paceChoice: "achievable",
     accommodations: ["camping", "hostel"],
   });
 
-  const days = Math.max(1, Math.ceil(corridor.total_km / state.kmPerDay));
-  const previewPrompt = useMemo(() => buildPrompt(corridor, state), [corridor, state]);
+  const kmPerDay = paceKm(state.paceChoice, anchorKm);
+  const days = Math.max(1, Math.ceil(corridor.total_km / kmPerDay));
+  const previewPrompt = useMemo(
+    () => buildPrompt(corridor, state, anchorKm),
+    [corridor, state, anchorKm],
+  );
 
   const toggleAccom = (a: Accom) => {
     setState((prev) => {
@@ -193,10 +235,10 @@ export function RouteConfigForm({ corridor, onBack, onPlan }: RouteConfigFormPro
         )}
         {step === 1 && (
           <DistanceStep
-            value={state.kmPerDay}
-            days={days}
+            value={state.paceChoice}
+            anchorKm={anchorKm}
             totalKm={corridor.total_km}
-            onChange={(k) => setState((s) => ({ ...s, kmPerDay: k }))}
+            onChange={(c) => setState((s) => ({ ...s, paceChoice: c }))}
           />
         )}
         {step === 2 && (
@@ -209,7 +251,12 @@ export function RouteConfigForm({ corridor, onBack, onPlan }: RouteConfigFormPro
 
       {/* Live prompt preview — exactly what the agent receives, updating
           as the user picks. Replaces a duplicated step-summary strip. */}
-      <PromptPreview corridor={corridor} state={state} days={days} />
+      <PromptPreview
+        corridor={corridor}
+        state={state}
+        days={days}
+        kmPerDay={kmPerDay}
+      />
 
       {/* Footer nav */}
       <div className="mt-6 flex items-center justify-between">
@@ -413,27 +460,41 @@ function WhenStep({
 
 function DistanceStep({
   value,
-  days,
+  anchorKm,
   totalKm,
   onChange,
 }: {
-  value: KmTarget;
-  days: number;
+  value: PaceChoice;
+  anchorKm: number;
   totalKm: number;
-  onChange: (k: KmTarget) => void;
+  onChange: (c: PaceChoice) => void;
 }) {
+  const options = PACE_CHOICES.map((choice) => ({
+    choice,
+    km: paceKm(choice, anchorKm),
+    days: paceDays(choice, anchorKm, totalKm),
+  }));
+
+  const selected = options.find((o) => o.choice === value) ?? options[1];
+  const allSameDays = options.every((o) => o.days === options[0].days);
+
   return (
-    <Step icon={Compass} title="How far each day?" hint="The agent splits the route to match your daily comfort.">
-      {/* Big live readout */}
+    <Step
+      icon={Compass}
+      title="How far each day?"
+      hint={`Anchored on your stated ${anchorKm} km/day — three honest framings around that pace.`}
+    >
+      {/* Big live readout — same shape as before, but populated from the
+          derived option rather than a hardcoded chip value. */}
       <div className="mb-5 flex items-baseline gap-2 rounded-xl border border-border/60 bg-bg-soft/80 px-5 py-4">
         <div>
           <div className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Splits into
           </div>
           <div className="mt-1 text-[36px] font-bold leading-none tracking-[-0.025em] tabular-nums text-foreground">
-            {days}
+            {selected.days}
             <span className="ml-1 text-[16px] font-medium text-muted-foreground">
-              {days === 1 ? "day" : "days"}
+              {selected.days === 1 ? "day" : "days"}
             </span>
           </div>
         </div>
@@ -442,7 +503,10 @@ function DistanceStep({
             Pace
           </div>
           <div className="mt-1 text-[18px] font-bold tabular-nums text-foreground">
-            {value} <span className="text-[12px] font-medium text-muted-foreground">km/day</span>
+            {selected.km}{" "}
+            <span className="text-[12px] font-medium text-muted-foreground">
+              km/day
+            </span>
           </div>
           <div className="mt-0.5 font-mono text-[10px] text-muted-foreground">
             over {totalKm} km
@@ -450,36 +514,60 @@ function DistanceStep({
         </div>
       </div>
 
-      {/* Pace cards */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
-        {KM_OPTIONS.map((k) => {
-          const isOn = value === k;
-          return (
-            <button
-              key={k}
-              type="button"
-              onClick={() => onChange(k)}
-              className={[
-                "flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-all duration-200",
-                isOn
-                  ? "scale-[1.02] border-primary bg-primary text-primary-foreground shadow-[0_4px_16px_-4px_rgba(255,61,20,0.4)]"
-                  : "border-border bg-card text-foreground hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-paper",
-              ].join(" ")}
-              aria-pressed={isOn}
-            >
-              <span className="text-[16px] font-bold leading-none tabular-nums">{k} km</span>
-              <span
+      {allSameDays ? (
+        // Degenerate route — every band fits in the same number of days, so
+        // there's no meaningful trade-off to surface. Tell the rider that
+        // honestly instead of presenting three chips that look like a choice.
+        <div className="rounded-xl border border-dashed border-border/70 bg-card px-5 py-4 text-[13px] leading-snug text-muted-foreground">
+          This corridor fits in{" "}
+          <strong className="text-foreground">{options[0].days}</strong>{" "}
+          {options[0].days === 1 ? "day" : "days"} at any reasonable pace —
+          we&rsquo;ll plan it at your stated{" "}
+          <strong className="text-foreground">{anchorKm} km/day</strong>.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {options.map(({ choice, km, days }) => {
+            const isOn = value === choice;
+            return (
+              <button
+                key={choice}
+                type="button"
+                onClick={() => onChange(choice)}
                 className={[
-                  "text-[11px] leading-tight",
-                  isOn ? "text-primary-foreground/80" : "text-muted-foreground/80",
+                  "flex flex-col items-start gap-1 rounded-xl border px-4 py-3 text-left transition-all duration-200",
+                  isOn
+                    ? "scale-[1.02] border-primary bg-primary text-primary-foreground shadow-[0_4px_16px_-4px_rgba(255,61,20,0.4)]"
+                    : "border-border bg-card text-foreground hover:-translate-y-0.5 hover:border-foreground/30 hover:shadow-paper",
                 ].join(" ")}
+                aria-pressed={isOn}
               >
-                {KM_DESCRIPTOR[k]}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span className="text-[15px] font-bold leading-none tracking-[-0.01em]">
+                  {PACE_LABEL[choice]}
+                </span>
+                <span
+                  className={[
+                    "font-mono text-[12px] tabular-nums",
+                    isOn ? "text-primary-foreground" : "text-foreground/85",
+                  ].join(" ")}
+                >
+                  {km} km/day · {days} {days === 1 ? "day" : "days"}
+                </span>
+                <span
+                  className={[
+                    "text-[11px] leading-tight",
+                    isOn
+                      ? "text-primary-foreground/80"
+                      : "text-muted-foreground/80",
+                  ].join(" ")}
+                >
+                  {PACE_HINT[choice]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </Step>
   );
 }
@@ -601,10 +689,12 @@ function PromptPreview({
   corridor,
   state,
   days,
+  kmPerDay,
 }: {
   corridor: Corridor;
   state: FormState;
   days: number;
+  kmPerDay: number;
 }) {
   const monthFull = MONTH_FULL[state.month];
 
@@ -639,7 +729,7 @@ function PromptPreview({
         Plan a <Pick value={`${days}d`}>{days}-day</Pick> cycling trip{" "}
         <span className="font-semibold text-foreground">{corridor.label.toLowerCase()}</span>{" "}
         (roughly {corridor.total_km} km), at{" "}
-        <Pick value={`${state.kmPerDay}km`}>{state.kmPerDay} km/day</Pick>, prefer{" "}
+        <Pick value={`${kmPerDay}km`}>{kmPerDay} km/day</Pick>, prefer{" "}
         <Pick value={accomPhrase}>{accomPhrase}</Pick>, traveling in{" "}
         <Pick value={monthFull}>{monthFull}</Pick>.
       </p>
