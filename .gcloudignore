@@ -1,0 +1,29 @@
+# Files excluded from Cloud Build source uploads.
+# Secrets, local state, caches, and frontend/mobile assets the backend doesn't need.
+
+.gcloudignore
+.git
+.gitignore
+
+# Secrets — never ship to Cloud Build
+.env
+.env.*
+!.env.example
+
+# Python local state
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Frontend / mobile (backend deploy doesn't need them)
+web/
+mobile/
+
+# Local artifacts
+AL/
+.DS_Store
+.vercel/

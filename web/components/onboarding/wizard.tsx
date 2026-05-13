@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useState } from "react";
-import { Loader2, X } from "lucide-react";
+import { ArrowLeft, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, postProfile } from "@/lib/api";
@@ -148,58 +148,75 @@ export function OnboardingWizard({ onComplete, onDismiss, existing }: WizardProp
       aria-labelledby="wizard-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 px-4 py-6 backdrop-blur-sm"
     >
-      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        {/* Skip button — top-right, always visible */}
-        <button
-          type="button"
-          onClick={onDismiss}
-          aria-label="Skip onboarding"
-          className="absolute right-3 top-3 rounded-md p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-
-        {/* Header */}
-        <div className="border-b border-border/60 px-6 pb-4 pt-5">
-          <h2 id="wizard-title" className="text-base font-semibold tracking-tight text-foreground">
-            {isEditing ? "Edit your profile" : "Tell me about your riding"}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {isEditing
-              ? "Update any answers — your next plan will reflect the changes."
-              : "Five quick questions — I'll tailor the plan to you. Skip any time."}
-          </p>
-          <ProgressDots step={step} total={STEP_LABELS.length} labels={STEP_LABELS} />
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-card shadow-2xl">
+        {/* Top bar: Skip (left), step counter + close (right) */}
+        <div className="flex items-center justify-between px-10 pt-8">
+          <button
+            type="button"
+            onClick={onDismiss}
+            disabled={submitting}
+            className="text-sm text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+          >
+            {isEditing ? "Cancel" : "Skip"}
+          </button>
+          <div className="flex items-center gap-4">
+            <span
+              className="font-mono text-xs tracking-wide text-muted-foreground"
+              aria-label={`Step ${step + 1} of ${STEP_LABELS.length}: ${STEP_LABELS[step]}`}
+            >
+              {step + 1} / {STEP_LABELS.length}
+            </span>
+            <button
+              type="button"
+              onClick={onDismiss}
+              aria-label="Close"
+              className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            >
+              <X className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
         </div>
 
-        {/* Step body */}
-        <div className="px-6 py-5">
+        {/* Step body — generous padding */}
+        <div className="px-10 pb-6 pt-10 lg:px-14 lg:pt-14">
+          {/* Visually-hidden title for aria-labelledby */}
+          <h2 id="wizard-title" className="sr-only">
+            {isEditing ? "Edit your profile" : "Tell me about your riding"}
+          </h2>
+
           {step === 0 && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-foreground">Your experience level</p>
-              <p className="mb-3 text-xs text-muted-foreground">
-                Used to set your max comfortable daily distance — I won&apos;t plan past it without
-                checking with you first.
-              </p>
-              <div className="space-y-2">
-                {EXPERIENCE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setExperience(opt.value)}
-                    className={`flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition ${
-                      experience === opt.value
-                        ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/40"
-                        : "border-border bg-background hover:border-primary/50 hover:bg-muted/50"
-                    }`}
-                  >
-                    <div>
-                      <div className="text-sm font-medium">{opt.label}</div>
-                      <div className="text-xs text-muted-foreground">{opt.hint}</div>
-                    </div>
-                    <div className="font-mono text-[11px] text-muted-foreground">{opt.km}</div>
-                  </button>
-                ))}
+            <div className="space-y-8">
+              <div className="space-y-3">
+                <h3 className="text-2xl font-medium tracking-tight text-foreground">
+                  Your experience level
+                </h3>
+                <p className="text-base text-muted-foreground">
+                  Sets your max comfortable daily distance — I won&apos;t plan past it
+                  without checking with you first.
+                </p>
+              </div>
+              <div className="space-y-3">
+                {EXPERIENCE_OPTIONS.map((opt) => {
+                  const isSelected = experience === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setExperience(opt.value)}
+                      className={`flex w-full items-center justify-between gap-4 rounded-xl border px-5 py-4 text-left transition ${
+                        isSelected
+                          ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                          : "border-border bg-background hover:border-primary/40 hover:bg-muted/40"
+                      }`}
+                    >
+                      <div>
+                        <div className="text-base font-medium text-foreground">{opt.label}</div>
+                        <div className="mt-0.5 text-sm text-muted-foreground">{opt.hint}</div>
+                      </div>
+                      <div className="font-mono text-xs text-muted-foreground">{opt.km}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -217,19 +234,17 @@ export function OnboardingWizard({ onComplete, onDismiss, existing }: WizardProp
           {step === 2 && (
             <ChipPickerStep
               title="What matters most?"
-              hint="I&apos;ll bias route + accommodation toward these."
+              hint="I'll bias the route and stops toward these."
               options={PRIORITY_OPTIONS}
               selected={priorities}
-              onToggle={(v) =>
-                setPriorities((prev) => toggleInArray(prev, v))
-              }
+              onToggle={(v) => setPriorities((prev) => toggleInArray(prev, v))}
             />
           )}
 
           {step === 3 && (
             <ChipPickerStep
               title="Any dietary needs?"
-              hint="I'll match cafes, pubs, and supermarket recommendations."
+              hint="I'll match cafés, pubs, and supermarket suggestions."
               options={DIETARY_OPTIONS}
               selected={dietary}
               onToggle={(v) => setDietary((prev) => toggleInArray(prev, v))}
@@ -237,76 +252,80 @@ export function OnboardingWizard({ onComplete, onDismiss, existing }: WizardProp
           )}
 
           {step === 4 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium text-foreground">Anything else?</p>
-              <p className="text-xs text-muted-foreground">
-                Free text. Examples: cycling for charity, have asthma, want only quiet
-                roads, this is my honeymoon.
-              </p>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional — leave blank if nothing comes to mind."
-                rows={4}
-                maxLength={500}
-                className="resize-none"
-              />
-              <div className="text-right text-[10px] text-muted-foreground">
-                {notes.length}/500
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <h3 className="text-2xl font-medium tracking-tight text-foreground">
+                  Anything else?
+                </h3>
+                <p className="text-base text-muted-foreground">
+                  Free text. Examples: cycling for charity, asthma, want only quiet roads,
+                  this is my honeymoon.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional — leave blank if nothing comes to mind."
+                  rows={5}
+                  maxLength={500}
+                  className="resize-none text-base"
+                />
+                <div className="text-left text-xs text-muted-foreground">
+                  {notes.length}/500
+                </div>
               </div>
             </div>
           )}
 
           {error && (
-            <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <div className="mt-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {error}
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-card/50 px-6 py-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDismiss}
-            disabled={submitting}
-            className="text-xs text-muted-foreground"
+        {/* Footer — minimal: back arrow left (from step 2+), single primary action right */}
+        <div className="flex items-center justify-between px-10 pb-8 pt-2 lg:px-14">
+          <button
+            type="button"
+            onClick={() => setStep((s) => Math.max(0, s - 1))}
+            disabled={step === 0 || submitting}
+            aria-label="Back"
+            className={`rounded-md p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:pointer-events-none ${
+              step === 0 ? "opacity-0" : "opacity-100"
+            }`}
           >
-            {isEditing ? "Cancel" : "Skip for now"}
-          </Button>
-          <div className="flex gap-2">
+            <ArrowLeft className="h-5 w-5" aria-hidden />
+          </button>
+          {isLast ? (
             <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-              disabled={step === 0 || submitting}
+              size="lg"
+              onClick={handleSubmit}
+              disabled={!experience || submitting}
+              className="min-w-[10rem]"
             >
-              Back
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+                  Saving
+                </>
+              ) : isEditing ? (
+                "Save changes"
+              ) : (
+                "Save & continue"
+              )}
             </Button>
-            {isLast ? (
-              <Button size="sm" onClick={handleSubmit} disabled={!experience || submitting}>
-                {submitting ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                    Saving
-                  </>
-                ) : isEditing ? (
-                  "Save changes"
-                ) : (
-                  "Save & continue"
-                )}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => setStep((s) => s + 1)}
-                disabled={!canAdvance}
-              >
-                Next
-              </Button>
-            )}
-          </div>
+          ) : (
+            <Button
+              size="lg"
+              onClick={() => setStep((s) => s + 1)}
+              disabled={!canAdvance}
+              className="min-w-[10rem]"
+            >
+              Continue
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -331,12 +350,12 @@ function ChipPickerStep<T extends string>({
   maxNote,
 }: ChipPickerStepProps<T>) {
   return (
-    <div className="space-y-3">
-      <div>
-        <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground">{hint}</p>
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <h3 className="text-2xl font-medium tracking-tight text-foreground">{title}</h3>
+        <p className="text-base text-muted-foreground">{hint}</p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         {options.map((opt) => {
           const isSelected = selected.includes(opt.value);
           return (
@@ -344,10 +363,10 @@ function ChipPickerStep<T extends string>({
               key={opt.value}
               type="button"
               onClick={() => onToggle(opt.value)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+              className={`rounded-full border px-5 py-2.5 text-sm font-medium transition ${
                 isSelected
                   ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:border-primary/50 hover:bg-muted/60"
+                  : "border-border bg-background text-foreground hover:border-primary/40 hover:bg-muted/40"
               }`}
               title={opt.hint}
             >
@@ -357,36 +376,8 @@ function ChipPickerStep<T extends string>({
         })}
       </div>
       {maxNote && (
-        <p className="text-[11px] text-muted-foreground">{maxNote}</p>
+        <p className="text-xs text-muted-foreground">{maxNote}</p>
       )}
-    </div>
-  );
-}
-
-function ProgressDots({
-  step,
-  total,
-  labels,
-}: {
-  step: number;
-  total: number;
-  labels: string[];
-}) {
-  return (
-    <div className="mt-4 flex items-center gap-2">
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className={`h-1.5 flex-1 rounded-full transition ${
-            i < step
-              ? "bg-primary/70"
-              : i === step
-                ? "bg-primary"
-                : "bg-muted"
-          }`}
-          aria-label={`Step ${i + 1}: ${labels[i]}`}
-        />
-      ))}
     </div>
   );
 }

@@ -11,6 +11,7 @@ COPY pyproject.toml ./
 RUN pip install --upgrade pip && pip install .
 
 COPY src ./src
+COPY data ./data
 
 ENV PORT=8080
 EXPOSE 8080
