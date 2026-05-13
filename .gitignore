@@ -59,3 +59,4 @@ build/
 # Affinity Labs assignment artefacts (kept local, not for the public repo)
 AL/
 
+.vercel
