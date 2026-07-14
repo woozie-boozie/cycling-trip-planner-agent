@@ -1,6 +1,6 @@
 # Cycling Trip Planner Agent
 
-An AI agent that helps a cyclist plan a multi-day bike trip through conversation. Built as a case study for Affinity Labs.
+An AI agent that helps a cyclist plan a multi-day bike trip through conversation.
 
 ### 🚴 Try it live
 
