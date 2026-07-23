@@ -152,22 +152,13 @@ export function ChatInput({
           </div>
         ) : null}
 
-        {/* Spotlight callout — makes the agent unmissable during the ride */}
-        {spotlight && !value && !attachedImage && (
-          <div className="pointer-events-none mb-2.5 flex justify-center">
-            <span className="chat-callout rounded-full border-2 border-[#0A0A09] bg-[#FFD166] px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[#0A0A09] sm:text-[12px]">
-              💬 The Cyclepath is listening — type your dream trip ↓
-            </span>
-          </div>
-        )}
-
         {/* Composer — modern floating dock with subtle shadow */}
         <div
           className={
             isDraggingOver
               ? "flex items-end gap-2 rounded-2xl border-2 border-dashed border-primary bg-primary/10 p-2 transition-colors"
               : spotlight
-                ? "chat-spotlight flex items-end gap-2 rounded-2xl border-2 border-[#0A0A09] bg-card p-2 transition-colors focus-within:border-primary"
+                ? "chat-spotlight flex items-end gap-2 rounded-2xl border-[3px] border-primary bg-card p-3 transition-colors"
                 : "flex items-end gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-paper transition-colors focus-within:border-foreground/30 focus-within:shadow-lift"
           }
         >
@@ -203,7 +194,11 @@ export function ChatInput({
             }
             disabled={isPending}
             rows={1}
-            className="min-h-0 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
+            className={
+              spotlight
+                ? "min-h-0 resize-none border-0 bg-transparent px-2 py-2.5 text-base shadow-none placeholder:text-foreground/60 focus-visible:ring-0"
+                : "min-h-0 resize-none border-0 bg-transparent px-2 py-1.5 text-sm shadow-none focus-visible:ring-0"
+            }
           />
 
           <Button
