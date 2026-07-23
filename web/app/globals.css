@@ -282,3 +282,15 @@
     transform-origin: bottom left;
   }
 }
+
+/* Chat dock slides up when the ride finishes */
+@keyframes chat-dock-in {
+  from { transform: translateY(110%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.chat-dock-in {
+  animation: chat-dock-in 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-dock-in { animation: none !important; }
+}

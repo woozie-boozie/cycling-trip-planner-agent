@@ -142,7 +142,7 @@ function KmPost({ x, km }: { x: number; km: number }) {
 
 /* ---------- main ---------- */
 
-export function RideIntro() {
+export function RideIntro({ onFinished }: { onFinished?: () => void }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const skyFarRef = useRef<HTMLDivElement>(null);
@@ -157,10 +157,15 @@ export function RideIntro() {
   const whiteoutRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
   const [reduced, setReduced] = useState(false);
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
+  const finishedRef = useRef(false);
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setReduced(true);
+      finishedRef.current = true;
+      onFinishedRef.current?.();
       return;
     }
     let raf = 0;
@@ -179,11 +184,13 @@ export function RideIntro() {
     const tick = () => {
       const track = trackRef.current;
       if (track && worldRef.current) {
-        const vh = window.innerHeight;
         const vw = window.innerWidth;
-        const total = track.offsetHeight - vh;
-        const rect = track.getBoundingClientRect();
-        const target = Math.min(1, Math.max(0, -rect.top / total));
+        // Progress against the real scroll container (<main>, which sits
+        // below the sticky header) — window-based math can never hit 1.0
+        // here, which kept the finish from firing on short viewports.
+        const scroller = (track.closest("main") ?? document.documentElement) as HTMLElement;
+        const total = Math.max(1, track.offsetHeight - scroller.clientHeight);
+        const target = Math.min(1, Math.max(0, scroller.scrollTop / total));
         smooth += (target - smooth) * 0.13;
         if (Math.abs(target - smooth) < 0.0002) smooth = target;
 
@@ -237,6 +244,11 @@ export function RideIntro() {
           finaleRef.current.style.opacity = String(f);
           finaleRef.current.classList.toggle("celebrate", f > 0.6);
         }
+        if (!finishedRef.current && smooth >= 0.985) {
+          finishedRef.current = true;
+          onFinishedRef.current?.();
+        }
+
         /* dissolve to white over the last stretch so the un-pin into the
            page below is seamless instead of a hard cut */
         if (whiteoutRef.current) {

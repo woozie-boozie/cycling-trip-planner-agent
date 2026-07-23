@@ -30,6 +30,11 @@ export function ChatInput({
   spotlight = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCompact(window.matchMedia("(max-width: 640px)").matches);
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -190,7 +195,9 @@ export function ChatInput({
             placeholder={
               attachedImage
                 ? "Add optional context for the image (e.g. 'plan this for me, June, camping')…"
-                : "Ask me to plan a multi-day cycling trip — or drop a route screenshot…"
+                : compact
+                  ? "Plan my dream bike trip…"
+                  : "Ask me to plan a multi-day cycling trip — or drop a route screenshot…"
             }
             disabled={isPending}
             rows={1}
@@ -217,7 +224,7 @@ export function ChatInput({
           </Button>
         </div>
 
-        <p className="mt-2 text-center text-[11px] text-muted-foreground/70">
+        <p className="mt-2 hidden text-center text-[11px] text-muted-foreground/70 sm:block">
           Enter sends · Shift+Enter for a new line · drop an image or click the icon to attach
         </p>
       </div>

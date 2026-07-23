@@ -41,6 +41,7 @@ export default function Home() {
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authUser, setAuthUser] = useState<User | null>(null);
+  const [rideFinished, setRideFinished] = useState(false);
   const pendingSubmitRef = useRef<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
@@ -537,7 +538,7 @@ export default function Home() {
         {isEmpty ? (
           // Empty state — scroll-driven London→Paris ride, then hero + gallery
           <>
-            <RideIntro />
+            <RideIntro onFinished={() => setRideFinished(true)} />
             <div className="mx-auto max-w-[1200px] px-4 py-12 sm:py-16 lg:px-10">
               <RouteGallery
                 profile={profile}
@@ -572,16 +573,22 @@ export default function Home() {
         )}
       </main>
 
-      <ChatInput
-        value={input}
-        onChange={setInput}
-        onSubmit={handleSubmit}
-        disabled={!canSend}
-        isPending={isPending}
-        spotlight={isEmpty}
-        attachedImage={attachedImage}
-        onAttachImage={setAttachedImage}
-      />
+      {/* The composer stays out of the way until the ride reaches the
+          Eiffel Tower (or is skipped) — it slides up right on cue. */}
+      {(!isEmpty || rideFinished) && (
+        <div className="chat-dock-in">
+          <ChatInput
+            value={input}
+            onChange={setInput}
+            onSubmit={handleSubmit}
+            disabled={!canSend}
+            isPending={isPending}
+            spotlight={isEmpty}
+            attachedImage={attachedImage}
+            onAttachImage={setAttachedImage}
+          />
+        </div>
+      )}
     </div>
   );
 }
