@@ -12,11 +12,14 @@ import { useEffect, useRef, useState } from "react";
  * derived from getBoundingClientRect, which is scroller-agnostic.
  */
 
-const WORLD_W = 6200;
+const WORLD_W = 8800;
 /* Tall ground: the app's chat bar overlays the bottom ~130px of the
    viewport, so the riding surface sits well above it. */
 const GROUND_H = 230;
 const TRIP_KM = 364;
+/* World x the ride ends at — the cyclist always finishes at the foot of
+   the Eiffel Tower, whatever the viewport width. */
+const TOWER_ANCHOR = 5470;
 
 /* ---------- the cyclist ---------- */
 
@@ -184,7 +187,11 @@ export function RideIntro() {
         smooth += (target - smooth) * 0.13;
         if (Math.abs(target - smooth) < 0.0002) smooth = target;
 
-        const maxShift = Math.max(0, WORLD_W - vw);
+        const charCenterX = vw * 0.16 + 75;
+        const maxShift = Math.max(
+          0,
+          Math.min(WORLD_W - vw, TOWER_ANCHOR - charCenterX)
+        );
         const shift = smooth * maxShift;
         worldRef.current.style.transform = `translate3d(${-shift}px,0,0)`;
         if (skyFarRef.current)
@@ -277,7 +284,7 @@ export function RideIntro() {
 
         {/* far clouds */}
         <div ref={skyFarRef} className="absolute inset-0 will-change-transform" style={{ width: WORLD_W }} aria-hidden="true">
-          {[300, 1100, 1900, 2800, 3700, 4600, 5500].map((x, i) => (
+          {[300, 1100, 1900, 2800, 3700, 4600, 5500, 6400, 7300, 8200].map((x, i) => (
             <div
               key={x}
               className="absolute rounded-full bg-white/90"
@@ -301,6 +308,8 @@ export function RideIntro() {
             { x: 3300, w: 680, h: 160, c: "#B9DFB4" },
             { x: 4400, w: 560, h: 130, c: "#CDE8C9" },
             { x: 5300, w: 640, h: 150, c: "#B9DFB4" },
+            { x: 6400, w: 560, h: 130, c: "#CDE8C9" },
+            { x: 7400, w: 640, h: 160, c: "#B9DFB4" },
           ].map((h) => (
             <div
               key={h.x}
@@ -375,7 +384,7 @@ export function RideIntro() {
               ))}
             </div>
           </div>
-          <Beat x={1290} bottom={GROUND_H + 280} tilt="1.1deg" kicker="Weather check">
+          <Beat x={1290} bottom={GROUND_H + 240} tilt="1.1deg" kicker="Weather check">
             It checked <span className="text-[#FF3D14]">30 years of May weather</span>.
             Pack for one wet morning — Day 2, probably.
           </Beat>
@@ -432,7 +441,7 @@ export function RideIntro() {
               <div className="absolute bottom-0 left-1/2 h-14 w-9 -translate-x-1/2 border-2 border-b-0 border-[#0A0A09] bg-[#7A4B2A]" />
             </div>
           </div>
-          <Beat x={4620} bottom={GROUND_H + 310} tilt="-1.2deg" kicker="Bed booked">
+          <Beat x={4620} bottom={GROUND_H + 235} tilt="-1.2deg" kicker="Bed booked">
             Tonight: <span className="text-[#FF3D14]">4.7★, big breakfast, safe
             bike shed</span>. Spaced exactly to your legs.
           </Beat>
@@ -444,6 +453,31 @@ export function RideIntro() {
             <path d="M96 210 Q 130 250 164 210 M74 268 Q 130 320 186 268" fill="none" stroke="#3B3B47" strokeWidth="6" />
           </svg>
           <KmPost x={5380} km={364} />
+          {/* Paris rooftops beyond the tower */}
+          {[
+            { x: 5800, w: 150, h: 120 },
+            { x: 5980, w: 120, h: 150 },
+            { x: 6130, w: 170, h: 110 },
+            { x: 6330, w: 130, h: 140 },
+            { x: 6490, w: 160, h: 115 },
+          ].map((b) => (
+            <div key={b.x} className="absolute" style={{ left: b.x, bottom: GROUND_H - 2 }} aria-hidden="true">
+              <div
+                className="border-2 border-[#0A0A09]/30 bg-[#D9CDBE]"
+                style={{ width: b.w, height: b.h }}
+              >
+                <div className="grid grid-cols-4 gap-1.5 p-2">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="h-3 rounded-[1px] bg-[#8E7F6C]/50" />
+                  ))}
+                </div>
+              </div>
+              <div
+                className="absolute -top-4 left-0 h-4 w-full bg-[#5E6B7A]"
+                style={{ clipPath: "polygon(0 100%, 6% 0, 94% 0, 100% 100%)" }}
+              />
+            </div>
+          ))}
         </div>
 
         {/* the ferry (fixed like the cyclist, shown over water) */}
@@ -463,7 +497,7 @@ export function RideIntro() {
 
         {/* the cyclist */}
         <div ref={charRef} className="absolute z-20" style={{ left: "16vw", bottom: GROUND_H - 8 }}>
-          <div className="relative" style={{ width: 150, height: 112 }}>
+          <div className="ride-cyclist relative" style={{ width: 150, height: 112 }}>
             <div className="cyclist-a absolute inset-0">
               <Cyclist frame="a" />
             </div>
@@ -486,7 +520,7 @@ export function RideIntro() {
 
         {/* HUD */}
         <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <div className="rounded-lg border-2 border-[#0A0A09] bg-white px-3 py-2 font-mono text-[11px] font-bold tracking-[0.12em] text-[#0A0A09] sm:text-[12px]">
+          <div className="hidden rounded-lg border-2 border-[#0A0A09] bg-white px-3 py-2 font-mono text-[12px] font-bold tracking-[0.12em] text-[#0A0A09] sm:block">
             LONDON → PARIS
           </div>
           <div className="hidden min-w-0 flex-1 sm:block">
