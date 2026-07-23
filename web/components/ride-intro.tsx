@@ -79,17 +79,29 @@ function Beat({
   x,
   bottom,
   tilt = "0deg",
+  kicker,
   children,
 }: {
   x: number;
   bottom: number;
   tilt?: string;
+  kicker?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="absolute z-10" style={{ left: x, bottom, transform: `rotate(${tilt})` }}>
-      <div className="ride-beat max-w-[86vw] rounded-2xl border-[3px] border-[#0A0A09] bg-white px-6 py-5 text-[18px] font-bold leading-[1.4] tracking-[-0.01em] text-[#0A0A09] shadow-[6px_6px_0_#0A0A09] sm:max-w-[360px] md:max-w-[420px] md:px-7 md:py-6 md:text-[21px]">
-        {children}
+      {/* cream + tail + kicker: unmistakably speech, never a cloud */}
+      <div className="ride-beat relative max-w-[86vw] rounded-2xl border-[3px] border-[#0A0A09] bg-[#FFF9EC] px-6 py-5 text-[18px] font-bold leading-[1.4] tracking-[-0.01em] text-[#0A0A09] shadow-[6px_6px_0_#0A0A09] sm:max-w-[360px] md:max-w-[420px] md:px-7 md:py-6 md:text-[21px]">
+        {kicker && (
+          <span className="mb-2 inline-block rounded-md bg-[#FF3D14] px-2.5 py-1 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-white md:text-[12px]">
+            {kicker}
+          </span>
+        )}
+        <div>{children}</div>
+        <span
+          className="absolute -bottom-[13px] left-9 h-6 w-6 rotate-45 border-b-[3px] border-r-[3px] border-[#0A0A09] bg-[#FFF9EC]"
+          aria-hidden="true"
+        />
       </div>
     </div>
   );
@@ -338,7 +350,7 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
               <div className="h-32 w-20 bg-[#41506B]" />
             </div>
           </div>
-          <Beat x={320} bottom={GROUND_H + 250} tilt="-1.4deg">
+          <Beat x={320} bottom={GROUND_H + 150} tilt="-1.4deg" kicker="The brief">
             “London to Paris in May. Pubs over pace.”{" "}
             <span className="text-[#FF3D14]">That&apos;s all it needs.</span>
           </Beat>
@@ -357,7 +369,7 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
               ))}
             </div>
           </div>
-          <Beat x={1290} bottom={GROUND_H + 300} tilt="1.1deg">
+          <Beat x={1290} bottom={GROUND_H + 280} tilt="1.1deg" kicker="Weather check">
             It checked <span className="text-[#FF3D14]">30 years of May weather</span>.
             Pack for one wet morning — Day 2, probably.
           </Beat>
@@ -374,7 +386,7 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
             <path d="M0 80 L250 6 L500 80 Z" fill="#DCD5C6" stroke="#0A0A09" strokeWidth="3" />
             <path d="M0 80 L250 6 L500 80" fill="none" stroke="#FF3D14" strokeWidth="3" strokeDasharray="14 12" />
           </svg>
-          <Beat x={1620} bottom={GROUND_H + 220} tilt="-1deg">
+          <Beat x={1620} bottom={GROUND_H + 175} tilt="-1deg" kicker="Climb detected">
             It <span className="text-[#FF3D14]">felt this hill</span> in the elevation
             data — and split the day early because of it.
           </Beat>
@@ -384,7 +396,7 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
           <div className="absolute" style={{ left: 2330, bottom: GROUND_H - 2 }} aria-hidden="true">
             <div className="h-24 w-16 border-2 border-[#0A0A09] bg-white" style={{ clipPath: "polygon(0 0, 100% 0, 78% 100%, 0 100%)" }} />
           </div>
-          <Beat x={2560} bottom={GROUND_H + 240} tilt="1.3deg">
+          <Beat x={2560} bottom={GROUND_H + 170} tilt="1.3deg" kicker="Ferry logged">
             Newhaven → Dieppe. The ferry is{" "}
             <span className="text-[#FF3D14]">already in the plan</span> — timed,
             priced, sanity-checked.
@@ -414,7 +426,7 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
               <div className="absolute bottom-0 left-1/2 h-14 w-9 -translate-x-1/2 border-2 border-b-0 border-[#0A0A09] bg-[#7A4B2A]" />
             </div>
           </div>
-          <Beat x={4620} bottom={GROUND_H + 300} tilt="-1.2deg">
+          <Beat x={4620} bottom={GROUND_H + 310} tilt="-1.2deg" kicker="Bed booked">
             Tonight: <span className="text-[#FF3D14]">4.7★, big breakfast, safe
             bike shed</span>. Spaced exactly to your legs.
           </Beat>
