@@ -15,6 +15,8 @@ interface ChatInputProps {
   isPending: boolean;
   attachedImage: PreparedImage | null;
   onAttachImage: (image: PreparedImage | null) => void;
+  /** Landing mode: pull the eye to the composer while the ride plays above. */
+  spotlight?: boolean;
 }
 
 export function ChatInput({
@@ -25,6 +27,7 @@ export function ChatInput({
   isPending,
   attachedImage,
   onAttachImage,
+  spotlight = false,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,12 +152,23 @@ export function ChatInput({
           </div>
         ) : null}
 
+        {/* Spotlight callout — makes the agent unmissable during the ride */}
+        {spotlight && !value && !attachedImage && (
+          <div className="pointer-events-none mb-2.5 flex justify-center">
+            <span className="chat-callout rounded-full border-2 border-[#0A0A09] bg-[#FFD166] px-4 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.1em] text-[#0A0A09] sm:text-[12px]">
+              💬 The Cyclepath is listening — type your dream trip ↓
+            </span>
+          </div>
+        )}
+
         {/* Composer — modern floating dock with subtle shadow */}
         <div
           className={
             isDraggingOver
               ? "flex items-end gap-2 rounded-2xl border-2 border-dashed border-primary bg-primary/10 p-2 transition-colors"
-              : "flex items-end gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-paper transition-colors focus-within:border-foreground/30 focus-within:shadow-lift"
+              : spotlight
+                ? "chat-spotlight flex items-end gap-2 rounded-2xl border-2 border-[#0A0A09] bg-card p-2 transition-colors focus-within:border-primary"
+                : "flex items-end gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-paper transition-colors focus-within:border-foreground/30 focus-within:shadow-lift"
           }
         >
           <Button

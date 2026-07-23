@@ -543,6 +543,7 @@ export default function Home() {
         onSubmit={handleSubmit}
         disabled={!canSend}
         isPending={isPending}
+        spotlight={isEmpty}
         attachedImage={attachedImage}
         onAttachImage={setAttachedImage}
       />
