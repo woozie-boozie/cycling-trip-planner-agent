@@ -147,6 +147,12 @@ class UserProfileRow(SQLModel, table=True):
         index=True, unique=True, description="UUID4, generated client-side"
     )
 
+    # Firebase Auth linkage (Phase 3). Anonymous and Google users both get
+    # a stable uid; nullable so pre-auth rows keep working.
+    firebase_uid: str | None = Field(
+        default=None, index=True, description="Firebase Auth uid of the owner"
+    )
+
     # Cycling experience — the keystone field. Drives `max_daily_km_comfort`
     # and the agent's "don't push past their comfort distance unsolicited" check.
     experience: str = Field(

@@ -191,3 +191,14 @@ async def _apply_idempotent_migrations(engine: AsyncEngine) -> None:
                     "version INTEGER NOT NULL DEFAULT 0"
                 )
             )
+        # Phase 3 — Firebase Auth linkage on profiles.
+        if not await _column_exists(conn, "user_profiles", "firebase_uid"):
+            await conn.execute(
+                text("ALTER TABLE user_profiles ADD COLUMN firebase_uid VARCHAR")
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_user_profiles_firebase_uid "
+                    "ON user_profiles (firebase_uid)"
+                )
+            )

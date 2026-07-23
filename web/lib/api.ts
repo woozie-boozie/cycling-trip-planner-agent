@@ -10,6 +10,7 @@
  * set in Vercel's project env vars.
  */
 
+import { getIdToken } from "@/lib/firebase";
 import type {
   ChatRequest,
   ChatResponse,
@@ -44,10 +45,17 @@ async function jsonOrThrow<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
+
+/** Firebase ID token as an Authorization header (empty pre-sign-in/SSR). */
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await getIdToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function postChat(req: ChatRequest, signal?: AbortSignal): Promise<ChatResponse> {
   const res = await fetch(`${API_URL}/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(req),
     signal,
   });
@@ -56,6 +64,7 @@ export async function postChat(req: ChatRequest, signal?: AbortSignal): Promise<
 
 export async function getTrace(sessionId: string, signal?: AbortSignal): Promise<TraceResponse> {
   const res = await fetch(`${API_URL}/trace/${encodeURIComponent(sessionId)}`, {
+    headers: await authHeaders(),
     signal,
   });
   return jsonOrThrow<TraceResponse>(res);
@@ -67,7 +76,7 @@ export async function postProfile(
 ): Promise<UserProfile> {
   const res = await fetch(`${API_URL}/profile`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body),
     signal,
   });
@@ -80,7 +89,7 @@ export async function getProfile(
 ): Promise<UserProfile> {
   const res = await fetch(
     `${API_URL}/profile/${encodeURIComponent(profileId)}`,
-    { signal },
+    { headers: await authHeaders(), signal },
   );
   return jsonOrThrow<UserProfile>(res);
 }
@@ -145,7 +154,11 @@ export async function postChatStream(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      ...(await authHeaders()),
+    },
     body: JSON.stringify(req),
     signal,
   });

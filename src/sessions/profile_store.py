@@ -97,6 +97,10 @@ class UserProfile(BaseModel):
     """
 
     profile_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    firebase_uid: str | None = Field(
+        default=None,
+        description="Firebase Auth uid of the owner (anonymous or Google).",
+    )
     experience: ExperienceLevel
     max_daily_km_comfort: int = Field(ge=20, le=300)
     trip_styles: list[TripStyle] = Field(default_factory=list)
@@ -213,6 +217,7 @@ class PostgresProfileStore:
             if existing is None:
                 row = UserProfileRow(
                     profile_id=profile.profile_id,
+                    firebase_uid=profile.firebase_uid,
                     experience=profile.experience,
                     max_daily_km_comfort=profile.max_daily_km_comfort,
                     trip_styles_json=json.dumps(profile.trip_styles),
@@ -224,6 +229,8 @@ class PostgresProfileStore:
                 )
                 session.add(row)
             else:
+                if profile.firebase_uid is not None:
+                    existing.firebase_uid = profile.firebase_uid
                 existing.experience = profile.experience
                 existing.max_daily_km_comfort = profile.max_daily_km_comfort
                 existing.trip_styles_json = json.dumps(profile.trip_styles)
@@ -260,6 +267,7 @@ def _row_to_profile(row: UserProfileRow) -> UserProfile:
     and re-attaches UTC tzinfo to the naive timestamps."""
     return UserProfile(
         profile_id=row.profile_id,
+        firebase_uid=row.firebase_uid,
         experience=row.experience,  # type: ignore[arg-type]
         max_daily_km_comfort=row.max_daily_km_comfort,
         trip_styles=json.loads(row.trip_styles_json or "[]"),

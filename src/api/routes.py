@@ -36,6 +36,7 @@ from src.agent import (
     run_turn,
     run_turn_stream,
 )
+from src.api.auth import get_uid
 from src.api.dependencies import (
     get_anthropic_client,
     get_profile_store,
@@ -229,6 +230,7 @@ class ChatResponse(BaseModel):
 @router.post("/chat", response_model=ChatResponse, tags=["chat"])
 async def chat(
     request: ChatRequest,
+    _uid: str | None = Depends(get_uid),
     store: SessionStore = Depends(get_session_store),
     profile_store: ProfileStore = Depends(get_profile_store),
     client: AsyncAnthropic = Depends(get_anthropic_client),
@@ -375,6 +377,7 @@ async def chat(
 @router.post("/chat/stream", tags=["chat"])
 async def chat_stream(
     request: ChatRequest,
+    _uid: str | None = Depends(get_uid),
     store: SessionStore = Depends(get_session_store),
     profile_store: ProfileStore = Depends(get_profile_store),
     client: AsyncAnthropic = Depends(get_anthropic_client),
@@ -523,6 +526,7 @@ async def chat_stream(
 @router.post("/profile", response_model=UserProfile, tags=["profile"])
 async def upsert_profile(
     create: UserProfileCreate,
+    uid: str | None = Depends(get_uid),
     profile_store: ProfileStore = Depends(get_profile_store),
 ) -> UserProfile:
     """Create or update a cyclist profile.
@@ -535,25 +539,33 @@ async def upsert_profile(
     don't need to know the mapping.
     """
     profile = create.to_profile()
+    profile.firebase_uid = uid
     return await profile_store.upsert(profile)
 
 
 @router.get("/profile/{profile_id}", response_model=UserProfile, tags=["profile"])
 async def get_profile(
     profile_id: str,
+    uid: str | None = Depends(get_uid),
     profile_store: ProfileStore = Depends(get_profile_store),
 ) -> UserProfile:
     profile = await profile_store.get(profile_id)
     if profile is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="profile not found")
+    if profile.firebase_uid and uid and profile.firebase_uid != uid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not your profile")
     return profile
 
 
 @router.delete("/profile/{profile_id}", tags=["profile"])
 async def delete_profile(
     profile_id: str,
+    uid: str | None = Depends(get_uid),
     profile_store: ProfileStore = Depends(get_profile_store),
 ) -> dict[str, bool]:
+    existing = await profile_store.get(profile_id)
+    if existing and existing.firebase_uid and uid and existing.firebase_uid != uid:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not your profile")
     deleted = await profile_store.delete(profile_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="profile not found")
@@ -581,7 +593,10 @@ class SessionList(BaseModel):
 
 
 @router.get("/sessions", response_model=SessionList, tags=["sessions"])
-async def list_sessions(store: SessionStore = Depends(get_session_store)) -> SessionList:
+async def list_sessions(
+    _uid: str | None = Depends(get_uid),
+    store: SessionStore = Depends(get_session_store),
+) -> SessionList:
     ids = await store.list_ids()
     return SessionList(session_ids=ids, count=len(ids))
 
@@ -610,7 +625,9 @@ async def get_session(
 
 @router.delete("/sessions/{session_id}", tags=["sessions"])
 async def delete_session(
-    session_id: str, store: SessionStore = Depends(get_session_store)
+    session_id: str,
+    _uid: str | None = Depends(get_uid),
+    store: SessionStore = Depends(get_session_store),
 ) -> dict[str, bool]:
     deleted = await store.delete(session_id)
     if not deleted:
@@ -652,7 +669,9 @@ def _estimate_cost(input_tokens: int, output_tokens: int) -> float:
 
 @router.get("/trace/{session_id}", response_model=TraceResponse, tags=["trace"])
 async def get_trace(
-    session_id: str, store: SessionStore = Depends(get_session_store)
+    session_id: str,
+    _uid: str | None = Depends(get_uid),
+    store: SessionStore = Depends(get_session_store),
 ) -> TraceResponse:
     """Return the full ordered trace of a session — every user message,
     assistant text, tool call, and tool result, in order, with token usage

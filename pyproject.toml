@@ -20,6 +20,7 @@ dependencies = [
     "aiosqlite>=0.20.0",  # for SQLite-backed tests
     "greenlet>=3.0.0",  # required by SQLAlchemy async
     "PyYAML>=6.0",  # corridor catalog YAML (data/corridors/*.yaml)
+    "firebase-admin>=6.5.0",  # Phase 3 — ID-token verification (Firebase Auth)
 ]
 
 [project.optional-dependencies]

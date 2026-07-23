@@ -11,6 +11,13 @@ interface HeaderProps {
   onEditProfile?: () => void;
   viewMode?: ViewMode;
   onToggleViewMode?: () => void;
+  /** Firebase user shape — kept structural so the header stays SDK-agnostic. */
+  authUser?: {
+    isAnonymous: boolean;
+    displayName: string | null;
+    photoURL: string | null;
+  } | null;
+  onGoogleSignIn?: () => void;
 }
 
 /**
@@ -28,6 +35,8 @@ export function Header({
   onEditProfile,
   viewMode,
   onToggleViewMode,
+  authUser,
+  onGoogleSignIn,
 }: HeaderProps) {
   return (
     <header className="surface-glass sticky top-0 z-30 border-b border-border/50">
@@ -53,6 +62,40 @@ export function Header({
           {onEditProfile && (
             <ProfileButton profile={profile ?? null} onClick={onEditProfile} />
           )}
+
+          {/* Account: guest chip → Google upgrade; signed-in → avatar+name */}
+          {authUser &&
+            (authUser.isAnonymous ? (
+              onGoogleSignIn && (
+                <button
+                  type="button"
+                  onClick={onGoogleSignIn}
+                  className="hidden h-8 items-center gap-1.5 rounded-full border border-border/80 bg-card px-3 text-[12px] font-semibold text-foreground transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+                  title="Guest for now — sign in with Google to keep your trips on every device"
+                >
+                  <UserRound className="h-3.5 w-3.5" aria-hidden />
+                  Save my trips
+                </button>
+              )
+            ) : (
+              <span
+                className="hidden h-8 items-center gap-1.5 rounded-full border border-border/80 bg-card py-0.5 pl-1 pr-3 text-[12px] font-semibold text-foreground sm:inline-flex"
+                title="Signed in"
+              >
+                {authUser.photoURL ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={authUser.photoURL}
+                    alt=""
+                    className="h-6 w-6 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <UserRound className="h-3.5 w-3.5" aria-hidden />
+                )}
+                {authUser.displayName?.split(" ")[0] ?? "Signed in"}
+              </span>
+            ))}
 
           <button
             type="button"

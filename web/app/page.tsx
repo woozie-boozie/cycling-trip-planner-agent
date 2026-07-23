@@ -20,6 +20,8 @@ import {
   saveWizardDismissed,
 } from "@/lib/profile";
 import { clearSessionId, loadSessionId, saveSessionId } from "@/lib/session";
+import { ensureSignedIn, signInWithGoogle } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 import type { TraceResponse, UiMessage, UserProfile } from "@/lib/types";
 import { useViewMode } from "@/lib/view-mode";
 
@@ -38,6 +40,8 @@ export default function Home() {
   const [attachedImage, setAttachedImage] = useState<PreparedImage | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const pendingSubmitRef = useRef<string | null>(null);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   // Visual ⇄ text view-mode toggle (Phase A · v2 redesign).
@@ -59,6 +63,20 @@ export default function Home() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionId(stored);
     }
+  }, []);
+
+  // Every visitor gets a Firebase identity (anonymous by default).
+  useEffect(() => {
+    void ensureSignedIn()
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      .then((u) => setAuthUser(u))
+      .catch(() => {});
+  }, []);
+
+  const handleGoogleSignIn = useCallback(() => {
+    void signInWithGoogle()
+      .then((u) => setAuthUser(u))
+      .catch(() => {});
   }, []);
 
   // Hydrate profile_id from localStorage on mount. The wizard no longer
@@ -142,6 +160,14 @@ export default function Home() {
     const text = (textOverride ?? input).trim();
     // Allow send when there's text OR an image (both are valid turns).
     if ((!text && !attachedImage) || isPending) return;
+
+    // Onboarding-first gate: the rider sets up a profile before the
+    // first message. Their message is kept and sent right after.
+    if (!profileId) {
+      pendingSubmitRef.current = text;
+      setWizardOpen(true);
+      return;
+    }
 
     const userMessage: UiMessage = {
       id: makeId(),
@@ -404,6 +430,18 @@ export default function Home() {
     }
   }, [input, isPending, sessionId, attachedImage, refreshTrace, profileId]);
 
+  // A message that triggered the onboarding gate is sent as soon as the
+  // profile id is committed to state (calling handleSubmit synchronously in
+  // the wizard callback would still see the pre-onboarding null profileId).
+  useEffect(() => {
+    if (profileId && pendingSubmitRef.current) {
+      const held = pendingSubmitRef.current;
+      pendingSubmitRef.current = null;
+      handleSubmit(held);
+    }
+  }, [profileId, handleSubmit]);
+
+
   // Variant pick from the visual comparison card. Bottom-of-card "Plan this
   // route →" CTA fires this with the user's chosen variant; we dispatch a
   // curated chat prompt (using handleSubmit's textOverride path that the
@@ -478,6 +516,8 @@ export default function Home() {
   return (
     <div className="flex h-dvh flex-col bg-background">
       <Header
+        authUser={authUser}
+        onGoogleSignIn={handleGoogleSignIn}
         sessionId={sessionId}
         onReset={handleReset}
         profile={profile}
