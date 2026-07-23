@@ -7,6 +7,7 @@ import { LoadingIndicator } from "@/components/loading-indicator";
 import { ChatInput } from "@/components/chat-input";
 import { OnboardingWizard } from "@/components/onboarding/wizard";
 import { RouteGallery } from "@/components/route-gallery";
+import { RideIntro } from "@/components/ride-intro";
 import { ApiError, getProfile, getTrace, postChat, postChatStream } from "@/lib/api";
 import { matchCorridor } from "@/lib/corridors";
 import type { PreparedImage } from "@/lib/image";
@@ -494,13 +495,21 @@ export default function Home() {
 
       <main className="flex-1 overflow-y-auto">
         {isEmpty ? (
-          // Empty state — full-width hero + 3-up gallery, no sidebar
-          <div className="mx-auto max-w-[1200px] px-4 py-12 sm:py-16 lg:px-10">
-            <RouteGallery
-              profile={profile}
-              onPlan={(prompt) => handleSubmit(prompt)}
+          // Empty state — scroll-driven London→Paris ride, then hero + gallery
+          <>
+            <RideIntro
+              onPlanYours={() => {
+                const el = document.querySelector<HTMLTextAreaElement>("textarea");
+                el?.focus();
+              }}
             />
-          </div>
+            <div className="mx-auto max-w-[1200px] px-4 py-12 sm:py-16 lg:px-10">
+              <RouteGallery
+                profile={profile}
+                onPlan={(prompt) => handleSubmit(prompt)}
+              />
+            </div>
+          </>
         ) : (
           // Conversation — same wide container as the landing for visual
           // responses (maps, itineraries) to breathe. Individual bubbles
