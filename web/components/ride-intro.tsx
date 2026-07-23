@@ -88,7 +88,7 @@ function Beat({
 }) {
   return (
     <div className="absolute z-10" style={{ left: x, bottom, transform: `rotate(${tilt})` }}>
-      <div className="ride-beat max-w-[300px] rounded-xl border-2 border-[#0A0A09] bg-white px-5 py-4 text-[15px] font-semibold leading-snug text-[#0A0A09] shadow-[4px_4px_0_#0A0A09] md:max-w-[330px] md:text-[16px]">
+      <div className="ride-beat max-w-[86vw] rounded-2xl border-[3px] border-[#0A0A09] bg-white px-6 py-5 text-[18px] font-bold leading-[1.4] tracking-[-0.01em] text-[#0A0A09] shadow-[6px_6px_0_#0A0A09] sm:max-w-[360px] md:max-w-[420px] md:px-7 md:py-6 md:text-[21px]">
         {children}
       </div>
     </div>
