@@ -15,7 +15,6 @@ import {
   clearProfileId,
   clearWizardDismissed,
   loadProfileId,
-  loadWizardDismissed,
   saveProfileId,
   saveWizardDismissed,
 } from "@/lib/profile";
@@ -61,16 +60,14 @@ export default function Home() {
     }
   }, []);
 
-  // Hydrate profile_id from localStorage on mount. If absent AND the user
-  // hasn't explicitly dismissed the wizard, open it. Same "hydrate from
-  // external store" pattern as the session_id restore above.
+  // Hydrate profile_id from localStorage on mount. The wizard no longer
+  // auto-opens for new visitors — let them meet the landing (and the agent)
+  // first; personalisation is opt-in from the header.
   useEffect(() => {
     const stored = loadProfileId();
     if (stored) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setProfileId(stored);
-    } else if (!loadWizardDismissed()) {
-      setWizardOpen(true);
     }
   }, []);
 

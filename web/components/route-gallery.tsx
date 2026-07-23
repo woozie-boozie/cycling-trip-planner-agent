@@ -5,6 +5,7 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import { CORRIDORS, type Corridor } from "@/lib/corridors";
 import { RouteCard } from "@/components/route-card";
 import { RouteConfigForm } from "@/components/route-config-form";
+import { ObsessionBoard } from "@/components/obsession-board";
 import type { UserProfile } from "@/lib/types";
 
 interface RouteGalleryProps {
@@ -91,8 +92,10 @@ export function RouteGallery({ profile, onPlan }: RouteGalleryProps) {
     <div className="w-full">
       <Hero profile={profile} />
 
+      <ObsessionBoard />
+
       {/* Section header */}
-      <div className="mb-5 flex items-end justify-between gap-4">
+      <div className="mb-5 mt-20 flex items-end justify-between gap-4 sm:mt-24">
         <div>
           <h2 className="text-[26px] font-bold leading-none tracking-[-0.025em] text-foreground sm:text-[28px]">
             Curated routes
@@ -348,9 +351,15 @@ function Hero({ profile }: { profile: UserProfile | null }) {
             )}
           </>
         ) : (
-          <Meta label="Sources">
-            <span className="text-foreground">BRouter · ECMWF · Google Places · Anthropic</span>
-          </Meta>
+          <span className="inline-flex flex-wrap items-baseline gap-x-2 text-[13px] leading-relaxed text-muted-foreground">
+            <span className="font-semibold text-foreground">cyclepath</span>
+            <span className="font-mono text-[11px]">/ˈsʌɪkəpaθ/</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.08em]">noun</span>
+            <span>
+              — an AI that is <span className="text-primary">unhealthily obsessed</span> with
+              planning your perfect bike trip.
+            </span>
+          </span>
         )}
       </div>
 

@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cyclepath",
+  title: "Cyclepath — the AI that's a little too obsessed with your bike trip",
   description:
-    "An AI agent that helps a cyclist plan a multi-day bike trip through conversation.",
+    "Say the dream, watch it obsess: real bike routes, 30-year climate norms, vetted overnight stops, and a self-critique loop — a day-by-day plan with GPX, from one conversation.",
 };
 
 export default function RootLayout({
