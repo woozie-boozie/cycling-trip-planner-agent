@@ -151,6 +151,7 @@ export function RideIntro() {
   const dayRef = useRef<HTMLSpanElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const finaleRef = useRef<HTMLDivElement>(null);
+  const whiteoutRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
   const [reduced, setReduced] = useState(false);
 
@@ -228,6 +229,12 @@ export function RideIntro() {
           const f = Math.max(0, Math.min(1, (smooth - 0.93) / 0.05));
           finaleRef.current.style.opacity = String(f);
           finaleRef.current.classList.toggle("celebrate", f > 0.6);
+        }
+        /* dissolve to white over the last stretch so the un-pin into the
+           page below is seamless instead of a hard cut */
+        if (whiteoutRef.current) {
+          const w = Math.max(0, Math.min(1, (smooth - 0.9) / 0.1));
+          whiteoutRef.current.style.opacity = String(w * w);
         }
 
         /* beat pop-ins */
@@ -507,6 +514,17 @@ export function RideIntro() {
             ▼ Scroll to start pedalling ▼
           </span>
         </div>
+
+        {/* seamless hand-off into the page below */}
+        <div
+          ref={whiteoutRef}
+          className="pointer-events-none absolute inset-0 z-50"
+          style={{
+            opacity: 0,
+            background: "linear-gradient(rgba(255,255,255,0) 0%, rgba(255,255,255,0.9) 55%, #ffffff 100%)",
+          }}
+          aria-hidden="true"
+        />
 
         {/* finale */}
         <div
