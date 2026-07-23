@@ -139,7 +139,7 @@ function KmPost({ x, km }: { x: number; km: number }) {
 
 /* ---------- main ---------- */
 
-export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
+export function RideIntro() {
   const trackRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<HTMLDivElement>(null);
   const skyFarRef = useRef<HTMLDivElement>(null);
@@ -227,7 +227,6 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
         if (finaleRef.current) {
           const f = Math.max(0, Math.min(1, (smooth - 0.93) / 0.05));
           finaleRef.current.style.opacity = String(f);
-          finaleRef.current.style.pointerEvents = f > 0.6 ? "auto" : "none";
           finaleRef.current.classList.toggle("celebrate", f > 0.6);
         }
 
@@ -528,32 +527,6 @@ export function RideIntro({ onPlanYours }: { onPlanYours: () => void }) {
                 }}
               />
             ))}
-          </div>
-          <div className="relative mx-4 max-w-lg rounded-2xl border-[3px] border-[#0A0A09] bg-white p-8 text-center shadow-[6px_6px_0_#0A0A09]">
-            <p className="font-mono text-[12px] font-bold uppercase tracking-[0.2em] text-[#FF3D14]">
-              Day 4 · 364 km
-            </p>
-            <h2 className="mt-2 text-[40px] font-bold leading-[1.02] tracking-[-0.03em] text-[#0A0A09] sm:text-[52px]">
-              Paris. 🥐
-            </h2>
-            <p className="mt-3 text-[15px] leading-[1.6] text-[#0A0A09]/70">
-              That took you 20 seconds. The real plan takes the Cyclepath about
-              a minute — routes, weather, beds and all.
-            </p>
-            <button
-              type="button"
-              onClick={onPlanYours}
-              className="mt-6 w-full rounded-xl bg-[#FF3D14] px-6 py-4 text-[17px] font-bold text-white transition-transform hover:-translate-y-0.5 hover:shadow-xl"
-            >
-              Plan YOUR ride →
-            </button>
-            <button
-              type="button"
-              onClick={skip}
-              className="mt-3 text-[13px] font-semibold text-[#0A0A09]/60 underline decoration-2 underline-offset-2 hover:text-[#0A0A09]"
-            >
-              or browse curated routes
-            </button>
           </div>
         </div>
       </div>

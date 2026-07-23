@@ -497,12 +497,7 @@ export default function Home() {
         {isEmpty ? (
           // Empty state — scroll-driven London→Paris ride, then hero + gallery
           <>
-            <RideIntro
-              onPlanYours={() => {
-                const el = document.querySelector<HTMLTextAreaElement>("textarea");
-                el?.focus();
-              }}
-            />
+            <RideIntro />
             <div className="mx-auto max-w-[1200px] px-4 py-12 sm:py-16 lg:px-10">
               <RouteGallery
                 profile={profile}
